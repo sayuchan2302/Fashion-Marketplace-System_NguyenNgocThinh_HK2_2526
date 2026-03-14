@@ -1,40 +1,30 @@
 import './TopBar.css';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
-import { useState, useEffect } from 'react';
-
-const messages = [
-  "FREESHIP ĐƠN TỪ 200K - ĐỔI TRẢ MIỄN PHÍ 60 NGÀY",
-  "TỰ HÀO SẢN XUẤT TẠI VIỆT NAM",
-  "SALE UP TO 50% - ĐÓN HÈ RỰC RỠ"
-];
+import { Star, ChevronDown } from 'lucide-react';
 
 const TopBar = () => {
-  const [currentMessage, setCurrentMessage] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentMessage((prev) => (prev + 1) % messages.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const nextMessage = () => setCurrentMessage((prev) => (prev + 1) % messages.length);
-  const prevMessage = () => setCurrentMessage((prev) => (prev - 1 + messages.length) % messages.length);
-
   return (
     <div className="topbar">
       <div className="topbar-content container">
-        <button onClick={prevMessage} className="topbar-nav" aria-label="Previous message">
-          <ChevronLeft size={16} />
-        </button>
-        
-        <div className="topbar-message">
-          <p>{messages[currentMessage]}</p>
+        <div className="topbar-left">
+          <a href="#">VỀ COOLMATE</a>
+          <a href="#">CXP BY COOLMATE</a>
+          <a href="#">CARE&SHARE</a>
         </div>
-
-        <button onClick={nextMessage} className="topbar-nav" aria-label="Next message">
-          <ChevronRight size={16} />
-        </button>
+        
+        <div className="topbar-right">
+          <a href="#" className="coolclub-link">
+            <Star size={14} fill="currentColor" />
+            <span>Coolclub</span>
+          </a>
+          <a href="#">Cửa hàng</a>
+          <a href="#">Blog</a>
+          <a href="#">CSKH</a>
+          <button className="lang-btn">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/2/21/Flag_of_Vietnam.svg" alt="VN Flag" className="flag-icon" />
+            <span>VN</span>
+            <ChevronDown size={14} />
+          </button>
+        </div>
       </div>
     </div>
   );

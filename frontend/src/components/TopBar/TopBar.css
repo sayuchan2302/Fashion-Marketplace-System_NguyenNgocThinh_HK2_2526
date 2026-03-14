@@ -1,12 +1,15 @@
 .topbar {
-  background-color: var(--co-black);
+  background-color: #797979;
   color: var(--co-white);
   height: var(--topbar-height);
   display: flex;
   align-items: center;
   font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .topbar-content {
@@ -16,23 +19,101 @@
   width: 100%;
 }
 
-.topbar-message {
-  flex: 1;
-  text-align: center;
-  transition: opacity 0.3s ease-in-out;
-}
-
-.topbar-nav {
+.topbar-left {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: var(--co-gray-400);
 }
 
-.topbar-nav:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+.topbar-left a {
+  position: relative;
+  padding: 0 16px;
   color: var(--co-white);
+  text-decoration: none;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.topbar-left a:first-child {
+  padding-left: 0;
+}
+
+.topbar-left a:hover {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.topbar-left a:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 14px;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+}
+
+.topbar-right a, .lang-btn {
+  position: relative;
+  padding: 0 16px;
+  color: var(--co-white);
+  text-decoration: none;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.topbar-right a:last-child, .lang-btn {
+  padding-right: 0;
+}
+
+.topbar-right a:hover, .lang-btn:hover {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.topbar-right a:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 14px;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.coolclub-link {
+  gap: 6px;
+}
+
+.lang-btn {
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding-left: 16px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.flag-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 2px;
 }

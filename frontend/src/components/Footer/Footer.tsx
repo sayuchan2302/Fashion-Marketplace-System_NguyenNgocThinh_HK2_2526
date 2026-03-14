@@ -61,9 +61,13 @@ const Footer = () => {
       
       <div className="footer-bottom">
         <div className="container bottom-content">
-          <p>&copy; 2024 COOLMATE. All rights reserved. (Clone for academic purposes)</p>
+          <p className="copyright-text">&copy; 2024 COOLMATE. All rights reserved. (Clone for academic purposes)</p>
           <div className="payment-methods">
-            <span style={{ fontSize: '10px', opacity: 0.5, border: '1px solid currentColor', padding: '4px', borderRadius: '4px'}}>ĐÃ THÔNG BÁO BỘ CÔNG THƯƠNG</span>
+            <span className="payment-icon">MoMo</span>
+            <span className="payment-icon">VNPay</span>
+            <span className="payment-icon">Visa</span>
+            <span className="payment-icon">MasterCard</span>
+            <span style={{ fontSize: '10px', opacity: 0.5, border: '1px solid currentColor', padding: '4px', borderRadius: '4px', marginLeft: '12px'}}>ĐÃ THÔNG BÁO BỘ CÔNG THƯƠNG</span>
           </div>
         </div>
       </div>

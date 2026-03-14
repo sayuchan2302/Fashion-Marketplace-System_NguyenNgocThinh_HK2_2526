@@ -39,7 +39,7 @@ const Categories = () => {
         </button>
       </div>
       
-      <div className="categories-grid">
+      <div className="categories-grid" key={activeTab}>
         {currentData.map((cat) => (
           <a href="#" key={cat.id} className="category-card">
             <div className="category-img-wrapper">

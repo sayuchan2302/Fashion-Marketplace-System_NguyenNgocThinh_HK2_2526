@@ -1,14 +1,8 @@
-import './Home.css';
-import HeroSlider from '../../components/HeroSlider/HeroSlider';
-import Categories from '../../components/Categories/Categories';
-import CollectionsBanner from '../../components/CollectionsBanner/CollectionsBanner';
-import ProductSection from '../../components/ProductSection/ProductSection';
-import Testimonials from '../../components/Testimonials/Testimonials';
-import TrustBadges from '../../components/TrustBadges/TrustBadges';
-import Newsletter from '../../components/Newsletter/Newsletter';
+import './ProductGrid.css';
+import ProductCard from '../ProductCard/ProductCard';
 
-// Mock Data
-const mensFashion = [
+// Temporary mock data mapping
+const mockProducts = [
   {
     id: 101,
     name: "Áo Polo Nam Cotton Khử Mùi",
@@ -70,10 +64,7 @@ const mensFashion = [
     price: 399000,
     image: "https://images.unsplash.com/photo-1618354691438-25af0475c28f?q=80&w=672&auto=format&fit=crop",
     colors: ["#000000", "#4b5563"]
-  }
-];
-
-const womensFashion = [
+  },
   {
     id: 201,
     name: "Váy Liền Nữ Cổ Khuy Thanh Lịch",
@@ -90,40 +81,11 @@ const womensFashion = [
     colors: ["#ffffff", "#000000", "#fbcfe8"]
   },
   {
-    id: 203,
-    name: "Quần Ống Suông Nữ Hack Dáng",
-    price: 389000,
-    image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=672&auto=format&fit=crop",
-    colors: ["#374151", "#f3f4f6"]
-  },
-  {
     id: 204,
     name: "Áo Nỉ Hoodie Nữ Form Rộng",
     price: 399000,
     originalPrice: 450000,
     image: "https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=672&auto=format&fit=crop",
-  },
-  {
-    id: 205,
-    name: "Áo Khoác Blazer Nữ Tính",
-    price: 699000,
-    originalPrice: 899000,
-    image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?q=80&w=672&auto=format&fit=crop",
-    colors: ["#000000", "#fcd34d"]
-  },
-  {
-    id: 206,
-    name: "Chân Váy Chữ A Tôn Dáng",
-    price: 299000,
-    image: "https://images.unsplash.com/photo-1583496920310-91890e2b96e5?q=80&w=672&auto=format&fit=crop",
-    colors: ["#000000", "#ffffff"]
-  },
-  {
-    id: 207,
-    name: "Quần Shorts Nữ Đi Biển Xinh Xắn",
-    price: 199000,
-    originalPrice: 250000,
-    image: "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?q=80&w=672&auto=format&fit=crop",
   },
   {
     id: 208,
@@ -135,34 +97,47 @@ const womensFashion = [
   }
 ];
 
-const Home = () => {
+const ProductGrid = () => {
   return (
-    <div className="home-page">
-      <main className="main-content">
-        <HeroSlider />
-        <Categories />
-        
-        <ProductSection 
-          title="THỜI TRANG NAM NỔI BẬT" 
-          products={mensFashion} 
-          viewAllLink="/mens-fashion" 
-        />
-        
-        <CollectionsBanner />
-        
-        <ProductSection 
-          title="THỜI TRANG NỮ THỊNH HÀNH" 
-          products={womensFashion} 
-          viewAllLink="/womens-fashion" 
-        />
-        
-        <Testimonials />
-        
-        <Newsletter />
-        <TrustBadges />
-      </main>
+    <div className="product-grid-container">
+      {/* Toolbar: Sort & Views */}
+      <div className="plp-toolbar">
+        <div className="toolbar-left">
+          <span className="results-count">Hiển thị 1 - 12 của 120 sản phẩm</span>
+        </div>
+        <div className="toolbar-right">
+          <label htmlFor="sort-select" className="sort-label">Sắp xếp theo:</label>
+          <select id="sort-select" className="sort-select">
+            <option value="newest">Mới nhất</option>
+            <option value="bestseller">Bán chạy nhất</option>
+            <option value="price-asc">Giá: Thấp đến cao</option>
+            <option value="price-desc">Giá: Cao đến thấp</option>
+            <option value="discount">Giảm giá nhiều nhất</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Grid */}
+      <div className="plp-grid">
+        {mockProducts.map((product) => (
+          <ProductCard key={product.id} {...product} />
+        ))}
+      </div>
+
+      {/* Pagination */}
+      <div className="plp-pagination">
+        <button className="pagination-btn disabled">Trang trước</button>
+        <div className="pagination-numbers">
+          <button className="page-number active">1</button>
+          <button className="page-number">2</button>
+          <button className="page-number">3</button>
+          <span className="page-dots">...</span>
+          <button className="page-number">10</button>
+        </div>
+        <button className="pagination-btn">Trang sau</button>
+      </div>
     </div>
   );
 };
 
-export default Home;
+export default ProductGrid;

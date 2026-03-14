@@ -1,0 +1,253 @@
+.product-description-container {
+  margin: 60px 0;
+  border-top: 1px solid var(--co-gray-200);
+}
+
+/* Tabs Header */
+.desc-tabs-header {
+  display: flex;
+  gap: 40px;
+  border-bottom: 1px solid var(--co-gray-200);
+  margin-bottom: 30px;
+  overflow-x: auto; /* For mobile if many tabs */
+  scrollbar-width: none;
+}
+
+.desc-tabs-header::-webkit-scrollbar {
+  display: none;
+}
+
+.desc-tab-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--co-gray-500);
+  padding: 20px 0;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+.desc-tab-btn:hover {
+  color: var(--co-black);
+}
+
+.desc-tab-btn.active {
+  color: var(--co-black);
+}
+
+.desc-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: var(--co-black);
+}
+
+/* Tabs Content */
+.desc-tabs-content {
+  min-height: 200px;
+}
+
+.tab-pane {
+  display: none;
+  animation: fadeIn 0.4s ease forwards;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tab-pane h3 {
+  font-size: 20px;
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: var(--co-black);
+}
+
+.tab-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-color);
+  margin-bottom: 20px;
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 30px;
+}
+
+.feature-list li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-color);
+  margin-bottom: 12px;
+}
+
+.feature-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--co-black);
+  font-weight: bold;
+}
+
+.feature-images {
+  margin: 30px 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.feature-images img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Material Stats */
+.material-stats {
+  display: flex;
+  gap: 40px;
+  margin-top: 30px;
+  padding: 30px;
+  background-color: var(--co-gray-100);
+  border-radius: var(--radius-md);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-percentage {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--co-black);
+}
+
+.stat-label {
+  font-size: 15px;
+  color: var(--co-gray-600);
+}
+
+/* Reviews Section */
+.reviews-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  background-color: #f8f9fa;
+  border-radius: var(--radius-md);
+  margin-bottom: 30px;
+}
+
+.rating-overview {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.rating-big {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--co-black);
+}
+
+.rating-out-of {
+  font-size: 20px;
+  color: var(--co-gray-500);
+  font-weight: 600;
+}
+
+.rating-text {
+  color: var(--co-gray-600);
+  margin-top: 10px;
+}
+
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.review-item {
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--co-gray-200);
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.reviewer-name {
+  font-weight: 600;
+  color: var(--co-black);
+}
+
+.review-date {
+  color: var(--co-gray-500);
+  font-size: 13px;
+}
+
+.review-stars {
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.review-content {
+  font-size: 15px;
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+.view-more-reviews-btn {
+  display: block;
+  margin: 30px auto 0;
+  background: none;
+  border: 1px solid var(--co-black);
+  color: var(--co-black);
+  padding: 12px 24px;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.view-more-reviews-btn:hover {
+  background-color: var(--co-black);
+  color: var(--co-white);
+}
+
+/* Responsiveness */
+@media (max-width: 600px) {
+  .desc-tabs-header {
+    gap: 24px;
+  }
+  
+  .desc-tab-btn {
+    font-size: 14px;
+    padding: 16px 0;
+  }
+
+  .material-stats {
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+  }
+}
