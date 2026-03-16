@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   User,
@@ -17,6 +17,7 @@ import {
   Trash2
 } from 'lucide-react';
 import AddressModal, { type AddressData } from './AddressModal';
+import EmptyState from '../../components/EmptyState/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
 import './Profile.css';
 
@@ -152,6 +153,17 @@ const Profile = () => {
 
             {/* Order Cards */}
             <div className="order-list">
+              {/* Note: In a real app, this would check if orders array is empty */}
+              {/* For demo, we are showing mock orders. To see empty state, imagine orders = [] */}
+              {/* 
+              <EmptyState 
+                icon={<Package size={80} strokeWidth={1} />}
+                title="Bạn chưa có đơn hàng nào"
+                description="Hãy trải nghiệm các sản phẩm của Coolmate để bắt đầu hành trình mua sắm của bạn!"
+                actionText="Mua sắm ngay"
+                actionLink="/"
+              />
+              */}
               {/* Order 1 - Delivered */}
               <div className="order-card">
                 <div className="order-card-header">
@@ -278,6 +290,17 @@ const Profile = () => {
               <h2 className="profile-content-title">Ví voucher của tôi</h2>
             </div>
             <div className="voucher-list">
+              {/* Note: In a real app, this would check if vouchers array is empty */}
+              {/* For demo, we are showing mock vouchers. If empty: */}
+              {/*
+              <EmptyState 
+                icon={<Ticket size={80} strokeWidth={1} />}
+                title="Ví voucher trống"
+                description="Săn ngay những mã giảm giá hấp dẫn để mua sắm tiết kiệm hơn tại Coolmate."
+                actionText="Săn Voucher"
+                actionLink="/"
+              />
+              */}
               {/* Voucher 1 */}
               <div className="voucher-card">
                 <div className="voucher-stripe"></div>
@@ -342,9 +365,13 @@ const Profile = () => {
               <h3 className="address-book-subtitle">Sổ địa chỉ</h3>
               
               {savedAddresses.length === 0 ? (
-                <div className="address-empty-state">
-                  <p>Bạn chưa có địa chỉ nào!</p>
-                </div>
+                <EmptyState 
+                  icon={<MapPin size={80} strokeWidth={1} />}
+                  title="Sổ địa chỉ trống"
+                  description="Bạn chưa có địa chỉ nào được lưu. Thêm địa chỉ để quá trình đặt hàng nhanh chóng hơn."
+                  actionText="+ Thêm địa chỉ mới"
+                  actionLink="#" // This is a bit of a placeholder since it's a modal, but for UI demo it works.
+                />
               ) : (
                 <div className="address-list">
                   {savedAddresses.map((addr, index) => (

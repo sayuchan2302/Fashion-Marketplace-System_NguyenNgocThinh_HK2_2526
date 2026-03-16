@@ -22,6 +22,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { CartAnimationProvider } from './context/CartAnimationContext';
 import { WishlistProvider } from './contexts/WishlistContext';
 import { CartProvider } from './contexts/CartContext';
+import { FilterProvider } from './contexts/FilterContext';
 
 const MainLayout = () => {
   const location = useLocation();
@@ -43,6 +44,7 @@ function App() {
       <CartProvider>
         <CartAnimationProvider>
           <WishlistProvider>
+            <FilterProvider>
         <Router>
           <ScrollToTop />
           <div className="app-container">
@@ -67,6 +69,7 @@ function App() {
             </Routes>
           </div>
         </Router>
+            </FilterProvider>
         </WishlistProvider>
       </CartAnimationProvider>
       </CartProvider>

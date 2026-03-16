@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Heart } from 'lucide-react';
+import { Plus, Heart, Eye } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useCartAnimation } from '../../context/CartAnimationContext';
 import { useWishlist } from '../../contexts/WishlistContext';
+import QuickViewModal from '../QuickViewModal/QuickViewModal';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -26,6 +27,7 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const [addedSize, setAddedSize] = useState<string | null>(null);
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
 
   const isWished = isInWishlist(String(id));
 
@@ -74,6 +76,12 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
     }
   };
 
+  const handleQuickView = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsQuickViewOpen(true);
+  };
+
   return (
     <div className="product-card">
       <div className="product-image-container">
@@ -94,6 +102,15 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
             <span className="product-badge badge-sale">-{discount}%</span>
           )}
         </Link>
+
+        {/* Quick View Button */}
+        <button 
+          className="product-quick-view-btn"
+          onClick={handleQuickView}
+          title="Xem nhanh"
+        >
+          <Eye size={18} /> Xem nhanh
+        </button>
 
         {/* Hover Quick-Add Panel */}
         <div className="quick-add-overlay">
@@ -142,6 +159,13 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
           {originalPrice && <span className="original-price">{originalPrice.toLocaleString('vi-VN')}đ</span>}
         </div>
       </div>
+
+      {/* Quick View Modal */}
+      <QuickViewModal
+        product={{ id, name, price, originalPrice, image, colors, sizes }}
+        isOpen={isQuickViewOpen}
+        onClose={() => setIsQuickViewOpen(false)}
+      />
     </div>
   );
 };

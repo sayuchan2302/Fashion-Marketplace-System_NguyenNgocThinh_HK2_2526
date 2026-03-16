@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trash2, ChevronRight, Check, ShieldCheck, Truck } from 'lucide-react';
+import { Trash2, ChevronRight, Check, ShieldCheck, Truck, ShoppingCart } from 'lucide-react';
 import ProductSection from '../../components/ProductSection/ProductSection';
+import EmptyState from '../../components/EmptyState/EmptyState';
 import { mensFashion } from '../Home/Home';
 import { useCart } from '../../contexts/CartContext';
 import './Cart.css';
@@ -62,15 +63,13 @@ const Cart = () => {
       <div className="cart-page">
         <div className="cart-container">
           <h1 className="cart-page-title">Giỏ hàng của bạn</h1>
-          <div className="cart-empty-state">
-            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="var(--co-blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-            <p>Giỏ hàng của bạn đang trống.</p>
-            <Link to="/" className="btn-back-shopping">Tiếp tục mua sắm</Link>
-          </div>
+          <EmptyState
+            icon={<ShoppingCart size={72} strokeWidth={1} />}
+            title="Giỏ hàng trống"
+            description="Chưa có sản phẩm nào trong giỏ hàng. Hãy khám phá các sản phẩm tuyệt vời của chúng tôi!"
+            actionText="Tiếp tục mua sắm"
+            actionLink="/"
+          />
         </div>
       </div>
     );

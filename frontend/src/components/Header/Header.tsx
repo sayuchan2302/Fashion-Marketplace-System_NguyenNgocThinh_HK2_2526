@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, Heart, Menu, X, ChevronDown } from 'lucide-react';
 import AuthModal from '../AuthModal/AuthModal';
+import SearchDropdown, { HISTORY_KEY } from '../SearchDropdown/SearchDropdown';
 import { useCartAnimation } from '../../context/CartAnimationContext';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
@@ -17,6 +18,7 @@ const Header = () => {
   const [searchValue, setSearchValue] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedMobileMenu, setExpandedMobileMenu] = useState<string | null>(null);
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
 
   const toggleMobileSubMenu = (menuId: string) => {
     setExpandedMobileMenu(prev => prev === menuId ? null : menuId);
@@ -42,6 +44,20 @@ const Header = () => {
   const openAuthModal = (tab: 'login' | 'register') => {
     setAuthTab(tab);
     setIsAuthModalOpen(true);
+  };
+
+  const handleSearchSubmit = (query: string) => {
+    if (query.trim()) {
+      // Save to history
+      try {
+        const history: string[] = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+        const updated = [query.trim(), ...history.filter(h => h !== query.trim())].slice(0, 5);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+      } catch { /* ignore */ }
+      setSearchValue(query);
+      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+      setIsSearchDropdownOpen(false);
+    }
   };
 
   return (
@@ -219,9 +235,22 @@ const Header = () => {
 
         {/* Actions */}
         <div className="header-actions">
-          <form className="search-box" onSubmit={(e) => { e.preventDefault(); if (searchValue.trim()) navigate(`/search?q=${encodeURIComponent(searchValue.trim())}`); }}>
+          <form className="search-box" onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(searchValue); }}>
             <Search size={18} className="search-icon" />
-            <input type="text" placeholder="Tìm kiếm sản phẩm..." className="search-input" value={searchValue} onChange={e => setSearchValue(e.target.value)} />
+            <input
+              type="text"
+              placeholder="Tìm kiếm sản phẩm..."
+              className="search-input"
+              value={searchValue}
+              onChange={e => setSearchValue(e.target.value)}
+              onFocus={() => setIsSearchDropdownOpen(true)}
+            />
+            <SearchDropdown
+              isOpen={isSearchDropdownOpen}
+              onClose={() => setIsSearchDropdownOpen(false)}
+              inputValue={searchValue}
+              onSearch={handleSearchSubmit}
+            />
           </form>
           <div className="auth-links">
             <a href="#" className="auth-link" onClick={(e) => { e.preventDefault(); openAuthModal('login'); }}>Đăng nhập</a>

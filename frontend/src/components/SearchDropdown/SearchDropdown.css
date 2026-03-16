@@ -1,0 +1,236 @@
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+  animation: sdSlideDown 0.2s ease;
+  max-height: 450px;
+  overflow-y: auto;
+}
+
+@keyframes sdSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Section titles */
+.sd-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 16px 8px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sd-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 16px;
+}
+
+.sd-clear-all {
+  background: none;
+  border: none;
+  color: var(--co-blue);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sd-clear-all:hover {
+  text-decoration: underline;
+}
+
+/* ── Suggestions ────────────────────────────────────────── */
+.sd-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  text-decoration: none;
+  color: var(--co-black);
+  transition: background 0.15s;
+}
+
+.sd-suggestion-item:hover {
+  background-color: #f9fafb;
+}
+
+.sd-suggestion-img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.sd-suggestion-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.sd-suggestion-name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-suggestion-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--co-blue);
+}
+
+.sd-view-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  background: #f3f4f6;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--co-blue);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sd-view-all:hover {
+  background: #e5e7eb;
+}
+
+.sd-no-results {
+  padding: 24px 16px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ── History ────────────────────────────────────────────── */
+.sd-history-list {
+  padding-bottom: 8px;
+}
+
+.sd-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.sd-history-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: #555;
+  cursor: pointer;
+  flex: 1;
+  text-align: left;
+}
+
+.sd-history-text:hover {
+  color: var(--co-blue);
+}
+
+.sd-history-remove {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  transition: color 0.15s;
+}
+
+.sd-history-remove:hover {
+  color: #ef4444;
+}
+
+/* ── Popular Chips ──────────────────────────────────────── */
+.sd-popular-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.sd-popular-chip {
+  padding: 6px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sd-popular-chip:hover {
+  background-color: var(--co-blue);
+  border-color: var(--co-blue);
+  color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .search-dropdown {
+    max-height: 350px;
+    font-size: 14px;
+  }
+
+  .sd-suggestion-item {
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .sd-suggestion-img {
+    width: 40px;
+    height: 40px;
+  }
+
+  .sd-suggestion-name,
+  .sd-suggestion-price {
+    font-size: 13px;
+  }
+
+  .sd-section-title {
+    padding: 10px 12px 6px;
+    font-size: 12px;
+  }
+
+  .sd-history-item {
+    padding: 0 12px;
+  }
+
+  .sd-popular-chips {
+    padding: 0 12px 12px;
+  }
+
+  .sd-popular-chip {
+    font-size: 12px;
+    padding: 5px 12px;
+  }
+}

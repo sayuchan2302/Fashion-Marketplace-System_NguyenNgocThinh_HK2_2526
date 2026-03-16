@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './ProductGrid.css';
 import ProductCard from '../ProductCard/ProductCard';
 import ProductCardSkeleton from '../ProductCardSkeleton/ProductCardSkeleton';
+import { useFilter } from '../../contexts/FilterContext';
 
 // Temporary mock data mapping
 const mockProducts = [
@@ -101,6 +102,7 @@ const mockProducts = [
 
 const ProductGrid = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const { filters, updateSortBy } = useFilter();
 
   // Simulate network request
   useEffect(() => {
@@ -110,16 +112,96 @@ const ProductGrid = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Filter products based on selected filters
+  const filteredProducts = useMemo(() => {
+    let results = [...mockProducts];
+
+    // Filter by price
+    if (filters.priceRanges.length > 0) {
+      results = results.filter(product => {
+        return filters.priceRanges.some(range => {
+          if (range === 'under-200k') return product.price < 200000;
+          if (range === 'from-200k-500k') return product.price >= 200000 && product.price <= 500000;
+          if (range === 'over-500k') return product.price > 500000;
+          return false;
+        });
+      });
+    }
+
+    // Filter by size (check if product has this size - assuming all products support all sizes for now)
+    if (filters.sizes.length > 0) {
+      // In a real scenario, products would have their own size arrays
+      // For now, we'll just return all products since size is not in the mock data
+    }
+
+    // Filter by color
+    if (filters.colors.length > 0) {
+      results = results.filter(product => {
+        return product.colors && product.colors.length > 0 && 
+          filters.colors.some(selectedColor => {
+            // Check if any of the product's colors match selected colors
+            return product.colors.some(productColor => 
+              colorHexMatch(selectedColor, productColor)
+            );
+          });
+      });
+    }
+
+    // Sort products
+    switch (filters.sortBy) {
+      case 'bestseller':
+        // Sort by popularity (mock: keep original order)
+        break;
+      case 'price-asc':
+        results.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-desc':
+        results.sort((a, b) => b.price - a.price);
+        break;
+      case 'discount':
+        results.sort((a, b) => {
+          const discountA = a.originalPrice ? ((a.originalPrice - a.price) / a.originalPrice) * 100 : 0;
+          const discountB = b.originalPrice ? ((b.originalPrice - b.price) / b.originalPrice) * 100 : 0;
+          return discountB - discountA;
+        });
+        break;
+      case 'newest':
+      default:
+        // Keep original order
+        break;
+    }
+
+    return results;
+  }, [filters]);
+
+  // Helper to match color hex
+  const colorHexMatch = (colorName: string, productColorHex: string): boolean => {
+    const colorMap: Record<string, string> = {
+      'Đen': '#000000',
+      'Trắng': '#ffffff',
+      'Xám': '#9ca3af',
+      'Xanh Navy': '#1e3a8a',
+      'Đỏ': '#ef4444',
+      'Be': '#f5f5dc'
+    };
+    return (colorMap[colorName] || '').toLowerCase() === productColorHex.toLowerCase();
+  };
+
   return (
     <div className="product-grid-container">
       {/* Toolbar: Sort & Views */}
       <div className="plp-toolbar">
         <div className="toolbar-left">
-          <span className="results-count">Hiển thị 1 - 12 của 120 sản phẩm</span>
+          <span className="results-count">Hiển thị 1 - {filteredProducts.length} của {mockProducts.length} sản phẩm</span>
         </div>
         <div className="toolbar-right">
           <label htmlFor="sort-select" className="sort-label">Sắp xếp theo:</label>
-          <select id="sort-select" className="sort-select">
+          <select 
+            id="sort-select" 
+            className="sort-select"
+            value={filters.sortBy}
+            onChange={(e) => updateSortBy(e.target.value)}
+          >
             <option value="newest">Mới nhất</option>
             <option value="bestseller">Bán chạy nhất</option>
             <option value="price-asc">Giá: Thấp đến cao</option>
@@ -135,9 +217,15 @@ const ProductGrid = () => {
           ? Array.from({ length: 8 }).map((_, index) => (
               <ProductCardSkeleton key={index} />
             ))
-          : mockProducts.map((product) => (
+          : filteredProducts.length > 0
+          ? filteredProducts.map((product) => (
               <ProductCard key={product.id} {...product} />
-            ))}
+            ))
+          : (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#999' }}>
+                <p style={{ fontSize: '16px' }}>Không tìm thấy sản phẩm nào</p>
+              </div>
+            )}
       </div>
 
       {/* Pagination */}
