@@ -52,17 +52,22 @@ const HeroSlider = () => {
 
   return (
     <section className="hero-slider">
-      {slides.map((slide, i) => (
-        <div key={slide.title} className={`hero-slide ${i === index ? 'active' : ''}`}>
-          <img src={slide.image} alt={slide.title} className="hero-image" loading={i === index ? 'eager' : 'lazy'} />
-          <div className="hero-overlay" />
-          <div className="hero-content">
-            <h1 className="hero-title">{slide.title}</h1>
-            <p className="hero-subtitle">{slide.subtitle}</p>
-            <button className="hero-btn">{slide.cta}</button>
+      <div
+        className="hero-track"
+        style={{ transform: `translateX(-${index * 100}%)` }}
+      >
+        {slides.map((slide, i) => (
+          <div key={slide.title} className="hero-slide">
+            <img src={slide.image} alt={slide.title} className="hero-image" loading={i === index ? 'eager' : 'lazy'} />
+            <div className="hero-overlay" />
+            <div className="hero-content">
+              <h1 className="hero-title">{slide.title}</h1>
+              <p className="hero-subtitle">{slide.subtitle}</p>
+              <button className="hero-btn">{slide.cta}</button>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
       <button className="hero-nav prev" onClick={prev} aria-label="Slide trước">
         <ChevronLeft size={22} />
@@ -70,17 +75,6 @@ const HeroSlider = () => {
       <button className="hero-nav next" onClick={next} aria-label="Slide tiếp">
         <ChevronRight size={22} />
       </button>
-
-      <div className="hero-dots">
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            className={`dot ${i === index ? 'active' : ''}`}
-            onClick={() => setIndex(i)}
-            aria-label={`Chuyển tới banner ${i + 1}`}
-          />
-        ))}
-      </div>
     </section>
   );
 };
