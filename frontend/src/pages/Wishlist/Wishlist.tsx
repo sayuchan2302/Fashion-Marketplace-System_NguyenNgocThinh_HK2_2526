@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Heart, ShoppingCart, Trash2, ChevronRight, X } from 'lucide-react';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useCart } from '../../contexts/CartContext';
+import { useCartAnimation } from '../../context/CartAnimationContext';
 import './Wishlist.css';
 
 const AVAILABLE_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
@@ -19,6 +20,7 @@ interface PendingItem {
 const Wishlist = () => {
   const { items, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
+  const { triggerAnimation } = useCartAnimation();
 
   const [pendingItem, setPendingItem] = useState<PendingItem | null>(null);
   const [selectedSize, setSelectedSize] = useState('M');
@@ -33,8 +35,12 @@ const Wishlist = () => {
     setSelectedColor('Đen');
   };
 
-  const handleConfirmAddToCart = () => {
+  const handleConfirmAddToCart = (e: React.MouseEvent) => {
     if (!pendingItem) return;
+    
+    // Tìm element ảnh để lấy toạ độ ban đầu (nếu có)
+    const imgEl = document.querySelector('.wl-modal-img') as HTMLImageElement | null;
+    
     addToCart({
       id: pendingItem.id,
       name: pendingItem.name,
@@ -43,6 +49,13 @@ const Wishlist = () => {
       color: selectedColor,
       size: selectedSize,
     });
+    
+    triggerAnimation({
+      imgSrc: pendingItem.image,
+      imageRect: imgEl?.getBoundingClientRect() || null,
+      fallbackPoint: { x: e.clientX, y: e.clientY }
+    });
+    
     removeFromWishlist(pendingItem.id);
     setPendingItem(null);
   };

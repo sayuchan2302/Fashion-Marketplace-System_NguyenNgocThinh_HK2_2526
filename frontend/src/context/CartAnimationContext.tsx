@@ -1,8 +1,15 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { motion } from 'framer-motion';
 import './CartAnimation.css';
 
+type TriggerPayload = {
+  imgSrc: string;
+  imageRect?: DOMRect | null;
+  fallbackPoint?: { x: number; y: number };
+};
+
 interface CartAnimationContextType {
-  triggerAnimation: (event: React.MouseEvent, imgSrc: string) => void;
+  triggerAnimation: (payload: TriggerPayload) => void;
   cartIconRef: React.RefObject<HTMLButtonElement | null>;
 }
 
@@ -10,35 +17,75 @@ const CartAnimationContext = createContext<CartAnimationContextType | undefined>
 
 export const CartAnimationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const cartIconRef = useRef<HTMLButtonElement>(null);
-  const [animations, setAnimations] = useState<{ id: string; startX: number; startY: number; imgSrc: string }[]>([]);
+  const [animations, setAnimations] = useState<{
+    id: string;
+    imgSrc: string;
+    size: number;
+    keyframes: { x: number[]; y: number[]; scale: number[]; opacity: number[] };
+  }[]>([]);
 
-  const triggerAnimation = useCallback((event: React.MouseEvent, imgSrc: string) => {
+  const triggerAnimation = useCallback(({ imgSrc, imageRect, fallbackPoint }: TriggerPayload) => {
     if (!cartIconRef.current) return;
 
-    // Get click coordinates (start position)
-    const startX = event.clientX;
-    const startY = event.clientY;
+    const startX = imageRect ? imageRect.left + imageRect.width / 2 : fallbackPoint?.x;
+    const startY = imageRect ? imageRect.top + imageRect.height / 2 : fallbackPoint?.y;
+    if (startX == null || startY == null) return;
+
+    const endRect = cartIconRef.current.getBoundingClientRect();
+    const endX = endRect.left + endRect.width / 2;
+    const endY = endRect.top + endRect.height / 2;
+
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2 - 60; // Giảm độ nảy (curve) xuống chỉ còn 60px thay vì 140px
+
+    const size = Math.max(60, Math.min(120, imageRect?.width ?? 80));
+    const offset = size / 2;
+    
+    // Adjust x,y so the center of the image flies along the path
+    const targetStartX = startX - offset;
+    const targetStartY = startY - offset;
+    const targetMidX = midX - offset;
+    const targetMidY = midY - offset;
+    const targetEndX = endX - offset;
+    const targetEndY = endY - offset;
 
     const newAnimationId = Math.random().toString(36).substring(7);
 
-    setAnimations(prev => [...prev, { id: newAnimationId, startX, startY, imgSrc }]);
+    setAnimations(prev => [...prev, {
+      id: newAnimationId,
+      imgSrc,
+      size,
+      keyframes: {
+        x: [targetStartX, targetMidX, targetEndX],
+        y: [targetStartY, targetMidY, targetEndY],
+        scale: [1, 0.6, 0.35],
+        opacity: [1, 0.9, 0],
+      }
+    }]);
+  }, []);
 
-    // Remove the animation element after it completes
-    setTimeout(() => {
-      setAnimations(prev => prev.filter(anim => anim.id !== newAnimationId));
-    }, 1500); // Duration matches CSS transition
+  const bounceCart = useCallback(() => {
+    const el = cartIconRef.current;
+    if (!el) return;
+    el.classList.remove('cart-bounce');
+    void el.offsetWidth;
+    el.classList.add('cart-bounce');
+    setTimeout(() => el.classList.remove('cart-bounce'), 320);
   }, []);
 
   return (
     <CartAnimationContext.Provider value={{ triggerAnimation, cartIconRef }}>
       {children}
       {animations.map(anim => (
-        <FlyingImage 
-          key={anim.id} 
-          startX={anim.startX} 
-          startY={anim.startY} 
-          endElementRef={cartIconRef} 
-          imgSrc={anim.imgSrc} 
+        <FlyingImage
+          key={anim.id}
+          imgSrc={anim.imgSrc}
+          size={anim.size}
+          keyframes={anim.keyframes}
+          onDone={() => {
+            setAnimations(prev => prev.filter(a => a.id !== anim.id));
+            bounceCart();
+          }}
         />
       ))}
     </CartAnimationContext.Provider>
@@ -55,47 +102,25 @@ export const useCartAnimation = () => {
 
 // --- Flying Image Component ---
 const FlyingImage: React.FC<{
-  startX: number;
-  startY: number;
-  endElementRef: React.RefObject<HTMLButtonElement | null>;
   imgSrc: string;
-}> = ({ startX, startY, endElementRef, imgSrc }) => {
-  const [position, setPosition] = useState({ x: startX, y: startY });
-  const [isFlying, setIsFlying] = useState(false);
-
-  React.useEffect(() => {
-    // Start animation on next frame to ensure initial position is rendered
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (endElementRef.current) {
-          const endRect = endElementRef.current.getBoundingClientRect();
-          // Calculate center of the cart icon
-          const endX = endRect.left + endRect.width / 2;
-          const endY = endRect.top + endRect.height / 2;
-
-          setPosition({ x: endX, y: endY });
-          setIsFlying(true);
-        }
-      });
-    });
-  }, [endElementRef]);
-
-  // If start and end are exactly the same immediately, don't show
-  if (!isFlying && position.x === startX && position.y === startY) {
-    // We still render it initially at start position, but hide via opacity if needed
-  }
-
+  size: number;
+  keyframes: { x: number[]; y: number[]; scale: number[]; opacity: number[] };
+  onDone: () => void;
+}> = ({ imgSrc, size, keyframes, onDone }) => {
   return (
-    <img
+    <motion.img
       src={imgSrc}
-      className={`cart-flying-img ${isFlying ? 'flying' : ''}`}
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        // Initial transform to center the image on the cursor
-        transform: isFlying ? 'translate(-50%, -50%) scale(0.1)' : 'translate(-50%, -50%) scale(1)',
+      className="cart-flying-img"
+      style={{ width: size, height: size }}
+      initial={{ x: keyframes.x[0], y: keyframes.y[0], scale: 1, opacity: 1 }}
+      animate={{
+        x: keyframes.x,
+        y: keyframes.y,
+        scale: keyframes.scale,
+        opacity: keyframes.opacity,
       }}
-      alt=""
+      transition={{ duration: 1.1, ease: [0.25, 0.1, 0.25, 1] }} // Sửa ease mượt hơn, chậm hơn (1.1s)
+      onAnimationComplete={onDone}
       aria-hidden="true"
     />
   );

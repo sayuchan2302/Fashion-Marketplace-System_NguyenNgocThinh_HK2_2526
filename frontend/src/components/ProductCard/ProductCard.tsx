@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Heart, Eye } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
@@ -28,6 +28,7 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
   const [addedSize, setAddedSize] = useState<string | null>(null);
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   const isWished = isInWishlist(String(id));
 
@@ -49,7 +50,11 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
     });
 
     setAddedSize(size);
-    triggerAnimation(e, image);
+    triggerAnimation({
+      imgSrc: image,
+      imageRect: imageRef.current?.getBoundingClientRect() || null,
+      fallbackPoint: { x: e.clientX, y: e.clientY },
+    });
     
     setTimeout(() => setAddedSize(null), 1500);
   };
@@ -97,6 +102,7 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
 
         <Link to={`/product/${id}`}>
           <img
+            ref={imageRef}
             src={image}
             alt={name}
             className="product-image"

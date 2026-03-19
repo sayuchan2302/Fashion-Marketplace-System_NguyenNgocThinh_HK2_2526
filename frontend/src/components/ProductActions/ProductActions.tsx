@@ -38,8 +38,13 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
       size: selectedSize,
       quantity,
     });
-    
-    triggerAnimation(e, product.image);
+
+    const mainImg = document.querySelector('.gallery-main-image .main-image') as HTMLImageElement | null;
+    triggerAnimation({
+      imgSrc: product.image,
+      imageRect: mainImg?.getBoundingClientRect() || null,
+      fallbackPoint: { x: e.clientX, y: e.clientY },
+    });
     
     // Show success feedback
     setAdded(true);
@@ -57,7 +62,12 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
       size: selectedSize,
       quantity,
     });
-    triggerAnimation(e, product.image);
+    const mainImg = document.querySelector('.gallery-main-image .main-image') as HTMLImageElement | null;
+    triggerAnimation({
+      imgSrc: product.image,
+      imageRect: mainImg?.getBoundingClientRect() || null,
+      fallbackPoint: { x: e.clientX, y: e.clientY },
+    });
     navigate('/cart');
   };
 
