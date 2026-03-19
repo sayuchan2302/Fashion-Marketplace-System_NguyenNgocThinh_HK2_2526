@@ -13,6 +13,7 @@ const navItems = [
   { label: 'Tổng quan', to: '/admin' },
   { label: 'Đơn hàng', to: '/admin/orders' },
   { label: 'Sản phẩm', to: '/admin/products' },
+  { label: 'Danh mục', to: '/admin/categories' },
   { label: 'Khách hàng', to: '/admin/customers' },
   { label: 'Khuyến mãi', to: '/admin/promotions' },
   { label: 'Nội dung', to: '/admin/content' },
@@ -27,6 +28,7 @@ const AdminLayout = ({ title, actions, children }: AdminLayoutProps) => {
     if (path.startsWith('/admin/orders/')) return ['Đơn hàng', 'Chi tiết'];
     if (path.startsWith('/admin/orders')) return ['Đơn hàng', 'Danh sách'];
     if (path.startsWith('/admin/products')) return ['Sản phẩm', 'Danh sách'];
+    if (path.startsWith('/admin/categories')) return ['Danh mục', 'Danh sách'];
     return ['Tổng quan'];
   };
 

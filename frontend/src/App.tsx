@@ -39,6 +39,7 @@ import Admin from './pages/Admin/Admin';
 import AdminOrders from './pages/Admin/AdminOrders';
 import AdminProducts from './pages/Admin/AdminProducts';
 import AdminOrderDetail from './pages/Admin/AdminOrderDetail';
+import AdminCategories from './pages/Admin/AdminCategories';
 
 const MainLayout = () => {
   const location = useLocation();
@@ -88,6 +89,7 @@ function App() {
                         <Route path="/admin/orders" element={<AdminOrders />} />
                         <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
                         <Route path="/admin/products" element={<AdminProducts />} />
+                        <Route path="/admin/categories" element={<AdminCategories />} />
                         <Route path="/policy/:type" element={<Policy />} />
                         <Route path="/about" element={<About />} />
                         <Route path="/contact" element={<Contact />} />

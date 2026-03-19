@@ -4,6 +4,7 @@ import { Filter, Search, Plus, Pencil, Layers, Trash2, ArrowUpDown, X } from 'lu
 import AdminLayout from './AdminLayout';
 import { useMemo, useState } from 'react';
 import AdminVariantModal from './AdminVariantModal';
+import type { VariantRow } from './AdminVariantModal';
 
 const initialProducts = [
   { sku: 'POLO-001', name: 'Áo Polo Cotton Khử Mùi', category: 'Áo Polo', price: 359000, stock: 42, status: 'Đang bán', variants: '3 sizes · 4 colors', thumb: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=140&h=170&q=80', statusType: 'active' },
@@ -34,11 +35,44 @@ const AdminProducts = () => {
   const [showDrawer, setShowDrawer] = useState(false);
   const [toast, setToast] = useState<string>('');
   const [showVariants, setShowVariants] = useState(false);
+  const initialVariantRows: VariantRow[] = [
+    { id: 'S-Đen', size: 'S', color: 'Đen', sku: 'POLO-001-DEN-S', price: '350000', stock: '12' },
+    { id: 'M-Đen', size: 'M', color: 'Đen', sku: 'POLO-001-DEN-M', price: '350000', stock: '10' },
+    { id: 'L-Đen', size: 'L', color: 'Đen', sku: 'POLO-001-DEN-L', price: '350000', stock: '8' },
+    { id: 'S-Trắng', size: 'S', color: 'Trắng', sku: 'POLO-001-TRANG-S', price: '350000', stock: '6' },
+    { id: 'M-Trắng', size: 'M', color: 'Trắng', sku: 'POLO-001-TRANG-M', price: '350000', stock: '4' },
+    { id: 'L-Trắng', size: 'L', color: 'Trắng', sku: 'POLO-001-TRANG-L', price: '350000', stock: '2' },
+  ];
+  const [variantRows, setVariantRows] = useState<VariantRow[]>(initialVariantRows);
+  const [price, setPrice] = useState('359.000');
+  const [salePrice, setSalePrice] = useState('329.000');
+  const [stock, setStock] = useState('42');
+  const [slug, setSlug] = useState('ao-polo-cotton-khu-mui');
+  const [metaTitle, setMetaTitle] = useState('Áo Polo Cotton Khử Mùi - Coolmate');
 
   const filtered = useMemo(() => {
     if (activeTab === 'all') return rows;
     return rows.filter(p => p.statusType === activeTab);
   }, [activeTab, rows]);
+
+  const hasVariants = variantRows.length > 0;
+  const variantStockTotal = useMemo(() => variantRows.reduce((sum, r) => sum + (parseInt(r.stock.replace(/\D/g, ''), 10) || 0), 0), [variantRows]);
+
+  const formatCurrency = (val: string) => {
+    const digits = val.replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+
+  const handleSlugChange = (val: string) => {
+    const clean = val
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+    setSlug(clean);
+  };
 
   const toggleAll = (checked: boolean) => {
     if (checked) setSelected(new Set(filtered.map(p => p.sku)));
@@ -76,6 +110,12 @@ const AdminProducts = () => {
 
   const openVariants = () => setShowVariants(true);
   const closeVariants = () => setShowVariants(false);
+
+  const handleVariantsSaved = (matrix: VariantRow[]) => {
+    setVariantRows(matrix);
+    setToast('Lưu cấu hình biến thể thành công');
+    setTimeout(() => setToast(''), 2000);
+  };
 
   return (
     <AdminLayout
@@ -197,9 +237,10 @@ const AdminProducts = () => {
       </section>
 
       {showDrawer && (
-        <div className="modal-overlay" onClick={closeDrawer}>
-          <div className="modal large" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
+        <>
+          <div className="drawer-overlay" onClick={closeDrawer} />
+          <div className="drawer">
+            <div className="drawer-header">
               <div>
                 <p className="drawer-eyebrow">Chỉnh sửa sản phẩm</p>
                 <h3>#POLO-001</h3>
@@ -207,7 +248,7 @@ const AdminProducts = () => {
               <button className="admin-icon-btn" onClick={closeDrawer} aria-label="Đóng"><X size={16} /></button>
             </div>
 
-            <div className="modal-body">
+            <div className="drawer-body">
               <section className="drawer-section">
                 <h4>Hình ảnh</h4>
                 <div className="media-grid">
@@ -249,18 +290,36 @@ const AdminProducts = () => {
                   <h4>Giá & Khuyến mãi</h4>
                   <label className="form-field">
                     <span>Giá bán</span>
-                    <input type="number" defaultValue={359000} />
+                    <input
+                      type="text"
+                      value={price}
+                      onChange={e => setPrice(formatCurrency(e.target.value))}
+                      inputMode="numeric"
+                    />
                   </label>
                   <label className="form-field">
                     <span>Giá khuyến mãi</span>
-                    <input type="number" defaultValue={329000} />
+                    <input
+                      type="text"
+                      value={salePrice}
+                      onChange={e => setSalePrice(formatCurrency(e.target.value))}
+                      inputMode="numeric"
+                    />
                   </label>
                 </div>
                 <div>
                   <h4>Tồn kho</h4>
                   <label className="form-field">
                     <span>Số lượng</span>
-                    <input type="number" defaultValue={42} />
+                    <input
+                      type="text"
+                      value={hasVariants ? formatCurrency(variantStockTotal.toString()) : stock}
+                      onChange={e => setStock(formatCurrency(e.target.value))}
+                      inputMode="numeric"
+                      disabled={hasVariants}
+                      className={hasVariants ? 'disabled-input' : ''}
+                    />
+                    {hasVariants && <span className="admin-muted small">Tự động tính từ biến thể</span>}
                   </label>
                 </div>
               </section>
@@ -294,18 +353,38 @@ const AdminProducts = () => {
                   </label>
                 </div>
               </section>
+
+              <section className="drawer-section">
+                <h4>Tối ưu SEO</h4>
+                <div className="form-grid">
+                  <label className="form-field">
+                    <span>URL Slug</span>
+                    <input value={slug} onChange={e => handleSlugChange(e.target.value)} />
+                  </label>
+                  <label className="form-field">
+                    <span>Meta Title</span>
+                    <input value={metaTitle} onChange={e => setMetaTitle(e.target.value)} />
+                  </label>
+                </div>
+              </section>
             </div>
 
-            <div className="modal-footer">
+            <div className="drawer-footer">
               <button className="admin-ghost-btn" onClick={closeDrawer}>Hủy</button>
               <button className="admin-primary-btn" onClick={handleSaveDrawer}>Lưu thay đổi</button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {toast && <div className="toast success">{toast}</div>}
-      {showVariants && <AdminVariantModal onClose={closeVariants} onSaved={() => { setToast('Lưu cấu hình biến thể thành công'); setTimeout(() => setToast(''), 2000); }} />}
+      {showVariants && (
+        <AdminVariantModal
+          initialMatrix={variantRows}
+          onClose={closeVariants}
+          onSaved={handleVariantsSaved}
+        />
+      )}
     </AdminLayout>
   );
 };

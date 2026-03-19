@@ -2,7 +2,7 @@ import './Admin.css';
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 
-interface VariantRow {
+export interface VariantRow {
   id: string;
   size: string;
   color: string;
@@ -11,11 +11,19 @@ interface VariantRow {
   stock: string;
 }
 
-const AdminVariantModal = ({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) => {
+interface Props {
+  onClose: () => void;
+  onSaved: (rows: VariantRow[]) => void;
+  initialMatrix?: VariantRow[];
+}
+
+const AdminVariantModal = ({ onClose, onSaved, initialMatrix }: Props) => {
   const baseSku = 'POLO-001';
-  const [sizes, setSizes] = useState<string[]>(['S', 'M', 'L']);
-  const [colors, setColors] = useState<string[]>(['Đen', 'Trắng']);
-  const [matrix, setMatrix] = useState<VariantRow[]>([]);
+  const initialSizes = initialMatrix && initialMatrix.length > 0 ? Array.from(new Set(initialMatrix.map(r => r.size))) : ['S', 'M', 'L'];
+  const initialColors = initialMatrix && initialMatrix.length > 0 ? Array.from(new Set(initialMatrix.map(r => r.color))) : ['Đen', 'Trắng'];
+  const [sizes, setSizes] = useState<string[]>(initialSizes);
+  const [colors, setColors] = useState<string[]>(initialColors);
+  const [matrix, setMatrix] = useState<VariantRow[]>(initialMatrix ?? []);
   const [bulkPrice, setBulkPrice] = useState('');
   const [bulkStock, setBulkStock] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -72,7 +80,7 @@ const AdminVariantModal = ({ onClose, onSaved }: { onClose: () => void; onSaved:
     setIsSaving(true);
     setTimeout(() => {
       setIsSaving(false);
-      onSaved();
+      onSaved(matrix);
     }, 800);
   };
 
