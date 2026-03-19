@@ -134,6 +134,9 @@ const AdminOrders = () => {
     pushToast('Đã đặt lại view đơn hàng về mặc định.');
   };
 
+  const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label || 'Tất cả';
+  const hasViewContext = activeTab !== 'all' || Boolean(search.trim()) || view.page > 1;
+
   const tabCounts = {
     all: rows.length,
     urgent: rows.filter((o) => isPendingOver30Minutes(o)).length,
@@ -225,6 +228,14 @@ const AdminOrders = () => {
           </button>
         ))}
       </div>
+
+      {hasViewContext && (
+        <div className="admin-view-summary">
+          <span className="summary-chip">Trạng thái: {activeTabLabel}</span>
+          {search.trim() && <span className="summary-chip">Từ khóa: {search.trim()}</span>}
+          <button className="summary-clear" onClick={resetCurrentView}>Xóa bộ lọc</button>
+        </div>
+      )}
 
       <section className="admin-panels single">
         <div className="admin-panel">

@@ -153,6 +153,12 @@ const AdminCategories = () => {
 
   const activeFilterLabel = activeFilter === 'all' ? 'Tất cả' : activeFilter === 'visible' ? 'Đang hiện' : activeFilter === 'hidden' ? 'Ẩn' : 'Có trên menu';
   const hasViewContext = activeFilter !== 'all' || Boolean(search.trim()) || view.page > 1;
+  const tabCounts = {
+    all: categories.length,
+    visible: categories.filter((category) => category.status === 'visible').length,
+    hidden: categories.filter((category) => category.status === 'hidden').length,
+    menu: categories.filter((category) => category.showOnMenu).length,
+  } as const;
 
   const syncCategoryChanges = async (_next: Category[]) => {
     await new Promise(resolve => setTimeout(resolve, 160));
@@ -339,10 +345,22 @@ const AdminCategories = () => {
       )}
     >
       <div className="admin-tabs">
-        <button className={`admin-tab ${activeFilter === 'all' ? 'active' : ''}`} onClick={() => changeFilter('all')}>Tất cả</button>
-        <button className={`admin-tab ${activeFilter === 'visible' ? 'active' : ''}`} onClick={() => changeFilter('visible')}>Đang hiện</button>
-        <button className={`admin-tab ${activeFilter === 'hidden' ? 'active' : ''}`} onClick={() => changeFilter('hidden')}>Ẩn</button>
-        <button className={`admin-tab ${activeFilter === 'menu' ? 'active' : ''}`} onClick={() => changeFilter('menu')}>Có trên menu</button>
+        <button className={`admin-tab ${activeFilter === 'all' ? 'active' : ''}`} onClick={() => changeFilter('all')}>
+          <span>Tất cả</span>
+          <span className="admin-tab-count">{tabCounts.all}</span>
+        </button>
+        <button className={`admin-tab ${activeFilter === 'visible' ? 'active' : ''}`} onClick={() => changeFilter('visible')}>
+          <span>Đang hiện</span>
+          <span className="admin-tab-count">{tabCounts.visible}</span>
+        </button>
+        <button className={`admin-tab ${activeFilter === 'hidden' ? 'active' : ''}`} onClick={() => changeFilter('hidden')}>
+          <span>Ẩn</span>
+          <span className="admin-tab-count">{tabCounts.hidden}</span>
+        </button>
+        <button className={`admin-tab ${activeFilter === 'menu' ? 'active' : ''}`} onClick={() => changeFilter('menu')}>
+          <span>Có trên menu</span>
+          <span className="admin-tab-count">{tabCounts.menu}</span>
+        </button>
       </div>
 
       {hasViewContext && (

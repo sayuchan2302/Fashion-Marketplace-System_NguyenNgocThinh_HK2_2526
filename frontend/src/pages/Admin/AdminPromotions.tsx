@@ -2,7 +2,7 @@ import './Admin.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Plus, Ticket, Pencil, Pause, Play, X, Tag, Copy, Activity, Clock3, PauseCircle, Gauge, Link2 } from 'lucide-react';
+import { Search, Plus, Ticket, Pencil, Pause, Play, X, Tag, Copy, Link2 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
 import { useAdminListState } from './useAdminListState';
@@ -268,6 +268,13 @@ const AdminPromotions = () => {
     return { running, paused, expired, usageRate };
   }, [rows]);
 
+  const tabCounts = {
+    all: rows.length,
+    running: stats.running,
+    paused: stats.paused,
+    expired: stats.expired,
+  } as const;
+
   const formErrors = useMemo(() => validatePromotionForm(form, rows, editingId), [form, rows, editingId]);
   const hasFormError = Object.keys(formErrors).length > 0;
   const isCodeDuplicated = Boolean(formErrors.code && formErrors.code.includes('tồn tại'));
@@ -368,45 +375,23 @@ const AdminPromotions = () => {
         </>
       }
     >
-      <section className="promo-insights-grid">
-        <motion.article className="promo-insight-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
-          <div className="promo-insight-head">
-            <Activity size={16} />
-            <span>Đang chạy</span>
-          </div>
-          <p>{stats.running} chiến dịch</p>
-        </motion.article>
-
-        <motion.article className="promo-insight-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.04 }}>
-          <div className="promo-insight-head">
-            <PauseCircle size={16} />
-            <span>Tạm dừng</span>
-          </div>
-          <p>{stats.paused} chiến dịch</p>
-        </motion.article>
-
-        <motion.article className="promo-insight-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.08 }}>
-          <div className="promo-insight-head">
-            <Clock3 size={16} />
-            <span>Hết hạn</span>
-          </div>
-          <p>{stats.expired} chiến dịch</p>
-        </motion.article>
-
-        <motion.article className="promo-insight-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.12 }}>
-          <div className="promo-insight-head">
-            <Gauge size={16} />
-            <span>Tỷ lệ sử dụng</span>
-          </div>
-          <p>{stats.usageRate}%</p>
-        </motion.article>
-      </section>
-
       <div className="admin-tabs">
-        <button className={`admin-tab ${statusFilter === 'all' ? 'active' : ''}`} onClick={() => changeStatusFilter('all')}>Tất cả</button>
-        <button className={`admin-tab ${statusFilter === 'running' ? 'active' : ''}`} onClick={() => changeStatusFilter('running')}>Đang chạy</button>
-        <button className={`admin-tab ${statusFilter === 'paused' ? 'active' : ''}`} onClick={() => changeStatusFilter('paused')}>Tạm dừng</button>
-        <button className={`admin-tab ${statusFilter === 'expired' ? 'active' : ''}`} onClick={() => changeStatusFilter('expired')}>Hết hạn</button>
+        <button className={`admin-tab ${statusFilter === 'all' ? 'active' : ''}`} onClick={() => changeStatusFilter('all')}>
+          <span>Tất cả</span>
+          <span className="admin-tab-count">{tabCounts.all}</span>
+        </button>
+        <button className={`admin-tab ${statusFilter === 'running' ? 'active' : ''}`} onClick={() => changeStatusFilter('running')}>
+          <span>Đang chạy</span>
+          <span className="admin-tab-count">{tabCounts.running}</span>
+        </button>
+        <button className={`admin-tab ${statusFilter === 'paused' ? 'active' : ''}`} onClick={() => changeStatusFilter('paused')}>
+          <span>Tạm dừng</span>
+          <span className="admin-tab-count">{tabCounts.paused}</span>
+        </button>
+        <button className={`admin-tab ${statusFilter === 'expired' ? 'active' : ''}`} onClick={() => changeStatusFilter('expired')}>
+          <span>Hết hạn</span>
+          <span className="admin-tab-count">{tabCounts.expired}</span>
+        </button>
       </div>
 
       {hasViewContext && (

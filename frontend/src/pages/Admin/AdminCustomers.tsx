@@ -1,7 +1,7 @@
 import './Admin.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Eye, Pencil, Ban, X, Mail, Download, Gift, ChevronDown, Sparkles, Users, ShieldCheck, Gem, Wallet, Link2 } from 'lucide-react';
+import { Search, Eye, Pencil, Ban, X, Mail, Download, Gift, ChevronDown, Sparkles, Link2 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
 import { useAdminListState } from './useAdminListState';
@@ -327,9 +327,6 @@ const AdminCustomers = () => {
   const activeCustomer = useMemo(() => customers.find((c) => c.id === drawerCustomerId) ?? null, [customers, drawerCustomerId]);
   const tierFilterLabel = tierOptions.find((o) => o.value === tierFilter)?.label ?? 'Tất cả hạng';
   const spendingFilterLabel = spendingOptions.find((o) => o.value === spendingFilter)?.label ?? 'Tất cả chi tiêu';
-  const filteredTotalSpent = useMemo(() => filtered.reduce((sum, item) => sum + item.totalSpent, 0), [filtered]);
-  const filteredVipCount = useMemo(() => filtered.filter((item) => isVipCustomer(item)).length, [filtered]);
-  const filteredActiveCount = useMemo(() => filtered.filter((item) => item.status === 'active').length, [filtered]);
 
   useEffect(() => {
     const nextTab = validCustomerTabs.has(view.status) ? view.status : 'all';
@@ -459,6 +456,12 @@ const AdminCustomers = () => {
   const selectedIds = Array.from(selected);
   const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label || 'Tất cả';
   const hasViewContext = activeTab !== 'all' || tierFilter !== 'all' || spendingFilter !== 'all' || Boolean(search.trim()) || view.page > 1;
+  const tabCounts = {
+    all: customers.length,
+    new: customers.filter((customer) => isNewCustomer(customer.createdAt)).length,
+    vip: customers.filter((customer) => isVipCustomer(customer)).length,
+    banned: customers.filter((customer) => customer.status === 'banned').length,
+  } as const;
 
   const handleBulkSendVoucher = () => {
     if (!selectedIds.length) return;
@@ -548,7 +551,8 @@ const AdminCustomers = () => {
       <div className="admin-tabs">
         {tabs.map((tab) => (
           <button key={tab.key} className={`admin-tab ${activeTab === tab.key ? 'active' : ''}`} onClick={() => changeTab(tab.key)}>
-            {tab.label}
+            <span>{tab.label}</span>
+            <span className="admin-tab-count">{tabCounts[tab.key as keyof typeof tabCounts]}</span>
           </button>
         ))}
       </div>
@@ -562,32 +566,6 @@ const AdminCustomers = () => {
           <button className="summary-clear" onClick={resetCurrentView}>Xóa bộ lọc</button>
         </div>
       )}
-
-      <section className="customer-insights-grid">
-        <motion.article className="customer-insight-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
-          <div className="customer-insight-icon"><Users size={18} /></div>
-          <p>Khách hàng theo bộ lọc</p>
-          <h3>{filtered.length}</h3>
-        </motion.article>
-
-        <motion.article className="customer-insight-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.04 }}>
-          <div className="customer-insight-icon"><ShieldCheck size={18} /></div>
-          <p>Tài khoản đang hoạt động</p>
-          <h3>{filteredActiveCount}</h3>
-        </motion.article>
-
-        <motion.article className="customer-insight-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.08 }}>
-          <div className="customer-insight-icon"><Gem size={18} /></div>
-          <p>Khách VIP</p>
-          <h3>{filteredVipCount}</h3>
-        </motion.article>
-
-        <motion.article className="customer-insight-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.12 }}>
-          <div className="customer-insight-icon"><Wallet size={18} /></div>
-          <p>Tổng chi tiêu</p>
-          <h3>{formatCurrencyVnd(filteredTotalSpent)}</h3>
-        </motion.article>
-      </section>
 
       <section className="admin-panels single">
         <div className="admin-panel">
