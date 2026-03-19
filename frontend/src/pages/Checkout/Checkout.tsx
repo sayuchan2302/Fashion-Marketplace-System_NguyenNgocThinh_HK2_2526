@@ -453,6 +453,13 @@ const Checkout = () => {
                 <div className="payment-return-policy">
                   Nếu bạn không hài lòng với sản phẩm? Bạn hoàn toàn có thể trả lại sản phẩm. Tìm hiểu thêm <Link to="#">tại đây</Link>.
                 </div>
+                <div className="payment-help">
+                  <div>
+                    <p className="payment-help-title">Gặp sự cố khi thanh toán?</p>
+                    <p className="payment-help-desc">Kiểm tra kết quả giao dịch hoặc thử lại với phương thức khác.</p>
+                  </div>
+                  <Link to="/payment-result?status=pending" className="payment-help-link">Xem kết quả</Link>
+                </div>
               </section>
             </div>
 

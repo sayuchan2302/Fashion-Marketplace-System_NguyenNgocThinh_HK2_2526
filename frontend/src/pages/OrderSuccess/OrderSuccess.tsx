@@ -143,6 +143,10 @@ const OrderSuccess = () => {
               <Package size={16} />
               Theo dõi đơn hàng
             </Link>
+            <Link to={`/payment-result?status=success&orderCode=${orderId}`} className="os-btn os-btn-outline">
+              <Home size={16} />
+              Xem thanh toán
+            </Link>
             <Link to="/" className="os-btn os-btn-primary">
               <Home size={16} />
               Tiếp tục mua sắm

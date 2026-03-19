@@ -1,6 +1,6 @@
 import './FAQ.css';
 import { Link } from 'react-router-dom';
-import { MessageCircle, Package, ShieldCheck, Search } from 'lucide-react';
+import { MessageCircle, Package, ShieldCheck, Search, CreditCard } from 'lucide-react';
 
 const faqGroups = [
   {
@@ -69,6 +69,7 @@ const quickLinks = [
   { icon: <Search size={18} />, label: 'Theo dõi đơn', to: '/order-tracking' },
   { icon: <Package size={18} />, label: 'Đổi trả online', to: '/returns' },
   { icon: <ShieldCheck size={18} />, label: 'Chính sách', to: '/policy/shipping' },
+  { icon: <CreditCard size={18} />, label: 'Kết quả thanh toán', to: '/payment-result?status=pending' },
   { icon: <MessageCircle size={18} />, label: 'Liên hệ CSKH', to: '/contact' },
 ];
 

@@ -16,9 +16,10 @@ const PaymentResult = () => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const status = getStatusFromQuery(location.search);
-  const orderCode = params.get('orderCode') || params.get('order_id') || '—';
-  const amount = params.get('amount') || params.get('total') || '—';
-  const method = params.get('method') || 'Cổng thanh toán';
+  const orderCode = params.get('orderCode') || params.get('order_id') || '';
+  const amount = params.get('amount') || params.get('total') || '';
+  const method = params.get('method') || '';
+  const missingInfo = !orderCode || !amount;
 
   const statusMeta: Record<Status, { label: string; desc: string; icon: React.ReactNode; tone: string }> = {
     success: {
@@ -59,20 +60,26 @@ const PaymentResult = () => {
           <div className="pr-summary">
             <div className="pr-row">
               <span>Mã đơn / Order code</span>
-              <strong>{orderCode}</strong>
+              <strong>{orderCode || 'Chưa có'}</strong>
             </div>
             <div className="pr-row">
               <span>Số tiền / Amount</span>
-              <strong>{amount}</strong>
+              <strong>{amount || 'Chưa có'}</strong>
             </div>
             <div className="pr-row">
               <span>Phương thức / Method</span>
-              <strong className="pr-method"><CreditCard size={16} /> {method}</strong>
+              <strong className="pr-method"><CreditCard size={16} /> {method || 'Cổng thanh toán'}</strong>
             </div>
             <div className="pr-row">
               <span>Trạng thái</span>
               <span className={`pr-pill ${meta.tone}`}>{meta.label}</span>
             </div>
+            {missingInfo && (
+              <div className="pr-row pr-warning">
+                <span>Thiếu thông tin</span>
+                <span>Kiểm tra email/SMS hoặc trang Lịch sử đơn để lấy mã đơn và số tiền.</span>
+              </div>
+            )}
           </div>
 
           <div className="pr-actions">
@@ -92,6 +99,7 @@ const PaymentResult = () => {
                 <Link to="/" className="pr-btn ghost">Trang chủ</Link>
               </>
             )}
+            <Link to="/faq" className="pr-btn ghost">Xem FAQ thanh toán</Link>
           </div>
         </div>
 

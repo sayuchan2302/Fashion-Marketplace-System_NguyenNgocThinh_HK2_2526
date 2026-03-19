@@ -70,6 +70,16 @@
   color: var(--co-gray-600);
 }
 
+.pr-row.pr-warning {
+  align-items: flex-start;
+  flex-direction: column;
+  background: #fff7ed;
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+
 .pr-row strong {
   color: var(--co-black);
   font-size: 15px;
