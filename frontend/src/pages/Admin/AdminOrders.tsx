@@ -33,7 +33,7 @@ const AdminOrders = () => {
         </>
       }
     >
-      <section className="admin-panels">
+      <section className="admin-panels single">
         <div className="admin-panel">
           <div className="admin-panel-head">
             <h2>Danh sách đơn hàng</h2>
