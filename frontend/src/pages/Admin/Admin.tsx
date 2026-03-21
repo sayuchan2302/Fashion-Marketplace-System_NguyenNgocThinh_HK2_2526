@@ -130,151 +130,147 @@ const Admin = () => {
         ))}
       </section>
 
-      <div className="admin-grid">
-        <div className="admin-left">
-          <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.06 }}>
-            <div className="admin-panel-head">
-              <h2>Doanh thu 7 ngày</h2>
-              <span className="admin-muted">+8% vs tuần trước</span>
-            </div>
-            <div className="area-chart-wrap">
-              <svg className="area-chart" viewBox="0 0 100 50" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="revGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="rgba(30,58,138,0.35)" />
-                    <stop offset="100%" stopColor="rgba(30,58,138,0.00)" />
-                  </linearGradient>
-                </defs>
-                <path
-                  d={`M 0 50 L ${revenueData.map((v, i) => `${(i / (revenueData.length - 1)) * 100} ${50 - (v / Math.max(...revenueData)) * 44}`).join(' L ')} L 100 50 Z`}
-                  fill="url(#revGradient)"
-                />
-                <path
-                  d={`M ${revenueData.map((v, i) => `${(i / (revenueData.length - 1)) * 100} ${50 - (v / Math.max(...revenueData)) * 44}`).join(' L ')}`}
-                  fill="none"
-                  stroke="#1e3a8a"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <line x1="0" y1="50" x2="100" y2="50" stroke="#e5e7eb" strokeWidth="1" />
-                <line x1="0" y1="0" x2="0" y2="50" stroke="#e5e7eb" strokeWidth="1" />
-              </svg>
-              <div className="chart-axes">
-                <span>Ngày</span>
-                <span>VNĐ</span>
-              </div>
-              <div className="chart-x-labels">
-                {revenueLabels.map((label) => (
-                  <span key={label}>{label}</span>
-                ))}
-              </div>
-            </div>
-          </motion.section>
+      <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.06 }}>
+        <div className="admin-panel-head">
+          <h2>Doanh thu 7 ngày</h2>
+          <span className="admin-muted">+8% vs tuần trước</span>
+        </div>
+        <div className="area-chart-wrap">
+          <svg className="area-chart" viewBox="0 0 100 50" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="revGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="rgba(30,58,138,0.35)" />
+                <stop offset="100%" stopColor="rgba(30,58,138,0.00)" />
+              </linearGradient>
+            </defs>
+            <path
+              d={`M 0 50 L ${revenueData.map((v, i) => `${(i / (revenueData.length - 1)) * 100} ${50 - (v / Math.max(...revenueData)) * 44}`).join(' L ')} L 100 50 Z`}
+              fill="url(#revGradient)"
+            />
+            <path
+              d={`M ${revenueData.map((v, i) => `${(i / (revenueData.length - 1)) * 100} ${50 - (v / Math.max(...revenueData)) * 44}`).join(' L ')}`}
+              fill="none"
+              stroke="#1e3a8a"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <line x1="0" y1="50" x2="100" y2="50" stroke="#e5e7eb" strokeWidth="1" />
+            <line x1="0" y1="0" x2="0" y2="50" stroke="#e5e7eb" strokeWidth="1" />
+          </svg>
+          <div className="chart-axes">
+            <span>Ngày</span>
+            <span>VNĐ</span>
+          </div>
+          <div className="chart-x-labels">
+            {revenueLabels.map((label) => (
+              <span key={label}>{label}</span>
+            ))}
+          </div>
+        </div>
+      </motion.section>
 
-          <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.1 }}>
-            <div className="admin-panel-head">
-              <h2>Đơn hàng gần đây</h2>
-              <Link to="/admin/orders">Xem tất cả</Link>
-            </div>
-            <div className="admin-table" role="table" aria-label="Đơn hàng gần đây">
-              <div className="admin-table-row admin-table-head recent-v2" role="row">
-                <div role="columnheader">Đơn hàng</div>
-                <div role="columnheader">Ưu tiên</div>
-                <div role="columnheader">Thời gian chờ</div>
-                <div role="columnheader">Tổng tiền</div>
-                <div role="columnheader">Hành động</div>
-              </div>
-              {recentOrders.length === 0 ? (
-                <div role="row">
-                  <AdminStateBlock type="empty" title="Chưa có đơn gần đây" description="Đơn mới sẽ hiển thị tại đây để team xử lý nhanh." />
+      <div className="admin-action-bar">
+        <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.08 }}>
+          <div className="admin-panel-head">
+            <h2>Action Center</h2>
+          </div>
+          <div className="action-bar-tiles">
+            <Link to="/admin/products" className="action-bar-tile"><Plus size={20} /> Thêm sản phẩm</Link>
+            <Link to="/admin/promotions" className="action-bar-tile"><Gift size={20} /> Tạo voucher</Link>
+            <Link to="/returns" className="action-bar-tile"><RefreshCcw size={20} /> Xử lý đổi/trả</Link>
+            <Link to="/admin/orders" className="action-bar-tile"><Zap size={20} /> Xử lý nhanh</Link>
+          </div>
+        </motion.section>
+
+        <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.1 }}>
+          <div className="admin-panel-head">
+            <h2>Action Feed</h2>
+          </div>
+          <div className="action-bar-feed">
+            {actionFeed.map((item) => (
+              <Link key={item.id} to={item.to} className={`action-bar-feed-item ${item.tone}`}>
+                <span className="feed-icon">{item.icon}</span>
+                <div className="feed-content">
+                  <p>{item.text}</p>
+                  <span>{item.cta}</span>
                 </div>
-              ) : recentOrders.map((order, idx) => (
-                <motion.div
-                  className="admin-table-row recent-v2 recent-order-row"
-                  role="row"
-                  key={order.code}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.12 + idx * 0.03 }}
-                  whileHover={{ y: -1 }}
-                >
-                  <div role="cell" className="admin-customer">
-                    <img src={order.thumb} alt={order.customer} />
-                    <div>
-                      <p className="admin-bold">{order.code}</p>
-                      <span>{order.customer}</span>
-                    </div>
-                  </div>
-                  <div role="cell"><span className={`admin-pill ${priorityTone(order.priority)}`}>{order.priority === 'high' ? 'Cao' : order.priority === 'medium' ? 'Vừa' : 'Thấp'}</span></div>
-                  <div role="cell" className="wait-time-cell"><Timer size={14} /> {order.waitTime}</div>
-                  <div role="cell">{order.total}</div>
-                  <div role="cell" className="admin-actions compact">
-                    <button className={`admin-ghost-btn small ${order.priority === 'high' ? 'primary-cta' : ''}`}>Xác nhận</button>
-                    <Link to={`/admin/orders/${order.code}`} className="admin-icon-btn" aria-label={ADMIN_ACTION_TITLES.viewDetail}>
-                      <ChevronRight size={15} />
-                    </Link>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
-
-          <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.14 }}>
-            <div className="admin-panel-head">
-              <h2>Top bán chạy</h2>
-            </div>
-            <div className="top-products">
-              {topProducts.length === 0 ? (
-                <AdminStateBlock type="empty" title="Chưa có dữ liệu top bán chạy" description="Sản phẩm bán chạy sẽ xuất hiện sau khi có đủ dữ liệu bán hàng." />
-              ) : topProducts.map((p, idx) => (
-                <motion.div key={p.name} className="top-product" whileHover={{ y: -2 }}>
-                  <div className="top-rank">Top {idx + 1}</div>
-                  <img src={p.img} alt={p.name} />
-                  <div className="top-product-meta">
-                    <p className="admin-bold">{p.name}</p>
-                    <p className="admin-muted"><Flame size={13} /> {p.sales} bán</p>
-                    <div className="top-product-bar"><span className={p.stockLeft < 10 ? 'low-stock' : ''} style={{ width: `${Math.round((p.sales / topSaleBase) * 100)}%` }} /></div>
-                    <p className={`admin-muted stock-note ${p.stockLeft < 10 ? 'low' : ''}`}>Tồn kho còn {p.stockLeft}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
-        </div>
-
-        <div className="admin-right">
-          <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.08 }}>
-            <div className="admin-panel-head">
-              <h2>Action Center</h2>
-            </div>
-            <div className="action-grid">
-              <Link to="/admin/products" className="action-tile"><Plus size={18} /> Thêm sản phẩm</Link>
-              <Link to="/admin/promotions" className="action-tile"><Gift size={18} /> Tạo voucher</Link>
-              <Link to="/returns" className="action-tile"><RefreshCcw size={18} /> Đổi/Trả</Link>
-              <Link to="/admin/orders" className="action-tile"><Zap size={18} /> Xử lý nhanh</Link>
-            </div>
-          </motion.section>
-
-          <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.12 }}>
-            <div className="admin-panel-head">
-              <h2>Action Feed</h2>
-            </div>
-            <div className="action-feed-list">
-              {actionFeed.map((item) => (
-                <Link key={item.id} to={item.to} className={`action-feed-item ${item.tone}`}>
-                  <span className="feed-icon">{item.icon}</span>
-                  <div>
-                    <p>{item.text}</p>
-                    <span>{item.cta}</span>
-                  </div>
-                  <ChevronRight size={16} />
-                </Link>
-              ))}
-            </div>
-          </motion.section>
-        </div>
+                <ChevronRight size={18} />
+              </Link>
+            ))}
+          </div>
+        </motion.section>
       </div>
+
+      <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.12 }}>
+        <div className="admin-panel-head">
+          <h2>Đơn hàng gần đây</h2>
+          <Link to="/admin/orders">Xem tất cả</Link>
+        </div>
+        <div className="admin-table" role="table" aria-label="Đơn hàng gần đây">
+          <div className="admin-table-row admin-table-head recent-v2" role="row">
+            <div role="columnheader">Đơn hàng</div>
+            <div role="columnheader">Ưu tiên</div>
+            <div role="columnheader">Thời gian chờ</div>
+            <div role="columnheader">Tổng tiền</div>
+            <div role="columnheader">Hành động</div>
+          </div>
+          {recentOrders.length === 0 ? (
+            <div role="row">
+              <AdminStateBlock type="empty" title="Chưa có đơn gần đây" description="Đơn mới sẽ hiển thị tại đây để team xử lý nhanh." />
+            </div>
+          ) : recentOrders.map((order, idx) => (
+            <motion.div
+              className="admin-table-row recent-v2 recent-order-row"
+              role="row"
+              key={order.code}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: 0.12 + idx * 0.03 }}
+              whileHover={{ y: -1 }}
+            >
+              <div role="cell" className="admin-customer">
+                <img src={order.thumb} alt={order.customer} />
+                <div>
+                  <p className="admin-bold">{order.code}</p>
+                  <span>{order.customer}</span>
+                </div>
+              </div>
+              <div role="cell"><span className={`admin-pill ${priorityTone(order.priority)}`}>{order.priority === 'high' ? 'Cao' : order.priority === 'medium' ? 'Vừa' : 'Thấp'}</span></div>
+              <div role="cell" className="wait-time-cell"><Timer size={14} /> {order.waitTime}</div>
+              <div role="cell">{order.total}</div>
+              <div role="cell" className="admin-actions compact">
+                <button className={`admin-ghost-btn small ${order.priority === 'high' ? 'primary-cta' : ''}`}>Xác nhận</button>
+                <Link to={`/admin/orders/${order.code}`} className="admin-icon-btn" aria-label={ADMIN_ACTION_TITLES.viewDetail}>
+                  <ChevronRight size={15} />
+                </Link>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.section>
+
+      <motion.section className="admin-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.14 }}>
+        <div className="admin-panel-head">
+          <h2>Top bán chạy</h2>
+        </div>
+        <div className="top-products">
+          {topProducts.length === 0 ? (
+            <AdminStateBlock type="empty" title="Chưa có dữ liệu top bán chạy" description="Sản phẩm bán chạy sẽ xuất hiện sau khi có đủ dữ liệu bán hàng." />
+          ) : topProducts.map((p, idx) => (
+            <motion.div key={p.name} className="top-product" whileHover={{ y: -2 }}>
+              <div className="top-rank">Top {idx + 1}</div>
+              <img src={p.img} alt={p.name} />
+              <div className="top-product-meta">
+                <p className="admin-bold">{p.name}</p>
+                <p className="admin-muted"><Flame size={13} /> {p.sales} bán</p>
+                <div className="top-product-bar"><span className={p.stockLeft < 10 ? 'low-stock' : ''} style={{ width: `${Math.round((p.sales / topSaleBase) * 100)}%` }} /></div>
+                <p className={`admin-muted stock-note ${p.stockLeft < 10 ? 'low' : ''}`}>Tồn kho còn {p.stockLeft}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.section>
     </AdminLayout>
   );
 };
