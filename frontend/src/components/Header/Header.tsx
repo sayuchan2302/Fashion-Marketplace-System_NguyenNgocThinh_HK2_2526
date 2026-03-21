@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, Heart, Menu, X, ChevronDown } from 'lucide-react';
+import { Search, ShoppingCart, Heart, Menu, X, ChevronDown, Bell } from 'lucide-react';
 import AuthModal from '../AuthModal/AuthModal';
-import SearchDropdown, { HISTORY_KEY } from '../SearchDropdown/SearchDropdown';
+import SearchDropdown from '../SearchDropdown/SearchDropdown';
+import NotificationDropdown from '../NotificationDropdown/NotificationDropdown';
 import { useCartAnimation } from '../../context/CartAnimationContext';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { searchService } from '../../services/searchService';
+import { CLIENT_TEXT } from '../../utils/texts';
 import './Header.css';
 
 const Header = () => {
@@ -24,6 +28,8 @@ const Header = () => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   const toggleMobileSubMenu = (menuId: string) => {
     setExpandedMobileMenu(prev => prev === menuId ? null : menuId);
@@ -46,14 +52,9 @@ const Header = () => {
     prevItemsRef.current = totalItems;
   }, [totalItems]);
 
-  const handleSearchSubmit = (query: string) => {
+const handleSearchSubmit = (query: string) => {
     if (query.trim()) {
-      // Save to history
-      try {
-        const history: string[] = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-        const updated = [query.trim(), ...history.filter(h => h !== query.trim())].slice(0, 5);
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-      } catch { /* ignore */ }
+      searchService.addToHistory(query);
       setSearchValue(query);
       navigate(`/search?q=${encodeURIComponent(query.trim())}`);
       setIsSearchDropdownOpen(false);
@@ -97,7 +98,7 @@ const Header = () => {
                     <h3 className="mega-menu-title">QUẦN</h3>
                     <ul className="mega-menu-list">
                       <li><Link to="/category/men-quan-jeans">Quần jeans</Link></li>
-                      <li><Link to="/category/men-quan-tay">Quần tây</Link></li>
+                      <li><Link to="/category/men-quan-tay">Quần tay</Link></li>
                       <li><Link to="/category/men-quan-kaki">Quần kaki</Link></li>
                       <li><Link to="/category/men-quan-short">Quần short</Link></li>
                       <li><Link to="/category/men-quan-jogger">Quần jogger</Link></li>
@@ -160,7 +161,7 @@ const Header = () => {
                     <ul className="mega-menu-list">
                       <li><Link to="/category/women-quan-jeans">Quần jeans</Link></li>
                       <li><Link to="/category/women-quan-short">Quần short</Link></li>
-                      <li><Link to="/category/women-quan-tay">Quần tây</Link></li>
+                      <li><Link to="/category/women-quan-tay">Quần tay</Link></li>
                       <li><Link to="/category/women-quan-legging">Quần legging</Link></li>
                     </ul>
                   </div>
@@ -227,7 +228,10 @@ const Header = () => {
             </li>
             <li>
               <Link to="/category/sale" className="nav-link nav-sale">
-                <span className="sale-badge">-50%</span> SALE
+                <div className="sale-content">
+                  <span className="sale-percent">-50%</span>
+                  <span className="sale-label">SALE</span>
+                </div>
               </Link>
             </li>
           </ul>
@@ -239,11 +243,12 @@ const Header = () => {
             <Search size={18} className="search-icon" />
             <input
               type="text"
-              placeholder="Tìm kiếm sản phẩm..."
+              placeholder={CLIENT_TEXT.search.dropdown.placeholder}
               className="search-input"
               value={searchValue}
               onChange={e => setSearchValue(e.target.value)}
               onFocus={() => setIsSearchDropdownOpen(true)}
+              aria-label={CLIENT_TEXT.common.actions.search}
             />
             <SearchDropdown
               isOpen={isSearchDropdownOpen}
@@ -260,21 +265,43 @@ const Header = () => {
                 <a href="#" className="auth-link" onClick={(e) => { e.preventDefault(); setAuthTab('register'); setIsAuthModalOpen(true); }}>Đăng ký</a>
               </div>
             ) : (
-              <div className="account-menu" onMouseLeave={() => setIsAccountMenuOpen(false)}>
+              <div 
+                className="account-menu"
+                onMouseEnter={() => setIsAccountMenuOpen(true)}
+                onMouseLeave={() => setIsAccountMenuOpen(false)}
+              >
                 <button
                   className="account-toggle"
-                  onClick={(e) => { e.preventDefault(); setIsAccountMenuOpen(v => !v); }}
+                  onClick={() => navigate('/profile')}
                 >
-                  {user?.name || 'Tài khoản'} <ChevronDown size={14} />
-                </button>
-                {isAccountMenuOpen && (
-                  <div className="account-dropdown">
-                    <button className="account-item" onClick={() => { navigate('/account/orders'); setIsAccountMenuOpen(false); }}>Đơn hàng</button>
-                    <button className="account-item" onClick={() => { navigate('/account/addresses'); setIsAccountMenuOpen(false); }}>Sổ địa chỉ</button>
-                    <button className="account-item" onClick={() => { navigate('/account/security'); setIsAccountMenuOpen(false); }}>Bảo mật</button>
-                    <button className="account-item" onClick={() => { logout(); addToast('Đã đăng xuất', 'info'); setIsAccountMenuOpen(false); navigate('/'); }}>Đăng xuất</button>
+                  <div className="account-avatar">
+                    {user?.avatar || user?.name?.charAt(0).toUpperCase() || 'U'}
                   </div>
-                )}
+                  <span className="account-name">{user?.name || 'Tài khoản'}</span>
+                </button>
+                <div className={`account-dropdown ${isAccountMenuOpen ? 'show' : ''}`}>
+                  <button className="account-item" onClick={() => { navigate('/profile'); setIsAccountMenuOpen(false); }}>
+                    Tài khoản của tôi
+                  </button>
+                  <button className="account-item" onClick={() => { navigate('/profile?tab=orders'); setIsAccountMenuOpen(false); }}>
+                    Đơn hàng
+                  </button>
+                  <button className="account-item" onClick={() => { navigate('/profile?tab=vouchers'); setIsAccountMenuOpen(false); }}>
+                    Ví Voucher
+                  </button>
+                  <button className="account-item" onClick={() => { navigate('/profile?tab=addresses'); setIsAccountMenuOpen(false); }}>
+                    Sổ địa chỉ
+                  </button>
+                  {user?.role === 'admin' && (
+                    <button className="account-item admin-link" onClick={() => { navigate('/admin'); setIsAccountMenuOpen(false); }}>
+                      Quản lý Admin
+                    </button>
+                  )}
+                  <div className="account-dropdown-divider"></div>
+                  <button className="account-item logout" onClick={() => { logout(); addToast('Đã đăng xuất', 'info'); setIsAccountMenuOpen(false); navigate('/'); }}>
+                    Đăng xuất
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -282,7 +309,21 @@ const Header = () => {
             <Heart size={22} />
             {wishlistCount > 0 && <span className="cart-badge">{wishlistCount}</span>}
           </button>
-          <button 
+          {isAuthenticated && (
+            <button 
+              className="icon-btn notification-btn" 
+              aria-label="Thông báo"
+              onClick={() => setIsNotificationOpen(true)}
+            >
+              <Bell size={22} />
+              {unreadCount > 0 && <span className="notif-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+            </button>
+          )}
+          <NotificationDropdown 
+            isOpen={isNotificationOpen} 
+            onClose={() => setIsNotificationOpen(false)} 
+          />
+          <button
             ref={cartIconRef}
             className={`icon-btn cart-btn ${isBouncing ? 'icon-bounce' : ''}`} 
             aria-label="Giỏ hàng" 
@@ -370,7 +411,19 @@ const Header = () => {
             </>
           ) : (
             <>
-              <Link to="/account/orders" className="mobile-auth-btn" onClick={closeMobileMenu}>Đơn hàng</Link>
+              <div className="mobile-user-info">
+                <div className="mobile-user-avatar">
+                  {user?.avatar || user?.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="mobile-user-details">
+                  <span className="mobile-user-name">{user?.name}</span>
+                  <span className="mobile-user-email">{user?.email}</span>
+                </div>
+              </div>
+              <Link to="/profile" className="mobile-auth-btn" onClick={closeMobileMenu}>Tài khoản</Link>
+              {user?.role === 'admin' && (
+                <Link to="/admin" className="mobile-auth-btn mobile-auth-admin" onClick={closeMobileMenu}>Quản lý Admin</Link>
+              )}
               <button className="mobile-auth-btn mobile-auth-register" onClick={() => { logout(); addToast('Đã đăng xuất', 'info'); closeMobileMenu(); }}>Đăng xuất</button>
             </>
           )}

@@ -105,4 +105,22 @@ export const orderService = {
     save(data);
   },
 
+  cancel(id: string, reason: string): boolean {
+    const data = load();
+    const order = data.find(o => o.id === id);
+    if (!order) return false;
+    if (order.status !== 'pending' && order.status !== 'processing') {
+      return false;
+    }
+    order.status = 'cancelled';
+    order.cancelReason = reason;
+    order.cancelledAt = new Date().toISOString();
+    save(data);
+    return true;
+  },
+
+  canCancel(order: Order): boolean {
+    return order.status === 'pending' || order.status === 'processing';
+  },
+
 };

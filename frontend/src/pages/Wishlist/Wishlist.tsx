@@ -77,7 +77,7 @@ const Wishlist = () => {
           <div className="wishlist-empty">
             <Heart size={80} strokeWidth={1} />
             <h2>Danh sách yêu thích trống</h2>
-            <p>Hãy thêm những sản phẩm bạn yêu thích bằng cách nhấn vào biểu tượng ❤️ trên sản phẩm.</p>
+            <p>Hãy thêm những sản phẩm bạn yêu thích bằng cách nhấn vào biểu tượng <Heart size={16} fill="var(--co-blue)" color="var(--co-blue)" style={{ verticalAlign: 'middle' }} /> trên sản phẩm.</p>
             <Link to="/" className="wishlist-shop-btn">Khám phá sản phẩm</Link>
           </div>
         ) : (

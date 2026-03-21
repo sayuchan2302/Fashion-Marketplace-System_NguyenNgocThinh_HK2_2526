@@ -1,142 +1,227 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { SlidersHorizontal, ChevronRight, Clock, Trash2, X } from 'lucide-react';
+import { SlidersHorizontal, ChevronRight, Clock, Trash2, X, Search as SearchIcon } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import FilterSidebar from '../../components/FilterSidebar/FilterSidebar';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
-import { HISTORY_KEY } from '../../components/SearchDropdown/SearchDropdown';
+import EmptySearchState from '../../components/EmptySearchState/EmptySearchState';
+import { searchService } from '../../services/searchService';
+import { useFilter } from '../../contexts/FilterContext';
+import { CLIENT_TEXT } from '../../utils/texts';
 import './Search.css';
 
-
-
-const POPULAR_KEYWORDS = ['Áo thun', 'Polo', 'Quần jeans', 'Hoodie', 'Sale', 'Quần short'];
+const t = CLIENT_TEXT.search;
 
 const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const [history, setHistory] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-    } catch { return []; }
-  });
+  const { filters } = useFilter();
+
+  const history = searchService.getRecentSearches();
+
+  const searchResults = useMemo(() => {
+    if (!query) return [];
+    return searchService.search(query, 100);
+  }, [query]);
+
+  const filteredResults = useMemo(() => {
+    if (!query) return [];
+    let results = [...searchResults];
+
+    if (filters.priceRanges.length > 0) {
+      results = results.filter(product => {
+        return filters.priceRanges.some(range => {
+          if (range === 'under-200k') return product.price < 200000;
+          if (range === 'from-200k-500k') return product.price >= 200000 && product.price <= 500000;
+          if (range === 'over-500k') return product.price > 500000;
+          return false;
+        });
+      });
+    }
+
+    if (filters.colors.length > 0) {
+      const colorMap: Record<string, string> = {
+        'Đen': '#000000',
+        'Trắng': '#ffffff',
+        'Xám': '#9ca3af',
+        'Xanh Navy': '#1e3a8a',
+        'Đỏ': '#ef4444',
+        'Be': '#f5f5dc'
+      };
+      results = results.filter(product => {
+        return product.colors && product.colors.some(colorHex =>
+          filters.colors.some(selectedColor =>
+            (colorMap[selectedColor] || '').toLowerCase() === colorHex.toLowerCase()
+          )
+        );
+      });
+    }
+
+    return results;
+  }, [query, searchResults, filters]);
 
   const clearHistory = () => {
-    setHistory([]);
-    localStorage.removeItem(HISTORY_KEY);
+    searchService.clearHistory();
+    window.location.reload();
   };
 
-  const removeHistoryItem = (e: React.MouseEvent, item: string) => {
-    e.stopPropagation();
-    const updated = history.filter(h => h !== item);
-    setHistory(updated);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  const removeHistoryItem = (keyword: string) => {
+    searchService.removeFromHistory(keyword);
+    window.location.reload();
   };
 
-
+  const handleKeywordClick = (keyword: string) => {
+    searchService.addToHistory(keyword);
+    setSearchParams({ q: keyword });
+  };
 
   return (
     <div className="search-page">
-      {/* Breadcrumb - always visible or only for results? Let's show it always for consistency */}
       <div className="breadcrumb-wrapper">
         <div className="container">
           <nav className="breadcrumbs">
-            <Link to="/" className="breadcrumb-link">Trang chủ</Link>
+            <Link to="/" className="breadcrumb-link">{CLIENT_TEXT.common.breadcrumb.home}</Link>
             <ChevronRight size={14} className="breadcrumb-separator" />
-            <span className="breadcrumb-current">Tìm kiếm</span>
+            <span className="breadcrumb-current">{CLIENT_TEXT.common.actions.search}</span>
           </nav>
         </div>
       </div>
 
       <div className="search-page-container container">
-        {/* Popular & History (Landing State) */}
-        {!query && (
-          <div className="search-landing">
-            {history.length > 0 && (
-              <div className="search-history-section">
-                <div className="search-section-header">
-                  <h3 className="search-section-title">
-                    <Clock size={16} /> Tìm kiếm gần đây
-                  </h3>
-                  <button className="search-clear-btn" onClick={clearHistory}>Xoá tất cả</button>
+        <AnimatePresence mode="wait">
+          {!query ? (
+            <motion.div
+              key="landing"
+              className="search-landing"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              {history.length > 0 && (
+                <div className="search-history-section">
+                  <div className="search-section-header">
+                    <h3 className="search-section-title">
+                      <Clock size={16} /> {t.dropdown.recentSearches}
+                    </h3>
+                    <button className="search-clear-btn" onClick={clearHistory}>
+                      {t.dropdown.clearAll}
+                    </button>
+                  </div>
+                  <div className="search-history-list">
+                    {history.slice(0, 5).map(item => (
+                      <motion.div
+                        key={item}
+                        className="search-history-item"
+                        onClick={() => handleKeywordClick(item)}
+                        whileHover={{ x: 4 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <span className="search-history-text">{item}</span>
+                        <button
+                          className="search-history-del"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeHistoryItem(item);
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
-                <div className="search-history-list">
-                  {history.map(item => (
-                    <div key={item} className="search-history-item" onClick={() => setSearchParams({ q: item })}>
-                      <span className="search-history-text">{item}</span>
-                      <button className="search-history-del" onClick={(e) => removeHistoryItem(e, item)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+              )}
+
+              <div className="search-popular">
+                <h3 className="search-section-title">
+                  <SearchIcon size={16} /> {t.dropdown.popularKeywords}
+                </h3>
+                <div className="search-keywords">
+                  {searchService.getPopularKeywords().map((kw, i) => (
+                    <motion.button
+                      key={kw}
+                      className="search-keyword-chip"
+                      onClick={() => handleKeywordClick(kw)}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.05, duration: 0.2 }}
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {kw}
+                    </motion.button>
                   ))}
                 </div>
               </div>
-            )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="results"
+              className="search-results-section"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              {filteredResults.length === 0 && searchResults.length === 0 ? (
+                <EmptySearchState query={query} />
+              ) : (
+                <>
+                  <div className="plp-header">
+                    <h1 className="plp-title">
+                      {t.page.resultsFor(query)}
+                    </h1>
+                    <span className="plp-count">
+                      ({t.page.productCount(filteredResults.length || searchResults.length)})
+                    </span>
+                  </div>
 
-            <div className="search-popular">
-              <h3 className="search-section-title">
-                <SlidersHorizontal size={16} /> Từ khoá phổ biến
-              </h3>
-              <div className="search-keywords">
-                {POPULAR_KEYWORDS.map(kw => (
-                  <button key={kw} className="search-keyword-chip" onClick={() => setSearchParams({ q: kw })}>
-                    {kw}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+                  <div className="plp-layout">
+                    <motion.button
+                      className="mobile-filter-btn"
+                      onClick={() => setIsMobileFilterOpen(true)}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <SlidersHorizontal size={18} />
+                      {CLIENT_TEXT.filter.title}
+                    </motion.button>
 
-        {/* PLP Results Layout (Active Search State) */}
-        {query && (
-          <div className="search-results-section">
-            <div className="plp-header">
-              <h1 className="plp-title">Kết quả cho: "{query}"</h1>
-              <span className="plp-count">(120 kết quả)</span>
-            </div>
+                    <aside className={`plp-sidebar ${isMobileFilterOpen ? 'is-open' : ''}`}>
+                      <div className="mobile-filter-header">
+                        <h3>{CLIENT_TEXT.filter.title}</h3>
+                        <button
+                          className="close-filter-btn"
+                          onClick={() => setIsMobileFilterOpen(false)}
+                        >
+                          <X size={24} />
+                        </button>
+                      </div>
+                      <div className="sidebar-content">
+                        <FilterSidebar />
+                      </div>
+                    </aside>
 
-            <div className="plp-layout">
-              {/* Mobile Filter Toggle */}
-              <button 
-                className="mobile-filter-btn"
-                onClick={() => setIsMobileFilterOpen(true)}
-              >
-                <SlidersHorizontal size={18} />
-                Bộ lọc
-              </button>
+                    {isMobileFilterOpen && (
+                      <motion.div
+                        className="filter-overlay"
+                        onClick={() => setIsMobileFilterOpen(false)}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      />
+                    )}
 
-              {/* Sidebar */}
-              <aside className={`plp-sidebar ${isMobileFilterOpen ? 'is-open' : ''}`}>
-                <div className="mobile-filter-header">
-                  <h3>Bộ lọc</h3>
-                  <button 
-                    className="close-filter-btn"
-                    onClick={() => setIsMobileFilterOpen(false)}
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-                <div className="sidebar-content">
-                  <FilterSidebar />
-                </div>
-              </aside>
-
-              {/* Overlay */}
-              {isMobileFilterOpen && (
-                <div 
-                  className="filter-overlay"
-                  onClick={() => setIsMobileFilterOpen(false)}
-                ></div>
+                    <main className="plp-main">
+                      <ProductGrid customResults={filteredResults.length > 0 ? filteredResults : searchResults} />
+                    </main>
+                  </div>
+                </>
               )}
-
-              {/* Main Grid */}
-              <main className="plp-main">
-                {/* Note: In a real app, query would be passed to ProductGrid to filter products */}
-                <ProductGrid />
-              </main>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -3,10 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, ChevronRight, Check, ShieldCheck, Truck, ShoppingCart } from 'lucide-react';
 import ProductSection from '../../components/ProductSection/ProductSection';
 import EmptyState from '../../components/EmptyState/EmptyState';
-import { mensFashion } from '../Home/Home';
+import { mensFashion } from '../../mocks/products';
 import { useCart } from '../../contexts/CartContext';
 import { formatPrice } from '../../utils/formatters';
+import { CLIENT_TEXT } from '../../utils/texts';
 import './Cart.css';
+
+const t = CLIENT_TEXT.cart;
+const tCommon = CLIENT_TEXT.common;
 
 const FREE_SHIPPING_THRESHOLD = 500000;
 
@@ -59,12 +63,12 @@ const Cart = () => {
     return (
       <div className="cart-page">
         <div className="cart-container">
-          <h1 className="cart-page-title">Giỏ hàng của bạn</h1>
+          <h1 className="cart-page-title">{t.title}</h1>
           <EmptyState
             icon={<ShoppingCart size={72} strokeWidth={1} />}
-            title="Giỏ hàng trống"
-            description="Chưa có sản phẩm nào trong giỏ hàng. Hãy khám phá các sản phẩm tuyệt vời của chúng tôi!"
-            actionText="Tiếp tục mua sắm"
+            title={t.empty.title}
+            description={t.empty.description}
+            actionText={t.empty.action}
             actionLink="/"
           />
         </div>
@@ -77,12 +81,12 @@ const Cart = () => {
       <div className="cart-container">
         {/* Breadcrumb */}
         <nav className="cart-breadcrumb">
-          <Link to="/" className="breadcrumb-link">Trang chủ</Link>
+          <Link to="/" className="breadcrumb-link">{tCommon.breadcrumb.home}</Link>
           <ChevronRight size={14} />
-          <span className="breadcrumb-active">Giỏ hàng ({items.length})</span>
+          <span className="breadcrumb-active">{tCommon.breadcrumb.cart} ({items.length})</span>
         </nav>
 
-        <h1 className="cart-page-title">Giỏ hàng của bạn</h1>
+        <h1 className="cart-page-title">{t.title}</h1>
 
         <div className="cart-layout">
           {/* ========== LEFT: Items ========== */}
@@ -92,9 +96,9 @@ const Cart = () => {
             <div className="cart-freeship-banner">
               <div className="freeship-text">
                 {remainingForFreeship > 0 ? (
-                  <span>Mua thêm <span className="highlight-red">{formatPrice(remainingForFreeship)}</span> để được <strong>Miễn phí vận chuyển</strong></span>
+                  <span>{t.freeship.remaining(formatPrice(remainingForFreeship))}</span>
                 ) : (
-                  <span className="freeship-done"><Check size={16} /> Đơn hàng đã đủ điều kiện <strong>Miễn phí giao hàng</strong></span>
+                  <span className="freeship-done"><Check size={16} /> {t.freeship.achieved}</span>
                 )}
               </div>
               <div className="progress-track">
@@ -109,7 +113,7 @@ const Cart = () => {
                   checked={validSelectedItems.length === items.length && items.length > 0}
                   onChange={toggleSelectAll} />
                 <span className="checkbox-icon"></span>
-                <span>Chọn tất cả ({items.length} sản phẩm)</span>
+                <span>{t.selectAll} ({t.productCount(items.length)})</span>
               </label>
             </div>
 
@@ -131,7 +135,7 @@ const Cart = () => {
                   <div className="item-details">
                     <div className="item-top-row">
                       <Link to={`/product/${item.id}`} className="item-name">{item.name}</Link>
-                      <button className="btn-remove" onClick={() => handleRemoveItem(item.cartId)} aria-label="Xóa">
+                      <button className="btn-remove" onClick={() => handleRemoveItem(item.cartId)} aria-label={tCommon.actions.delete}>
                         <Trash2 size={18} />
                       </button>
                     </div>
@@ -158,35 +162,35 @@ const Cart = () => {
           {/* ========== RIGHT: Summary ========== */}
           <div className="cart-right-col">
             <div className="cart-summary-card">
-              <h2 className="summary-title">Tóm tắt đơn hàng</h2>
+              <h2 className="summary-title">{tCommon.actions.viewDetails}</h2>
 
               <div className="coupon-row">
-                <input type="text" placeholder="Nhập mã giảm giá" value={couponCode}
+                <input type="text" placeholder={t.coupon.placeholder} value={couponCode}
                   onChange={e => setCouponCode(e.target.value)} className="coupon-input" />
-                <button className="btn-apply" disabled={!couponCode.trim()}>Áp dụng</button>
+                <button className="btn-apply" disabled={!couponCode.trim()}>{t.coupon.apply}</button>
               </div>
 
               <div className="summary-lines">
                 <div className="sum-row">
-                  <span>Tạm tính</span>
+                  <span>{t.subtotal}</span>
                   <span>{formatPrice(subtotal)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="sum-row discount">
-                    <span>Giảm giá</span>
+                    <span>{t.discount}</span>
                     <span>-{formatPrice(discount)}</span>
                   </div>
                 )}
                 <div className="sum-row">
-                  <span>Phí giao hàng</span>
-                  <span>{shippingFee === 0 ? 'Miễn phí' : formatPrice(shippingFee)}</span>
+                  <span>{t.shipping}</span>
+                  <span>{shippingFee === 0 ? t.freeShipping : formatPrice(shippingFee)}</span>
                 </div>
                 <div className="sum-divider"></div>
                 <div className="sum-row sum-total">
-                  <strong>Tổng cộng</strong>
+                  <strong>{t.total}</strong>
                   <div className="total-block">
                     <strong className="total-big">{formatPrice(total)}</strong>
-                    <span className="vat-note">(Đã bao gồm VAT nếu có)</span>
+                    <span className="vat-note">{t.vatNote}</span>
                   </div>
                 </div>
               </div>
@@ -194,27 +198,27 @@ const Cart = () => {
               <button className="btn-checkout"
                 disabled={validSelectedItems.length === 0}
                 onClick={() => navigate('/checkout')}>
-                TIẾN HÀNH THANH TOÁN
+                {t.proceedCheckout}
               </button>
 
               {/* Trust Badges */}
               <div className="trust-badges">
                 <div className="badge-box">
                   <ShieldCheck size={22} />
-                  <span>Bảo mật thanh toán</span>
+                  <span>{t.trustBadges.secure}</span>
                 </div>
                 <div className="badge-box">
                   <Truck size={22} />
-                  <span>Đổi trả miễn phí 60 ngày</span>
+                  <span>{t.trustBadges.returns}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Cross-sell */}
+{/* Cross-sell */}
         <div className="cart-cross-sell">
-          <ProductSection title="SẢN PHẨM BẠN CÓ THỂ THÍCH" products={mensFashion} />
+          <ProductSection title={t.crossSell} products={mensFashion} />
         </div>
       </div>
     </div>

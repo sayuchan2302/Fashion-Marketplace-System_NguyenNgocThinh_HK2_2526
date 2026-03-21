@@ -1,21 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Clock, X, TrendingUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { searchService } from '../../services/searchService';
+import { formatPrice } from '../../utils/formatters';
+import { CLIENT_TEXT } from '../../utils/texts';
+import type { Product } from '../../types';
 import './SearchDropdown.css';
 
-// Mock products for search suggestions
-const SEARCH_PRODUCTS = [
-  { id: '101', name: 'Áo Polo Nam Cotton Khử Mùi', price: 359000, image: 'https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/February2025/11025595_24_copy_11.jpg' },
-  { id: '102', name: 'Quần Jeans Nam Dáng Straight', price: 599000, image: 'https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/February2025/11025595_31_copy_91.jpg' },
-  { id: '103', name: 'Áo Sơ Mi Nam Vải Modal', price: 459000, image: 'https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/February2025/11025595_21.jpg' },
-  { id: '104', name: 'Áo Thun Nam Excool Co Giãn', price: 129000, image: 'https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/February2025/11025595_17_copy.jpg' },
-  { id: '105', name: 'Quần Shorts Nam Thể Thao', price: 249000, image: 'https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/November2024/24CMCW.AT012.2_72.jpg' },
-  { id: '106', name: 'Áo Khoác Gió Nam Chống Nước', price: 499000, image: 'https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/November2024/24CMCW.QT003.1_65.jpg' },
-  { id: '107', name: 'Áo Hoodie Basic Nam', price: 399000, image: 'https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/November2024/24CMCW.AT012.2_72.jpg' },
-];
-
-const POPULAR_KEYWORDS = ['Áo thun', 'Polo', 'Quần jeans', 'Hoodie', 'Sale', 'Quần short'];
-const HISTORY_KEY = 'search_history_v1';
+const t = CLIENT_TEXT.search.dropdown;
+const DEBOUNCE_MS = 300;
 
 interface SearchDropdownProps {
   isOpen: boolean;
@@ -25,117 +19,230 @@ interface SearchDropdownProps {
 }
 
 const SearchDropdown = ({ isOpen, onClose, inputValue, onSearch }: SearchDropdownProps) => {
-  const [history, setHistory] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-    } catch { return []; }
-  });
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
   const dropRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Close on outside click
+  useEffect(() => {
+    setHistory(searchService.getRecentSearches());
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (!inputValue.trim() || inputValue.length < 2) {
+      setSuggestions([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    debounceRef.current = setTimeout(() => {
+      const results = searchService.search(inputValue, 5);
+      setSuggestions(results);
+      setIsSearching(false);
+    }, DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [inputValue]);
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
-    if (isOpen) document.addEventListener('mousedown', handleClick);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClick);
+    }
     return () => document.removeEventListener('mousedown', handleClick);
   }, [isOpen, onClose]);
 
-  const suggestions = inputValue.trim()
-    ? SEARCH_PRODUCTS.filter(p =>
-        p.name.toLowerCase().includes(inputValue.toLowerCase())
-      ).slice(0, 5)
-    : [];
-
-  const clearHistory = () => {
+  const clearHistory = useCallback(() => {
+    searchService.clearHistory();
     setHistory([]);
-    localStorage.removeItem(HISTORY_KEY);
-  };
+  }, []);
 
-  const removeHistoryItem = (item: string) => {
-    const updated = history.filter(h => h !== item);
-    setHistory(updated);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-  };
+  const removeHistoryItem = useCallback((keyword: string) => {
+    searchService.removeFromHistory(keyword);
+    setHistory(searchService.getRecentSearches());
+  }, []);
 
-  if (!isOpen) return null;
+  const handleProductClick = useCallback((_productName: string) => {
+    searchService.addToHistory(inputValue);
+    setHistory(searchService.getRecentSearches());
+    onClose();
+  }, [inputValue, onClose]);
+
+  const handleSearchClick = useCallback((query: string) => {
+    searchService.addToHistory(query);
+    setHistory(searchService.getRecentSearches());
+    onSearch(query);
+    onClose();
+  }, [onSearch, onClose]);
+
+  const totalResults = inputValue.trim() ? searchService.search(inputValue, 100).length : 0;
 
   return (
-    <div className="search-dropdown" ref={dropRef}>
-      {/* If typing → show suggestions */}
-      {inputValue.trim() ? (
-        <div className="sd-suggestions">
-          {suggestions.length > 0 ? (
-            <>
-              <p className="sd-section-title">Gợi ý sản phẩm</p>
-              {suggestions.map(product => (
-                <Link
-                  key={product.id}
-                  to={`/product/${product.id}`}
-                  className="sd-suggestion-item"
-                  onClick={onClose}
-                >
-                  <img src={product.image} alt={product.name} className="sd-suggestion-img" />
-                  <div className="sd-suggestion-info">
-                    <span className="sd-suggestion-name">{product.name}</span>
-                    <span className="sd-suggestion-price">
-                      {product.price.toLocaleString('vi-VN')}đ
-                    </span>
-                  </div>
-                </Link>
-              ))}
-              <button
-                className="sd-view-all"
-                onClick={() => { onSearch(inputValue); onClose(); }}
-              >
-                <Search size={14} /> Xem tất cả kết quả cho "{inputValue}"
-              </button>
-            </>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="search-dropdown"
+          ref={dropRef}
+          initial={{ opacity: 0, y: -12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -8, scale: 0.98 }}
+          transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+          role="listbox"
+          aria-label={t.placeholder}
+        >
+          {inputValue.trim() && inputValue.length >= 2 ? (
+            <div className="sd-suggestions">
+              {isSearching ? (
+                <div className="sd-loading">
+                  <div className="sd-loading-spinner" />
+                  <span>{CLIENT_TEXT.common.messages.loading}</span>
+                </div>
+              ) : suggestions.length > 0 ? (
+                <>
+                  <p className="sd-section-title">{CLIENT_TEXT.search.suggestions.title}</p>
+                  <AnimatePresence>
+                    <div className="sd-suggestion-list">
+                      {suggestions.map((product, i) => (
+                        <motion.div
+                          key={product.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -4 }}
+                          transition={{ delay: i * 0.04, duration: 0.2, ease: 'easeOut' }}
+                        >
+                          <Link
+                            to={`/product/${product.id}`}
+                            className="sd-suggestion-item"
+                            onClick={() => handleProductClick(product.name)}
+                            role="option"
+                          >
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="sd-suggestion-img"
+                              loading="lazy"
+                            />
+                            <div className="sd-suggestion-info">
+                              <span className="sd-suggestion-name">{product.name}</span>
+                              <span className="sd-suggestion-price">
+                                {formatPrice(product.price)}
+                              </span>
+                            </div>
+                            {product.badge && (
+                              <span className="sd-suggestion-badge">{product.badge}</span>
+                            )}
+                          </Link>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </AnimatePresence>
+                  <motion.button
+                    className="sd-view-all"
+                    onClick={() => handleSearchClick(inputValue)}
+                    whileHover={{ x: 4 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <Search size={14} />
+                    {t.viewAllFor(totalResults)} cho "{inputValue}"
+                  </motion.button>
+                </>
+              ) : (
+                <div className="sd-no-results">
+                  <p>{t.noResults}</p>
+                  <p className="sd-no-results-hint">
+                    Thử tìm với từ khóa khác
+                  </p>
+                </div>
+              )}
+            </div>
           ) : (
-            <p className="sd-no-results">Không tìm thấy sản phẩm phù hợp</p>
-          )}
-        </div>
-      ) : (
-        /* If NOT typing → show history + popular */
-        <div className="sd-default">
-          {history.length > 0 && (
-            <div className="sd-history-section">
-              <div className="sd-section-header">
-                <p className="sd-section-title"><Clock size={14} /> Tìm kiếm gần đây</p>
-                <button className="sd-clear-all" onClick={clearHistory}>Xoá tất cả</button>
-              </div>
-              <div className="sd-history-list">
-                {history.slice(0, 5).map(item => (
-                  <div key={item} className="sd-history-item">
-                    <button className="sd-history-text" onClick={() => onSearch(item)}>
-                      <Clock size={14} /> {item}
-                    </button>
-                    <button className="sd-history-remove" onClick={() => removeHistoryItem(item)}>
-                      <X size={14} />
+            <div className="sd-default">
+              {history.length > 0 && (
+                <div className="sd-history-section">
+                  <div className="sd-section-header">
+                    <p className="sd-section-title">
+                      <Clock size={14} /> {t.recentSearches}
+                    </p>
+                    <button
+                      className="sd-clear-all"
+                      onClick={clearHistory}
+                      aria-label={t.clearAll}
+                    >
+                      {t.clearHistory}
                     </button>
                   </div>
-                ))}
+                  <div className="sd-history-list">
+                    {history.slice(0, 5).map((item, i) => (
+                      <motion.div
+                        key={item}
+                        className="sd-history-item"
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -4 }}
+                        transition={{ delay: i * 0.04, duration: 0.2, ease: 'easeOut' }}
+                      >
+                        <button
+                          className="sd-history-text"
+                          onClick={() => handleSearchClick(item)}
+                        >
+                          <Clock size={14} /> {item}
+                        </button>
+                        <button
+                          className="sd-history-remove"
+                          onClick={() => removeHistoryItem(item)}
+                          aria-label={`${t.clearAll} "${item}"`}
+                        >
+                          <X size={14} />
+                        </button>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="sd-popular-section">
+                <p className="sd-section-title">
+                  <TrendingUp size={14} /> {t.popularKeywords}
+                </p>
+                <div className="sd-popular-chips">
+                  {searchService.getPopularKeywords().map((kw, i) => (
+                    <motion.button
+                      key={kw}
+                      className="sd-popular-chip"
+                      onClick={() => handleSearchClick(kw)}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -4 }}
+                      transition={{ delay: i * 0.04, duration: 0.2, ease: 'easeOut' }}
+                      whileHover={{ scale: 1.02, y: -1 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {kw}
+                    </motion.button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
-
-          <div className="sd-popular-section">
-            <p className="sd-section-title"><TrendingUp size={14} /> Từ khoá phổ biến</p>
-            <div className="sd-popular-chips">
-              {POPULAR_KEYWORDS.map(kw => (
-                <button key={kw} className="sd-popular-chip" onClick={() => onSearch(kw)}>
-                  {kw}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </AnimatePresence>
   );
 };
 
-export { HISTORY_KEY };
+export { searchService };
 export default SearchDropdown;

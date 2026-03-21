@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, Package, ArrowRight, Home, Truck, Gift } from 'lucide-react';
 import ProductSection from '../../components/ProductSection/ProductSection';
-import { mensFashion } from '../Home/Home';
+import { mensFashion } from '../../mocks/products';
 import './OrderSuccess.css';
 
 const OrderSuccess = () => {

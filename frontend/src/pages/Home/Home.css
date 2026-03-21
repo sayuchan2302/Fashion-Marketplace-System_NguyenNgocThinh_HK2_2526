@@ -3,3 +3,39 @@
   background-color: var(--bg-primary);
   padding: var(--space-8) 0;
 }
+
+.home-loading {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+.hero-skeleton {
+  margin-bottom: var(--space-8);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.categories-skeleton {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-12);
+}
+
+.product-section-skeleton {
+  margin-bottom: var(--space-12);
+}
+
+.product-grid-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.product-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

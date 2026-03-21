@@ -1,47 +1,56 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Outlet, useLocation } from 'react-router-dom';
 import './App.css';
-import Home from './pages/Home/Home';
+
+// Lazy loaded pages
+const Home = lazy(() => import('./pages/Home/Home'));
+const ProductListing = lazy(() => import('./pages/ProductListing/ProductListing'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail/ProductDetail'));
+const Cart = lazy(() => import('./pages/Cart/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout/Checkout'));
+const Profile = lazy(() => import('./pages/Profile/Profile'));
+const NotFound = lazy(() => import('./pages/NotFound/NotFound'));
+const OrderSuccess = lazy(() => import('./pages/OrderSuccess/OrderSuccess'));
+const Search = lazy(() => import('./pages/Search/Search'));
+const Wishlist = lazy(() => import('./pages/Wishlist/Wishlist'));
+const Policy = lazy(() => import('./pages/Policy/Policy'));
+const About = lazy(() => import('./pages/About/About'));
+const Contact = lazy(() => import('./pages/Contact/Contact'));
+const OrderDetail = lazy(() => import('./pages/OrderDetail/OrderDetail'));
+const ScrollToTop = lazy(() => import('./components/ScrollToTop/ScrollToTop'));
+const OrdersPage = lazy(() => import('./pages/Account/OrdersPage'));
+const AddressesPage = lazy(() => import('./pages/Account/AddressesPage'));
+const SecurityPage = lazy(() => import('./pages/Account/SecurityPage'));
+const OrderDetailPage = lazy(() => import('./pages/Account/OrderDetailPage'));
+const ProtectedRoute = lazy(() => import('./components/ProtectedRoute/ProtectedRoute'));
+const OrderTracking = lazy(() => import('./pages/OrderTracking/OrderTracking'));
+const Returns = lazy(() => import('./pages/Returns/Returns'));
+const FAQ = lazy(() => import('./pages/FAQ/FAQ'));
+const PaymentResult = lazy(() => import('./pages/PaymentResult/PaymentResult'));
+const SizeGuide = lazy(() => import('./pages/SizeGuide/SizeGuide'));
+const Stores = lazy(() => import('./pages/Stores/Stores'));
+
+// Admin pages
+const Admin = lazy(() => import('./pages/Admin/Admin'));
+const AdminOrders = lazy(() => import('./pages/Admin/AdminOrders'));
+const AdminProducts = lazy(() => import('./pages/Admin/AdminProducts'));
+const AdminOrderDetail = lazy(() => import('./pages/Admin/AdminOrderDetail'));
+const AdminCategories = lazy(() => import('./pages/Admin/AdminCategories'));
+const AdminCustomers = lazy(() => import('./pages/Admin/AdminCustomers'));
+const AdminPromotions = lazy(() => import('./pages/Admin/AdminPromotions'));
+
+// Core components (not lazy loaded - needed immediately)
 import TopBar from './components/TopBar/TopBar';
 import Header from './components/Header/Header';
 import Footer from './components/Footer/Footer';
-import ProductListing from './pages/ProductListing/ProductListing';
-import ProductDetail from './pages/ProductDetail/ProductDetail';
-import Cart from './pages/Cart/Cart';
-import Checkout from './pages/Checkout/Checkout';
-import Profile from './pages/Profile/Profile';
-import NotFound from './pages/NotFound/NotFound';
-import OrderSuccess from './pages/OrderSuccess/OrderSuccess';
-import Search from './pages/Search/Search';
-import Wishlist from './pages/Wishlist/Wishlist';
-import Policy from './pages/Policy/Policy';
-import About from './pages/About/About';
-import Contact from './pages/Contact/Contact';
-import OrderDetail from './pages/OrderDetail/OrderDetail';
-import ScrollToTop from './components/ScrollToTop/ScrollToTop';
 import { ToastProvider } from './contexts/ToastContext';
 import { CartAnimationProvider } from './context/CartAnimationContext';
 import { WishlistProvider } from './contexts/WishlistContext';
 import { CartProvider } from './contexts/CartContext';
 import { FilterProvider } from './contexts/FilterContext';
 import { AuthProvider } from './contexts/AuthContext';
-import OrdersPage from './pages/Account/OrdersPage';
-import AddressesPage from './pages/Account/AddressesPage';
-import SecurityPage from './pages/Account/SecurityPage';
-import OrderDetailPage from './pages/Account/OrderDetailPage';
-import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
-import OrderTracking from './pages/OrderTracking/OrderTracking';
-import Returns from './pages/Returns/Returns';
-import FAQ from './pages/FAQ/FAQ';
-import PaymentResult from './pages/PaymentResult/PaymentResult';
-import SizeGuide from './pages/SizeGuide/SizeGuide';
-import Stores from './pages/Stores/Stores';
-import Admin from './pages/Admin/Admin';
-import AdminOrders from './pages/Admin/AdminOrders';
-import AdminProducts from './pages/Admin/AdminProducts';
-import AdminOrderDetail from './pages/Admin/AdminOrderDetail';
-import AdminCategories from './pages/Admin/AdminCategories';
-import AdminCustomers from './pages/Admin/AdminCustomers';
-import AdminPromotions from './pages/Admin/AdminPromotions';
+import { NotificationProvider } from './contexts/NotificationContext';
+import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner';
 
 const MainLayout = () => {
   const location = useLocation();
@@ -58,6 +67,12 @@ const MainLayout = () => {
   );
 };
 
+const RouteLoader = ({ children, text }: { children: React.ReactNode; text?: string }) => (
+  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text={text || 'Đang tải...'} />}>
+    {children}
+  </Suspense>
+);
+
 function App() {
   return (
     <ToastProvider>
@@ -66,27 +81,41 @@ function App() {
           <CartAnimationProvider>
             <WishlistProvider>
               <FilterProvider>
+                <NotificationProvider>
                 <Router>
-                  <ScrollToTop />
-                  <div className="app-container">
-                    <Routes>
-                      {/* All routes share standard layout (Header, Footer) */}
-                      <Route element={<MainLayout />}>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/category/:id" element={<ProductListing />} />
-                        <Route path="/product/:id" element={<ProductDetail />} />
-                        <Route path="/cart" element={<Cart />} />
-                        <Route path="/checkout" element={<Checkout />} />
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="/order-success" element={<OrderSuccess />} />
-                        <Route path="/search" element={<Search />} />
-                        <Route path="/wishlist" element={<Wishlist />} />
-                        <Route path="/order-tracking" element={<OrderTracking />} />
-                        <Route path="/returns" element={<Returns />} />
-                        <Route path="/payment-result" element={<PaymentResult />} />
-                        <Route path="/faq" element={<FAQ />} />
-                        <Route path="/size-guide" element={<SizeGuide />} />
-                        <Route path="/stores" element={<Stores />} />
+                  <RouteLoader>
+                    <ScrollToTop />
+                    <div className="app-container">
+                      <Routes>
+                        {/* All routes share standard layout (Header, Footer) */}
+                        <Route element={<MainLayout />}>
+                          <Route path="/" element={<Home />} />
+                          <Route path="/category/:id" element={<ProductListing />} />
+                          <Route path="/product/:id" element={<ProductDetail />} />
+                          <Route path="/cart" element={<Cart />} />
+                          <Route path="/checkout" element={<Checkout />} />
+                          <Route path="/profile" element={<Profile />} />
+                          <Route path="/order-success" element={<OrderSuccess />} />
+                          <Route path="/search" element={<Search />} />
+                          <Route path="/wishlist" element={<Wishlist />} />
+                          <Route path="/order-tracking" element={<OrderTracking />} />
+                          <Route path="/returns" element={<Returns />} />
+                          <Route path="/payment-result" element={<PaymentResult />} />
+                          <Route path="/faq" element={<FAQ />} />
+                          <Route path="/size-guide" element={<SizeGuide />} />
+                          <Route path="/stores" element={<Stores />} />
+                          <Route path="/policy/:type" element={<Policy />} />
+                          <Route path="/about" element={<About />} />
+                          <Route path="/contact" element={<Contact />} />
+                          <Route path="/profile/orders/:id" element={<OrderDetail />} />
+                          <Route path="/account/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+                          <Route path="/account/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
+                          <Route path="/account/addresses" element={<ProtectedRoute><AddressesPage /></ProtectedRoute>} />
+                          <Route path="/account/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
+                          <Route path="*" element={<NotFound />} />
+                        </Route>
+
+                        {/* Admin routes */}
                         <Route path="/admin" element={<Admin />} />
                         <Route path="/admin/orders" element={<AdminOrders />} />
                         <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
@@ -95,19 +124,11 @@ function App() {
                         <Route path="/admin/customers" element={<AdminCustomers />} />
                         <Route path="/admin/customer" element={<AdminCustomers />} />
                         <Route path="/admin/promotions" element={<AdminPromotions />} />
-                        <Route path="/policy/:type" element={<Policy />} />
-                        <Route path="/about" element={<About />} />
-                        <Route path="/contact" element={<Contact />} />
-                        <Route path="/profile/orders/:id" element={<OrderDetail />} />
-                        <Route path="/account/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
-                        <Route path="/account/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
-                        <Route path="/account/addresses" element={<ProtectedRoute><AddressesPage /></ProtectedRoute>} />
-                        <Route path="/account/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
-                        <Route path="*" element={<NotFound />} />
-                      </Route>
-                    </Routes>
-                  </div>
+                      </Routes>
+                    </div>
+                  </RouteLoader>
                 </Router>
+              </NotificationProvider>
               </FilterProvider>
             </WishlistProvider>
           </CartAnimationProvider>

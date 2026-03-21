@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, Check, Wallet, Loader2, Trash2, X, ChevronDown } from 'lucide-react';
+import { ChevronRight, Check, Wallet, Loader2, Trash2, X, ChevronDown, Tag, AlertCircle } from 'lucide-react';
 import './Checkout.css';
 import { useCart } from '../../contexts/CartContext';
+import { useToast } from '../../contexts/ToastContext';
 import { formatPrice } from '../../utils/formatters';
+import { CLIENT_TEXT } from '../../utils/texts';
+import { couponService, type Coupon } from '../../services/couponService';
 import AddressBookModal from './AddressBookModal';
+
+const t = CLIENT_TEXT.checkout;
+const tCommon = CLIENT_TEXT.common;
 
 interface FormErrors {
   name?: string;
@@ -37,6 +43,7 @@ const API_BASE = 'https://provinces.open-api.vn/api';
 const Checkout = () => {
   const navigate = useNavigate();
   const { items, updateQuantity, removeFromCart } = useCart();
+  const { addToast } = useToast();
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'zalopay' | 'momo' | 'vnpay'>('vnpay');
   const [isLoading, setIsLoading] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -47,6 +54,12 @@ const Checkout = () => {
 
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [isCouponLoading, setIsCouponLoading] = useState(false);
+  const [availableCoupons] = useState(() => couponService.getAvailableCoupons());
 
   // Address states
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -115,10 +128,47 @@ const Checkout = () => {
     removeFromCart(cartId);
   };
 
+  const handleApplyCoupon = () => {
+    if (!couponInput.trim()) {
+      setCouponError('Vui lòng nhập mã giảm giá');
+      return;
+    }
+
+    setIsCouponLoading(true);
+    setCouponError('');
+
+    setTimeout(() => {
+      const result = couponService.validate(couponInput, subtotal);
+      setIsCouponLoading(false);
+
+      if (result.valid && result.coupon) {
+        setAppliedCoupon(result.coupon);
+        setCouponInput('');
+        addToast(`Áp dụng mã ${result.coupon.code} thành công!`, 'success');
+      } else {
+        setCouponError(result.error || 'Mã giảm giá không hợp lệ');
+      }
+    }, 500);
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError('');
+    addToast('Đã xóa mã giảm giá', 'info');
+  };
+
+  const handleSelectCoupon = (coupon: Coupon) => {
+    setCouponInput(coupon.code);
+  };
+
   // All cart items go to checkout — selection was done on Cart page
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingFee = subtotal > 200000 ? 0 : 30000;
-  const total = subtotal + shippingFee;
+  const discount = appliedCoupon 
+    ? couponService.calculateDiscount(appliedCoupon, subtotal) 
+    : 0;
+  const total = subtotal + shippingFee - discount;
+  const savings = discount;
 
   const handleAddressSelect = (addr: any) => {
     setFormValues(prev => ({
@@ -134,13 +184,13 @@ const Checkout = () => {
 
   const validate = (): FormErrors => {
     const errors: FormErrors = {};
-    if (!formValues.name.trim()) errors.name = 'Vui lòng nhập họ và tên';
-    if (!formValues.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
-    else if (!/^(0[3|5|7|8|9])+([0-9]{8})$/.test(formValues.phone.trim())) errors.phone = 'Số điện thoại không hợp lệ';
-    if (!formValues.address.trim()) errors.address = 'Vui lòng nhập địa chỉ chi tiết';
-    if (!formValues.city) errors.city = 'Vui lòng nhập tỉnh / thành phố';
-    if (!formValues.district) errors.district = 'Vui lòng nhập quận / huyện';
-    if (!formValues.ward) errors.ward = 'Vui lòng nhập phường / xã';
+    if (!formValues.name.trim()) errors.name = t.validation.requiredName;
+    if (!formValues.phone.trim()) errors.phone = t.validation.requiredPhone;
+    else if (!/^(0[3|5|7|8|9])+([0-9]{8})$/.test(formValues.phone.trim())) errors.phone = t.validation.invalidPhone;
+    if (!formValues.address.trim()) errors.address = t.validation.requiredAddress;
+    if (!formValues.city) errors.city = t.validation.requiredCity;
+    if (!formValues.district) errors.district = t.validation.requiredDistrict;
+    if (!formValues.ward) errors.ward = t.validation.requiredWard;
     return errors;
   };
 
@@ -181,11 +231,11 @@ const Checkout = () => {
 
           {/* Breadcrumb */}
           <div className="checkout-breadcrumb">
-            <Link to="/cart" className="breadcrumb-link">Giỏ hàng</Link>
+            <Link to="/cart" className="breadcrumb-link">{t.breadcrumb.cart}</Link>
             <ChevronRight size={14} />
-            <span className="breadcrumb-active">Thông tin giao hàng</span>
+            <span className="breadcrumb-active">{t.breadcrumb.shippingInfo}</span>
             <ChevronRight size={14} />
-            <span className="breadcrumb-inactive">Thanh toán</span>
+            <span className="breadcrumb-inactive">{t.breadcrumb.paymentStep}</span>
           </div>
 
           <div className="checkout-layout">
@@ -195,24 +245,24 @@ const Checkout = () => {
               {/* Shipping Info */}
               <section className="checkout-section">
                 <div className="section-header-flex">
-                  <h2 className="checkout-section-title">Thông tin giao hàng</h2>
+                  <h2 className="checkout-section-title">{t.title}</h2>
                   <button className="address-book-toggle-btn" onClick={() => setIsAddressModalOpen(true)}>
-                    Chọn từ sổ địa chỉ <ChevronRight size={16} />
+                    {t.addressBook.title} <ChevronRight size={16} />
                   </button>
                 </div>
 
                 <div className="form-grid">
-                  <div className="form-group col-span-2">
-                    <label className="input-label">Họ Tên</label>
+<div className="form-group col-span-2">
+                    <label className="input-label">{t.form.name}</label>
                     <div className="input-with-prefix">
                       <select className="prefix-select" name="salutation" autoComplete="honorific-prefix">
-                        <option value="anh">Anh</option>
-                        <option value="chi">Chị</option>
+                        <option value="anh">{t.form.salutation.male}</option>
+                        <option value="chi">{t.form.salutation.female}</option>
                       </select>
                       <input
                         type="text"
                         className={`checkout-input ${formErrors.name ? 'input-error' : ''}`}
-                        placeholder="Họ Tên đệm và Tên"
+                        placeholder={t.form.namePlaceholder}
                         value={formValues.name}
                         onChange={e => handleFieldChange('name', e.target.value)}
                         name="fullName"
@@ -223,11 +273,11 @@ const Checkout = () => {
                   </div>
 
                   <div className="form-group col-span-1">
-                    <label className="input-label">SDT</label>
+                    <label className="input-label">{t.form.phone}</label>
                     <input
                       type="tel"
                       className={`checkout-input ${formErrors.phone ? 'input-error' : ''}`}
-                      placeholder="Số điện thoại"
+                      placeholder={t.form.phonePlaceholder}
                       value={formValues.phone}
                       onChange={e => handleFieldChange('phone', e.target.value)}
                       name="phone"
@@ -238,11 +288,11 @@ const Checkout = () => {
                   </div>
 
                   <div className="form-group col-span-1">
-                    <label className="input-label">Email</label>
+                    <label className="input-label">{t.form.email}</label>
                     <input
                       type="email"
                       className="checkout-input"
-                      placeholder="Email (Không bắt buộc)"
+                      placeholder={t.form.emailPlaceholder}
                       value={formValues.email}
                       onChange={e => handleFieldChange('email', e.target.value)}
                       name="email"
@@ -252,7 +302,7 @@ const Checkout = () => {
                   </div>
 
                   <div className="form-group col-span-2">
-                    <label className="input-label">Địa chỉ</label>
+                    <label className="input-label">{t.form.address}</label>
                     <input
                       type="text"
                       className={`checkout-input ${formErrors.address ? 'input-error' : ''}`}
@@ -283,7 +333,7 @@ const Checkout = () => {
                           handleFieldChange('ward', '');
                         }}
                       >
-                        <option value="">{loadingProvinces ? 'Đang tải...' : 'Tỉnh/Thành phố'}</option>
+                        <option value="">{loadingProvinces ? t.form.loading : t.form.province}</option>
                         {provinces.map(p => (
                           <option key={p.code} value={p.code}>{p.name}</option>
                         ))}
@@ -311,7 +361,7 @@ const Checkout = () => {
                           handleFieldChange('ward', '');
                         }}
                       >
-                        <option value="">{loadingDistricts ? 'Đang tải...' : 'Quận/Huyện'}</option>
+                        <option value="">{loadingDistricts ? t.form.loading : t.form.district}</option>
                         {districts.map(d => (
                           <option key={d.code} value={d.code}>{d.name}</option>
                         ))}
@@ -336,7 +386,7 @@ const Checkout = () => {
                           handleFieldChange('ward', w ? w.name : '');
                         }}
                       >
-                        <option value="">{loadingWards ? 'Đang tải...' : 'Phường/Xã'}</option>
+                        <option value="">{loadingWards ? t.form.loading : t.form.ward}</option>
                         {wards.map(w => (
                           <option key={w.code} value={w.code}>{w.name}</option>
                         ))}
@@ -358,9 +408,9 @@ const Checkout = () => {
 
               </section>
 
-              {/* Payment Methods */}
+{/* Payment Methods */}
               <section className="checkout-section">
-                <h2 className="checkout-section-title">Hình thức thanh toán</h2>
+                <h2 className="checkout-section-title">{t.payment}</h2>
                 <div className="payment-options-list">
 
                   <label className={`payment-card ${paymentMethod === 'cod' ? 'selected' : ''}`}>
@@ -377,7 +427,7 @@ const Checkout = () => {
                           loading="lazy"
                         />
                         <div>
-                          <span className="payment-name-text">Thanh toán khi nhận hàng</span>
+                          <span className="payment-name-text">{t.paymentMethods.cod}</span>
                         </div>
                       </div>
                     </div>
@@ -397,8 +447,8 @@ const Checkout = () => {
                           loading="lazy"
                         />
                         <div>
-                          <span className="payment-name-text">Thanh toán qua Zalopay</span>
-                          <span className="payment-sub-text">Hỗ trợ mọi hình thức thanh toán</span>
+                          <span className="payment-name-text">{t.paymentMethods.zalopay}</span>
+                          <span className="payment-sub-text">{t.paymentMethods.zalopayDesc}</span>
                         </div>
                       </div>
                     </div>
@@ -418,7 +468,7 @@ const Checkout = () => {
                           loading="lazy"
                         />
                         <div>
-                          <span className="payment-name-text">Ví điện tử MoMo</span>
+                          <span className="payment-name-text">{t.paymentMethods.momo}</span>
                         </div>
                       </div>
                     </div>
@@ -438,8 +488,8 @@ const Checkout = () => {
                           loading="lazy"
                         />
                         <div>
-                          <span className="payment-name-text">VNPAY / TháiQR</span>
-                          <span className="vnpay-promo-badge">Mã "VNPAYCOOL" giảm 10% (tối đa 150k)</span>
+                          <span className="payment-name-text">{t.paymentMethods.vnpay}</span>
+                          <span className="vnpay-promo-badge">{t.paymentMethods.vnpayPromo}</span>
                         </div>
                       </div>
                     </div>
@@ -447,12 +497,12 @@ const Checkout = () => {
 
                 </div>
                 <div className="payment-return-policy">
-                  Nếu bạn không hài lòng với sản phẩm? Bạn hoàn toàn có thể trả lại sản phẩm. Tìm hiểu thêm <Link to="#">tại đây</Link>.
+                  {t.returnPolicy} <Link to="#">{tCommon.actions.viewDetails}</Link>.
                 </div>
                 <div className="payment-help">
                   <div>
-                    <p className="payment-help-title">Gặp sự cố khi thanh toán?</p>
-                    <p className="payment-help-desc">Kiểm tra kết quả giao dịch hoặc thử lại với phương thức khác.</p>
+                    <p className="payment-help-title">{t.help.title}</p>
+                    <p className="payment-help-desc">{t.help.desc}</p>
                   </div>
                   <Link to="/payment-result?status=pending" className="payment-help-link">Xem kết quả</Link>
                 </div>
@@ -514,23 +564,22 @@ const Checkout = () => {
 
                 {/* Coupon Tickets */}
                 <div className="coupon-ticket-scroll">
-                  <div className="coupon-ticket">
-                    <div className="ticket-info">
-                      <strong>WELCOMEJ7BMF6</strong> (Còn 1)<br/>
-                      <span className="ticket-desc">Giảm 15% tối đa 50k cho đơn bất kỳ</span>
-                      <div className="ticket-expiry">HSD: 12/04/2026</div>
+                  {availableCoupons.map((coupon) => (
+                    <div 
+                      key={coupon.code}
+                      className={`coupon-ticket ${appliedCoupon?.code === coupon.code ? 'coupon-selected' : ''}`}
+                      onClick={() => !appliedCoupon && handleSelectCoupon(coupon)}
+                    >
+                      <div className="ticket-info">
+                        <strong>{coupon.code}</strong> (Còn {coupon.remaining})<br/>
+                        <span className="ticket-desc">{coupon.description}</span>
+                        <div className="ticket-expiry">HSD: {new Date(coupon.expiresAt).toLocaleDateString('vi-VN')}</div>
+                      </div>
+                      <div className="ticket-action">
+                        <div className="ticket-radio"></div>
+                      </div>
                     </div>
-                    <div className="ticket-action">
-                      <div className="ticket-radio"></div>
-                      <a href="#" className="ticket-link">Điều kiện</a>
-                    </div>
-                  </div>
-                  <div className="coupon-ticket coupon-faded">
-                    <div className="ticket-info">
-                      <strong>NHNS153</strong> (Còn 21)<br/>
-                      <span className="ticket-desc">Giảm 15.3% tối đa 200k</span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
                 {/* Voucher Input */}
@@ -539,9 +588,42 @@ const Checkout = () => {
                     <Wallet size={16} /> Ví Voucher
                   </button>
                   <div className="input-group-row">
-                    <input type="text" placeholder="Nhập mã giảm giá" className="checkout-input coupon-input" />
-                    <button className="btn-dark-apply">ÁP DỤNG</button>
+                    <input 
+                      type="text" 
+                      placeholder="Nhập mã giảm giá" 
+                      className={`checkout-input coupon-input ${couponError ? 'input-error' : ''}`}
+                      value={couponInput}
+                      onChange={(e) => {
+                        setCouponInput(e.target.value.toUpperCase());
+                        setCouponError('');
+                      }}
+                      disabled={!!appliedCoupon}
+                    />
+                    {appliedCoupon ? (
+                      <button className="btn-remove-coupon" onClick={handleRemoveCoupon}>
+                        <X size={16} />
+                      </button>
+                    ) : (
+                      <button 
+                        className="btn-dark-apply" 
+                        onClick={handleApplyCoupon}
+                        disabled={isCouponLoading}
+                      >
+                        {isCouponLoading ? <Loader2 size={16} className="spinner" /> : 'ÁP DỤNG'}
+                      </button>
+                    )}
                   </div>
+                  {couponError && (
+                    <div className="coupon-error">
+                      <AlertCircle size={14} /> {couponError}
+                    </div>
+                  )}
+                  {appliedCoupon && (
+                    <div className="coupon-success">
+                      <Tag size={14} />
+                      <span>Đã áp dụng: <strong>{appliedCoupon.code}</strong> - {appliedCoupon.description}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Order Calculations */}
@@ -558,12 +640,20 @@ const Checkout = () => {
                     <span>{shippingFee === 0 ? 'Miễn phí' : formatPrice(shippingFee)}</span>
                   </div>
 
-
+                  {appliedCoupon && discount > 0 && (
+                    <div className="calc-row calc-discount">
+                      <span className="calc-label">Giảm giá ({appliedCoupon.code})</span>
+                      <span className="discount-value">-{formatPrice(discount)}</span>
+                    </div>
+                  )}
 
                   <div className="calc-row calc-total">
                     <strong>Thành tiền</strong>
                     <div className="total-value-block">
                       <strong className="total-price-big">{formatPrice(total)}</strong>
+                      {savings > 0 && (
+                        <div className="savings-note">Tiết kiệm {formatPrice(savings)}</div>
+                      )}
                       <div className="vat-note">(Đã bao gồm VAT nếu có)</div>
                     </div>
                   </div>
@@ -598,7 +688,11 @@ const Checkout = () => {
                 <div className="bar-price-block">
                   <div className="bar-price-main">{formatPrice(total)}</div>
                   <div className="bar-price-sub">
-                    <span className="sub-text">Tiết kiệm <span className="sub-value">0đ</span></span>
+                    {savings > 0 ? (
+                      <span className="sub-text">Tiết kiệm <span className="sub-value">{formatPrice(savings)}</span></span>
+                    ) : (
+                      <span className="sub-text">&nbsp;</span>
+                    )}
                   </div>
                 </div>
                 <button className="btn-place-order-sticky"

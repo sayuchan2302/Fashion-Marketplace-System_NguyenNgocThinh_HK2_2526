@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   User,
@@ -18,15 +18,46 @@ import {
 } from 'lucide-react';
 import AddressModal, { type AddressData } from './AddressModal';
 import EmptyState from '../../components/EmptyState/EmptyState';
+import ReviewModal from '../../components/ReviewModal/ReviewModal';
 import { useToast } from '../../contexts/ToastContext';
+import Skeleton from '../../components/Skeleton/Skeleton';
+import { CLIENT_TEXT } from '../../utils/texts';
 import './Profile.css';
 
-// Type definition for tabs
+const t = CLIENT_TEXT.profile;
+const tCommon = CLIENT_TEXT.common;
+
 type TabId = 'account' | 'orders' | 'vouchers' | 'addresses' | 'reviews';
+
+interface PendingProduct {
+  productId: string;
+  productName: string;
+  productImage: string;
+  orderId: string;
+  variant: string;
+}
+
+const PENDING_REVIEWS: PendingProduct[] = [
+  {
+    productId: '101',
+    productName: 'Áo Polo Nam Excool',
+    productImage: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=80&h=80&fit=crop',
+    orderId: 'CM20260312',
+    variant: 'Màu: Xanh navy | Size: XL',
+  },
+  {
+    productId: '201',
+    productName: 'Áo Thun Nam Cổ Tròn Cotton',
+    productImage: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=80&h=80&fit=crop',
+    orderId: 'CM20260301',
+    variant: 'Màu: Trắng | Size: L',
+  },
+];
 
 const Profile = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<TabId>('account');
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -41,6 +72,20 @@ const Profile = () => {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<AddressData[]>([]);
 
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewProduct, setReviewProduct] = useState<PendingProduct | null>(null);
+  const [reviewFilter, setReviewFilter] = useState<'pending' | 'completed'>('pending');
+
+  const handleOpenReviewModal = (product: PendingProduct) => {
+    setReviewProduct(product);
+    setIsReviewModalOpen(true);
+  };
+
+  const handleCloseReviewModal = () => {
+    setIsReviewModalOpen(false);
+    setReviewProduct(null);
+  };
+
   // Placeholder user data
   const user = {
     name: "Ngọc Thịnh Nguyễn",
@@ -54,15 +99,20 @@ const Profile = () => {
   };
 
   const tabs = [
-    { id: 'account', label: 'Thông tin tài khoản', icon: User },
-    { id: 'orders', label: 'Lịch sử đơn hàng', icon: ShoppingBag },
-    { id: 'vouchers', label: 'Ví voucher', icon: Ticket },
-    { id: 'addresses', label: 'Sổ địa chỉ', icon: MapPin },
-    { id: 'reviews', label: 'Đánh giá & phản hồi', icon: MessageSquare },
+    { id: 'account', label: t.tabs.account, icon: User },
+    { id: 'orders', label: t.tabs.orders, icon: ShoppingBag },
+    { id: 'vouchers', label: t.tabs.vouchers, icon: Ticket },
+    { id: 'addresses', label: t.tabs.addresses, icon: MapPin },
+    { id: 'reviews', label: t.tabs.reviews, icon: MessageSquare },
   ];
 
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 600);
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleLogout = () => {
-    addToast("Đăng xuất thành công", "info");
+    addToast(t.logoutSuccess, "info");
     navigate('/');
   };
 
@@ -408,83 +458,91 @@ const Profile = () => {
 
             {/* Review Filter Tabs */}
             <div className="order-filter-tabs">
-              <button className="order-filter-btn active">Chờ đánh giá (2)</button>
-              <button className="order-filter-btn">Đã đánh giá (1)</button>
+              <button 
+                className={`order-filter-btn ${reviewFilter === 'pending' ? 'active' : ''}`}
+                onClick={() => setReviewFilter('pending')}
+              >
+                Chờ đánh giá ({PENDING_REVIEWS.length})
+              </button>
+              <button 
+                className={`order-filter-btn ${reviewFilter === 'completed' ? 'active' : ''}`}
+                onClick={() => setReviewFilter('completed')}
+              >
+                Đã đánh giá
+              </button>
             </div>
 
-            {/* Pending Reviews */}
-            <div className="review-section">
-              <h3 className="review-section-title">Sản phẩm chờ đánh giá</h3>
-              <div className="review-pending-list">
-                {/* Pending 1 */}
-                <div className="review-pending-card">
-                  <div className="review-pending-product">
-                    <div className="review-product-img">
-                      <img src="https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=80&h=80&fit=crop" alt="Áo Polo" />
-                    </div>
-                    <div className="review-product-info">
-                      <p className="review-product-name">Áo Polo Nam Excool</p>
-                      <p className="review-product-variant">Màu: Xanh navy | Size: XL</p>
-                      <p className="review-product-order">Đơn hàng: #CM20260312</p>
-                    </div>
-                  </div>
-                  <button className="review-write-btn">Viết đánh giá</button>
-                </div>
-
-                {/* Pending 2 */}
-                <div className="review-pending-card">
-                  <div className="review-pending-product">
-                    <div className="review-product-img">
-                      <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=80&h=80&fit=crop" alt="Áo Thun" />
-                    </div>
-                    <div className="review-product-info">
-                      <p className="review-product-name">Áo Thun Nam Cổ Tròn Cotton</p>
-                      <p className="review-product-variant">Màu: Trắng | Size: L</p>
-                      <p className="review-product-order">Đơn hàng: #CM20260301</p>
-                    </div>
-                  </div>
-                  <button className="review-write-btn">Viết đánh giá</button>
-                </div>
-              </div>
-            </div>
-
-            {/* Completed Reviews */}
-            <div className="review-section">
-              <h3 className="review-section-title">Đánh giá của bạn</h3>
-              <div className="review-completed-list">
-                <div className="review-completed-card">
-                  <div className="review-completed-header">
-                    <div className="review-pending-product">
-                      <div className="review-product-img">
-                        <img src="https://images.unsplash.com/photo-1542272604-787c3835535d?w=80&h=80&fit=crop" alt="Quần Jeans" />
+            {reviewFilter === 'pending' && (
+              <div className="review-section">
+                <h3 className="review-section-title">Sản phẩm chờ đánh giá</h3>
+                {PENDING_REVIEWS.length > 0 ? (
+                  <div className="review-pending-list">
+                    {PENDING_REVIEWS.map((product) => (
+                      <div key={product.productId} className="review-pending-card">
+                        <div className="review-pending-product">
+                          <div className="review-product-img">
+                            <img src={product.productImage} alt={product.productName} />
+                          </div>
+                          <div className="review-product-info">
+                            <p className="review-product-name">{product.productName}</p>
+                            <p className="review-product-variant">{product.variant}</p>
+                            <p className="review-product-order">Đơn hàng: #{product.orderId}</p>
+                          </div>
+                        </div>
+                        <button 
+                          className="review-write-btn"
+                          onClick={() => handleOpenReviewModal(product)}
+                        >
+                          Viết đánh giá
+                        </button>
                       </div>
-                      <div className="review-product-info">
-                        <p className="review-product-name">Quần Jeans Nam Slim Fit</p>
-                        <p className="review-product-variant">Màu: Xanh đậm | Size: 32</p>
-                      </div>
-                    </div>
-                    <span className="review-date">01/03/2026</span>
-                  </div>
-                  <div className="review-stars">
-                    {'★★★★★'.split('').map((star, i) => (
-                      <span key={i} className={`review-star ${i < 5 ? 'filled' : ''}`}>{star}</span>
                     ))}
                   </div>
-                  <p className="review-text">
-                    Vải jeans mềm, co giãn tốt, mặc rất thoải mái. Form slim fit vừa vặn, không quá ôm. Sẽ mua thêm màu khác!
-                  </p>
-                  {/* Shop Reply */}
-                  <div className="review-reply">
-                    <div className="review-reply-header">
-                      <span className="review-reply-badge">Phản hồi từ shop</span>
+                ) : (
+                  <div className="review-empty">
+                    <p>Không có sản phẩm nào chờ đánh giá</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {reviewFilter === 'completed' && (
+              <div className="review-section">
+                <h3 className="review-section-title">Đánh giá của bạn</h3>
+                <div className="review-completed-list">
+                  <div className="review-completed-card">
+                    <div className="review-completed-header">
+                      <div className="review-pending-product">
+                        <div className="review-product-img">
+                          <img src="https://images.unsplash.com/photo-1542272604-787c3835535d?w=80&h=80&fit=crop" alt="Quần Jeans" />
+                        </div>
+                        <div className="review-product-info">
+                          <p className="review-product-name">Quần Jeans Nam Slim Fit</p>
+                          <p className="review-product-variant">Màu: Xanh đậm | Size: 32</p>
+                        </div>
+                      </div>
+                      <span className="review-date">01/03/2026</span>
                     </div>
-                    <p className="review-reply-text">
-                      Cảm ơn bạn đã tin tưởng và mua hàng tại Coolmate! Rất vui khi biết bạn hài lòng với sản phẩm. Chúc bạn một ngày tốt lành! ❤️
+                    <div className="review-stars">
+                      {'★★★★★'.split('').map((star, i) => (
+                        <span key={i} className={`review-star ${i < 5 ? 'filled' : ''}`}>{star}</span>
+                      ))}
+                    </div>
+                    <p className="review-text">
+                      Vải jeans mềm, co giãn tốt, mặc rất thoải mái. Form slim fit vừa vặn, không quá ôm. Sẽ mua thêm màu khác!
                     </p>
+                    <div className="review-reply">
+                      <div className="review-reply-header">
+                        <span className="review-reply-badge">Phản hồi từ shop</span>
+                      </div>
+                      <p className="review-reply-text">
+                        Cảm ơn bạn đã tin tưởng và mua hàng tại Coolmate! Rất vui khi biết bạn hài lòng với sản phẩm. Chúc bạn một ngày tốt lành!
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         );
       default:
@@ -497,9 +555,9 @@ const Profile = () => {
       <div className="container">
         {/* Breadcrumbs */}
         <nav className="profile-breadcrumbs">
-          <Link to="/">Trang chủ</Link>
+          <Link to="/">{tCommon.breadcrumb.home}</Link>
           <ChevronRight size={14} className="breadcrumb-separator" />
-          <span className="current">Hồ sơ của tôi</span>
+          <span className="current">{t.title}</span>
         </nav>
 
         <div className="profile-layout">
@@ -534,7 +592,7 @@ const Profile = () => {
               <li className="profile-nav-item mt-4 pt-4 border-t border-gray-200">
                 <button className="profile-nav-btn text-red-500 hover:text-red-600 hover:bg-red-50" onClick={handleLogout}>
                   <LogOut className="profile-nav-icon" />
-                  Đăng xuất
+                  {t.logout}
                 </button>
               </li>
             </ul>
@@ -542,7 +600,21 @@ const Profile = () => {
 
           {/* Main Content */}
           <main className="profile-content">
-            {renderContent() || <div className="p-8 text-center text-red-500">Error rendering tab: {activeTab}</div>}
+            {isLoading ? (
+              <div className="profile-loading">
+                <Skeleton type="text" width="40%" height={32} />
+                <div className="profile-loading-rows">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <div key={i} className="profile-loading-row">
+                      <Skeleton type="text" width="30%" />
+                      <Skeleton type="text" width="50%" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              renderContent() || <div className="p-8 text-center text-red-500">Error rendering tab: {activeTab}</div>
+            )}
           </main>
         </div>
       </div>
@@ -720,6 +792,15 @@ const Profile = () => {
         onClose={() => setIsAddressModalOpen(false)}
         onSave={(newAddr) => setSavedAddresses(prev => [...prev, newAddr])}
       />
+
+      {/* Review Modal */}
+      {reviewProduct && (
+        <ReviewModal
+          isOpen={isReviewModalOpen}
+          onClose={handleCloseReviewModal}
+          product={reviewProduct}
+        />
+      )}
     </div>
   );
 };

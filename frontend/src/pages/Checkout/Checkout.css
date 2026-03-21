@@ -743,6 +743,78 @@
   background: #333;
 }
 
+.btn-dark-apply:disabled {
+  background: var(--co-gray-300);
+  cursor: not-allowed;
+}
+
+.btn-remove-coupon {
+  background: var(--co-red);
+  color: white;
+  border: none;
+  padding: 0 16px;
+  border-radius: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-remove-coupon:hover {
+  background: #dc2626;
+}
+
+.coupon-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--co-red);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.coupon-success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--co-green);
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f0fdf4;
+  border-radius: 6px;
+}
+
+.coupon-selected {
+  background: #dbeafe;
+  border-left-color: var(--co-blue);
+  cursor: pointer;
+}
+
+.coupon-ticket:not(.coupon-selected):hover {
+  background: #e0f2fe;
+  cursor: pointer;
+}
+
+.calc-discount {
+  color: var(--co-green);
+}
+
+.calc-discount .calc-label {
+  color: var(--co-green);
+}
+
+.discount-value {
+  color: var(--co-green);
+  font-weight: 600;
+}
+
+.savings-note {
+  font-size: 12px;
+  color: var(--co-green);
+  margin-top: 2px;
+}
+
 /* ---- Calculations ---- */
 .checkout-calculations {
   padding-top: 20px;

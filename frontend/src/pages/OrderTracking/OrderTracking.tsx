@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { CheckCircle2, Clock, MapPin, Package, Phone, Search, XCircle } from 'lucide-react';
 import './OrderTracking.css';
 import { useToast } from '../../contexts/ToastContext';
+import { mockOrders } from '../../mocks/products';
+import { CLIENT_TEXT } from '../../utils/texts';
+
+const t = CLIENT_TEXT.orderTracking;
+const tCommon = CLIENT_TEXT.common;
 
 type TrackingStep = {
   label: string;
@@ -19,37 +24,6 @@ type MockOrder = {
   status: 'delivered' | 'shipping' | 'processing' | 'pending' | 'cancelled';
   steps: TrackingStep[];
 };
-
-const mockOrders: MockOrder[] = [
-  {
-    id: 'CM20260301',
-    phone: '0382253049',
-    customer: 'Ngọc Thịnh Nguyễn',
-    address: 'JJJV+Q7F, Quốc lộ 37, Hùng Sơn, Đại Từ, Thái Nguyên',
-    eta: 'Dự kiến giao: 14/03/2026',
-    status: 'shipping',
-    steps: [
-      { label: 'Tiếp nhận', time: '10/03/2026 10:12', status: 'done' },
-      { label: 'Đang chuẩn bị hàng', time: '10/03/2026 16:00', status: 'done' },
-      { label: 'Đang giao', time: '11/03/2026 08:10', description: 'Đang vận chuyển tới bưu cục đích', status: 'current' },
-      { label: 'Giao thành công', time: '--', status: 'upcoming' },
-    ],
-  },
-  {
-    id: 'CM20260228',
-    phone: '0912345678',
-    customer: 'Anh Minh',
-    address: '12 Nguyễn Trãi, Hà Nội',
-    eta: 'Đã giao: 02/03/2026',
-    status: 'delivered',
-    steps: [
-      { label: 'Tiếp nhận', time: '28/02/2026 09:12', status: 'done' },
-      { label: 'Đang chuẩn bị hàng', time: '28/02/2026 13:00', status: 'done' },
-      { label: 'Đang giao', time: '01/03/2026 08:15', status: 'done' },
-      { label: 'Giao thành công', time: '02/03/2026 11:25', status: 'done' },
-    ],
-  },
-];
 
 const OrderTracking = () => {
   const { addToast } = useToast();
@@ -69,7 +43,7 @@ const OrderTracking = () => {
       );
       if (found) {
         setResult(found);
-        addToast('Đã tìm thấy đơn hàng', 'success');
+        addToast(t.found, 'success');
       } else {
         setResult(null);
         setNotFound(true);
@@ -83,40 +57,40 @@ const OrderTracking = () => {
       <div className="tracking-container">
         <div className="tracking-hero">
           <div>
-            <p className="hero-kicker">Theo dõi đơn hàng</p>
-            <h1 className="hero-title">Kiểm tra trạng thái giao hàng của bạn</h1>
-            <p className="hero-sub">Nhập mã đơn và số điện thoại để cập nhật lộ trình.</p>
+            <p className="hero-kicker">{t.hero.kicker}</p>
+            <h1 className="hero-title">{t.hero.title}</h1>
+            <p className="hero-sub">{t.hero.subtitle}</p>
           </div>
           <div className="hero-icon"><Package size={46} /></div>
         </div>
 
         <form className="tracking-form" onSubmit={handleSearch}>
           <div className="form-group">
-            <label>Mã đơn hàng</label>
+            <label>{t.form.orderId}</label>
             <div className="input-with-icon">
               <input
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                placeholder="VD: CM20260301"
+                placeholder={t.form.orderIdPlaceholder}
                 required
               />
               <Search size={16} />
             </div>
           </div>
           <div className="form-group">
-            <label>Số điện thoại</label>
+            <label>{t.form.phone}</label>
             <div className="input-with-icon">
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="VD: 0382253049"
+                placeholder={t.form.phonePlaceholder}
                 required
               />
               <Phone size={16} />
             </div>
           </div>
           <button type="submit" className="btn-search" disabled={loading}>
-            {loading ? 'Đang tra cứu...' : 'Tra cứu đơn hàng'}
+            {loading ? t.form.searching : t.form.search}
           </button>
         </form>
 
@@ -124,8 +98,8 @@ const OrderTracking = () => {
           <div className="tracking-empty">
             <XCircle size={28} />
             <div>
-              <h3>Không tìm thấy đơn hàng</h3>
-              <p>Kiểm tra lại mã đơn hàng và số điện thoại bạn đã nhập.</p>
+              <h3>{t.notFound.title}</h3>
+              <p>{t.notFound.desc}</p>
             </div>
           </div>
         )}
@@ -135,12 +109,12 @@ const OrderTracking = () => {
             <div className="result-header">
               <div>
                 <p className="result-id">Mã đơn: <strong>{result.id}</strong></p>
-                <p className="result-meta">Khách hàng: {result.customer}</p>
+                <p className="result-meta">{t.result.customer}: {result.customer}</p>
                 <p className="result-meta">SĐT: {result.phone}</p>
                 <p className="result-meta"><MapPin size={14} /> {result.address}</p>
               </div>
               <div className="result-status">
-                <span className={`status-pill status-${result.status}`}>{result.status}</span>
+                <span className={`status-pill status-${result.status}`}>{tCommon.status[result.status as keyof typeof tCommon.status]}</span>
                 <p className="eta-text">{result.eta}</p>
               </div>
             </div>

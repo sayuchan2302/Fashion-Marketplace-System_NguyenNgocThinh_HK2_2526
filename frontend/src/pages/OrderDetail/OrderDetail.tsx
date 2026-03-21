@@ -1,8 +1,9 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ChevronRight, Package, Truck, CheckCircle2, XCircle, Clock,
-  MapPin, Phone, CreditCard, ArrowLeft, RotateCcw, Copy
+  MapPin, Phone, CreditCard, ArrowLeft, RotateCcw, Copy, X, AlertTriangle
 } from 'lucide-react';
+import { useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPrice } from '../../utils/formatters';
 import './OrderDetail.css';
@@ -25,7 +26,7 @@ interface TimelineStep {
 interface OrderData {
   id: string;
   date: string;
-  status: 'delivered' | 'shipping' | 'processing' | 'cancelled';
+  status: 'pending' | 'delivered' | 'shipping' | 'processing' | 'cancelled';
   statusText: string;
   paymentMethod: string;
   shippingAddress: { name: string; phone: string; address: string };
@@ -39,6 +40,25 @@ interface OrderData {
 }
 
 const MOCK_ORDERS: Record<string, OrderData> = {
+  'CM20260318': {
+    id: 'CM20260318',
+    date: '18/03/2026, 09:00',
+    status: 'pending',
+    statusText: 'Chờ xác nhận',
+    paymentMethod: 'Thanh toán khi nhận hàng (COD)',
+    shippingAddress: { name: 'Ngọc Thịnh Nguyễn', phone: '0382253049', address: 'Q7F, Quốc lộ 37, Thị trấn Hùng Sơn, Huyện Đại Từ, Thái Nguyên' },
+    items: [
+      { name: 'Áo Sơ Mi Nam Dài Tay', variant: 'Trắng | Size: L', qty: 1, price: 399000, image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=120&h=120&fit=crop' },
+      { name: 'Quần Tây Nam Slim', variant: 'Đen | Size: 32', qty: 1, price: 549000, image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=120&h=120&fit=crop' },
+    ],
+    subtotal: 948000, shippingFee: 0, discount: 0, total: 948000,
+    timeline: [
+      { label: 'Đặt hàng thành công', time: '18/03 09:00', done: true, icon: <Clock size={16} /> },
+      { label: 'Chờ xác nhận', time: '', done: false, icon: <CheckCircle2 size={16} /> },
+      { label: 'Đang chuẩn bị hàng', time: '', done: false, icon: <Package size={16} /> },
+      { label: 'Đang vận chuyển', time: '', done: false, icon: <Truck size={16} /> },
+    ],
+  },
   'CM20260301': {
     id: 'CM20260301',
     date: '01/03/2026, 14:32',
@@ -103,10 +123,34 @@ const statusColorMap: Record<string, string> = {
   cancelled: 'status-cancelled',
 };
 
+const CANCEL_REASONS = [
+  'Tôi muốn thay đổi địa chỉ giao hàng',
+  'Tôi muốn thay đổi sản phẩm (size/màu)',
+  'Tôi tìm thấy giá tốt hơn ở nơi khác',
+  'Tôi không còn cần sản phẩm này',
+  'Đặt nhầm / thay đổi ý định',
+  'Lý do khác',
+];
+
 const OrderDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { addToast } = useToast();
   const order = id ? MOCK_ORDERS[id] : null;
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [selectedReason, setSelectedReason] = useState('');
+  const [otherReason, setOtherReason] = useState('');
+
+  const handleCancelOrder = () => {
+    const finalReason = selectedReason === 'Lý do khác' ? otherReason : selectedReason;
+    if (!finalReason) {
+      addToast('Vui lòng chọn hoặc nhập lý do hủy đơn', 'error');
+      return;
+    }
+    addToast('Đã hủy đơn hàng thành công!', 'success');
+    setIsCancelModalOpen(false);
+    setTimeout(() => navigate('/profile'), 1500);
+  };
 
   if (!order) {
     return (
@@ -254,6 +298,16 @@ const OrderDetail = () => {
               {order.status === 'shipping' && (
                 <button className="od-action-btn od-btn-primary">Xác nhận đã nhận hàng</button>
               )}
+              {(order.status === 'pending' || order.status === 'processing') && (
+                <>
+                  <button 
+                    className="od-action-btn od-btn-danger"
+                    onClick={() => setIsCancelModalOpen(true)}
+                  >
+                    <XCircle size={16} /> Hủy đơn hàng
+                  </button>
+                </>
+              )}
               {order.status === 'cancelled' && (
                 <button className="od-action-btn od-btn-primary">Mua lại</button>
               )}
@@ -261,6 +315,66 @@ const OrderDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Cancel Confirmation Modal */}
+      {isCancelModalOpen && (
+        <div className="od-modal-overlay">
+          <div className="od-cancel-modal">
+            <button className="od-modal-close" onClick={() => setIsCancelModalOpen(false)}>
+              <X size={20} />
+            </button>
+            <div className="od-modal-icon">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="od-modal-title">Xác nhận hủy đơn hàng</h3>
+            <p className="od-modal-desc">
+              Bạn có chắc chắn muốn hủy đơn hàng <strong>#{order.id}</strong>? 
+              Hành động này không thể hoàn tác.
+            </p>
+            
+            <div className="od-cancel-reasons">
+              <p className="od-reason-label">Lý do hủy đơn:</p>
+              {CANCEL_REASONS.map((reason) => (
+                <label key={reason} className="od-reason-option">
+                  <input
+                    type="radio"
+                    name="cancelReason"
+                    value={reason}
+                    checked={selectedReason === reason}
+                    onChange={(e) => setSelectedReason(e.target.value)}
+                  />
+                  <span className="od-reason-text">{reason}</span>
+                </label>
+              ))}
+            </div>
+
+            {selectedReason === 'Lý do khác' && (
+              <textarea
+                className="od-reason-input"
+                placeholder="Nhập lý do của bạn..."
+                value={otherReason}
+                onChange={(e) => setOtherReason(e.target.value)}
+                rows={3}
+              />
+            )}
+
+            <div className="od-modal-actions">
+              <button 
+                className="od-btn-cancel-action"
+                onClick={() => setIsCancelModalOpen(false)}
+              >
+                Không, giữ đơn
+              </button>
+              <button 
+                className="od-btn-confirm-cancel"
+                onClick={handleCancelOrder}
+              >
+                Xác nhận hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

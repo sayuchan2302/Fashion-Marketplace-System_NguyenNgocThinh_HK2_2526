@@ -26,4 +26,6 @@ export interface Order {
   addressSummary: string;
   paymentMethod: string;
   statusSteps: OrderStatusStep[];
+  cancelReason?: string;
+  cancelledAt?: string;
 }

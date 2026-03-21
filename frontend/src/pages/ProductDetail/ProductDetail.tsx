@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import ProductGallery from '../../components/ProductGallery/ProductGallery';
@@ -7,7 +7,11 @@ import ProductActions from '../../components/ProductActions/ProductActions';
 import ProductDescription from '../../components/ProductDescription/ProductDescription';
 import ProductSection from '../../components/ProductSection/ProductSection';
 import ProductDetailSkeleton from '../../components/ProductDetailSkeleton/ProductDetailSkeleton';
+import { productService } from '../../services/productService';
+import { CLIENT_TEXT } from '../../utils/texts';
 import './ProductDetail.css';
+
+const t = CLIENT_TEXT.productDetail;
 
 const mockProduct = {
   id: 101,
@@ -33,42 +37,15 @@ const mockProduct = {
   sizes: ['S', 'M', 'L', 'XL', '2XL', '3XL']
 };
 
-const relatedProducts = [
-  {
-    id: 102,
-    name: "Áo Thun Nam Thể Thao",
-    price: 159000,
-    image: "https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/February2025/11025595_24_copy_11.jpg",
-    colors: ['#000000', '#FFFFFF', '#000080']
-  },
-  {
-    id: 103,
-    name: "Quần Short Nam Màu Đen",
-    price: 199000,
-    image: "https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/February2025/11025595_17_copy.jpg",
-    colors: ['#000000']
-  },
-  {
-    id: 104,
-    name: "Ví Da Nam Cao Cấp",
-    price: 349000,
-    originalPrice: 450000,
-    badge: "SALE",
-    image: "https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/February2025/11025595_21.jpg",
-    colors: ['#8B4513', '#000000']
-  },
-  {
-    id: 105,
-    name: "Mũ Lưỡi Trai Logo",
-    price: 99000,
-    image: "https://media.coolmate.me/cdn-cgi/image/width=672,height=990,quality=85/uploads/February2025/11025595_31_copy_91.jpg",
-    colors: ['#000080', '#000000', '#FF0000']
-  }
-];
-
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const product = { ...mockProduct, id: id ? parseInt(id) : mockProduct.id };
+  const productId = id ? parseInt(id) : 101;
+  const product = { ...mockProduct, id: productId };
+
+  // Get related products from service
+  const relatedProducts = useMemo(() => {
+    return productService.getRelated(productId, 4);
+  }, [productId]);
 
   // Selected variant state lifted up here so ProductActions can use it
   const [selectedColor, setSelectedColor] = useState(product.colors[0]?.name ?? '');
@@ -141,11 +118,11 @@ const ProductDetail = () => {
               selectedColor={selectedColor}
               selectedSize={selectedSize}
             />
-            <div className="pd-size-help">
-              <p className="pd-size-text">Phân vân size? Xem bảng size hoặc nhờ CSKH tư vấn.</p>
+<div className="pd-size-help">
+              <p className="pd-size-text">{t.sizeHelp.text}</p>
               <div className="pd-size-links">
-                <Link to="/size-guide" className="pd-size-link">Bảng size</Link>
-                <Link to="/contact" className="pd-size-link">Nhờ tư vấn</Link>
+                <Link to="/size-guide" className="pd-size-link">{t.sizeHelp.sizeGuide}</Link>
+                <Link to="/contact" className="pd-size-link">{t.sizeHelp.consult}</Link>
               </div>
             </div>
           </div>
@@ -156,7 +133,7 @@ const ProductDetail = () => {
            <ProductDescription />
            
            <div className="related-products-section">
-             <ProductSection title="Sản Phẩm Bạn Có Thể Thích" products={relatedProducts} />
+             <ProductSection title={t.related} products={relatedProducts} />
            </div>
         </div>
 

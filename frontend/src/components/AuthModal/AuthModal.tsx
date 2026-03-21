@@ -124,6 +124,13 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
       if (activeTab === 'login') {
         await login(email.trim(), password.trim());
         addToast('Đăng nhập thành công', 'success');
+        
+        const adminSession = authService.getAdminSession();
+        if (adminSession?.user?.role === 'admin') {
+          onClose();
+          navigate('/admin', { replace: true });
+          return;
+        }
       } else {
         await register(fullName.trim(), email.trim(), password.trim());
         addToast('Tạo tài khoản thành công', 'success');
