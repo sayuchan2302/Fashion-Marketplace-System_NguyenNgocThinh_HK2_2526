@@ -29,4 +29,6 @@ export interface Order {
   cancelReason?: string;
   cancelledAt?: string;
   tracking?: string;
+  shippingFee?: number;
+  discount?: number;
 }

@@ -310,6 +310,7 @@ export const ADMIN_DICTIONARY = {
       title: 'Chi tiết khách hàng',
       tabs: {
         activity: 'Hoạt động',
+        body: 'Cơ thể',
         preferences: 'Sở thích',
         notes: 'Ghi chú Admin',
       },
@@ -327,6 +328,7 @@ export const ADMIN_DICTIONARY = {
         weight: 'Cân nặng',
         heightUnit: 'cm',
         weightUnit: 'kg',
+        points: 'Điểm tích lũy',
       },
     },
     filters: {

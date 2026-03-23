@@ -6,5 +6,15 @@ export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
     include: ['framer-motion', 'react/jsx-runtime']
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['lucide-react', 'framer-motion']
+        }
+      }
+    }
   }
 })

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Heart, Eye } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
@@ -34,7 +34,7 @@ const ProductCard = ({ id, sku, name, price, originalPrice, image, badge, colors
   const isWished = isInWishlist(String(sku || id));
 
   const availableSizes = sizes ?? DEFAULT_SIZES;
-  const selectedColorValue = colors?.[selectedColorIdx] ?? '';
+const selectedColorValue = colors?.[selectedColorIdx] ?? '';
 
   const handleSizeClick = (e: React.MouseEvent, size: string) => {
     e.preventDefault();
@@ -185,9 +185,25 @@ const ProductCard = ({ id, sku, name, price, originalPrice, image, badge, colors
         product={{ id: Number(sku) || id, name, price, originalPrice, image, colors, sizes }}
         isOpen={isQuickViewOpen}
         onClose={() => setIsQuickViewOpen(false)}
-      />
+/>
     </div>
   );
 };
 
-export default ProductCard;
+function arePropsEqual(prev: ProductCardProps, next: ProductCardProps) {
+  return (
+    prev.id === next.id &&
+    prev.sku === next.sku &&
+    prev.name === next.name &&
+    prev.price === next.price &&
+    prev.originalPrice === next.originalPrice &&
+    prev.image === next.image &&
+    prev.badge === next.badge &&
+    JSON.stringify(prev.colors) === JSON.stringify(next.colors) &&
+    JSON.stringify(prev.sizes) === JSON.stringify(next.sizes)
+  );
+}
+
+const ProductCardMemo = memo(ProductCard, arePropsEqual);
+
+export default ProductCardMemo;

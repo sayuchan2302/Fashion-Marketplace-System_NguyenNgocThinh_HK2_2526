@@ -74,7 +74,7 @@ const OrderDetail = () => {
             <Package size={64} strokeWidth={1} />
             <h2>Không tìm thấy đơn hàng</h2>
             <p>Đơn hàng #{id} không tồn tại hoặc đã bị xoá.</p>
-            <Link to="/profile" className="od-back-link">Quay lại lịch sử đơn hàng</Link>
+            <Link to="/profile?tab=orders" className="od-back-link">Quay lại lịch sử đơn hàng</Link>
           </div>
         </div>
       </div>
@@ -98,7 +98,7 @@ const OrderDetail = () => {
         </div>
 
         <div className="od-header">
-          <Link to="/profile" className="od-back-btn">
+          <Link to="/profile?tab=orders" className="od-back-btn">
             <ArrowLeft size={18} /> Quay lại
           </Link>
           <div className="od-header-info">

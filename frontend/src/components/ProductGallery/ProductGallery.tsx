@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import './ProductGallery.css';
 
 interface ProductGalleryProps {
   images: string[];
 }
 
-const ProductGallery = ({ images }: ProductGalleryProps) => {
+const ProductGallery = memo(({ images }: ProductGalleryProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
   if (!images || images.length === 0) {
@@ -23,7 +23,7 @@ const ProductGallery = ({ images }: ProductGalleryProps) => {
             onClick={() => setActiveIndex(index)}
             aria-label={`View image ${index + 1}`}
           >
-            <img src={img} alt={`Thumbnail ${index + 1}`} loading="lazy" />
+            <img src={img} alt={`Thumbnail ${index + 1}`} loading="lazy" decoding="async" />
           </button>
         ))}
       </div>
@@ -34,10 +34,12 @@ const ProductGallery = ({ images }: ProductGalleryProps) => {
           src={images[activeIndex]} 
           alt="Product details" 
           className="main-image"
+          loading="eager"
+          decoding="async"
         />
       </div>
     </div>
   );
-};
+});
 
 export default ProductGallery;

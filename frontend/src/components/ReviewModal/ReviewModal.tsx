@@ -118,14 +118,16 @@ const ReviewModal = ({ isOpen, onClose, product, existingReview }: ReviewModalPr
   return (
     <div className="review-modal-overlay" onClick={onClose}>
       <div className="review-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="review-modal-close" onClick={onClose}>
-          <X size={20} />
-        </button>
-
         <div className="review-modal-header">
-          <h3 className="review-modal-title">
-            {existingReview ? t.editTitle : t.writeTitle}
-          </h3>
+          <div>
+            <p className="review-modal-eyebrow">Đánh giá sản phẩm</p>
+            <h3 className="review-modal-title">
+              {existingReview ? t.editTitle : t.writeTitle}
+            </h3>
+          </div>
+          <button className="review-modal-close" onClick={onClose} aria-label="Đóng">
+            <X size={18} />
+          </button>
         </div>
 
         <div className="review-modal-product">
@@ -138,86 +140,88 @@ const ReviewModal = ({ isOpen, onClose, product, existingReview }: ReviewModalPr
           </div>
         </div>
 
-        <div className="review-modal-rating">
-          <label className="review-modal-label">{t.yourRating}</label>
-          <div className="review-stars-input">
-             {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                className={`review-star-btn ${(hoverRating || rating) >= star ? 'active' : ''}`}
-                onClick={() => handleStarClick(star)}
-                onMouseEnter={() => handleStarHover(star)}
-                onMouseLeave={handleStarLeave}
-              >
-                <Star size={32} fill={(hoverRating || rating) >= star ? '#f59e0b' : 'none'} stroke={(hoverRating || rating) >= star ? '#f59e0b' : '#d1d5db'} />
-              </button>
-            ))}
-          </div>
-          <p className="review-rating-text">
-            {t.ratingText[(hoverRating || rating) as keyof typeof t.ratingText]}
-          </p>
-        </div>
-
-        <div className="review-modal-form">
-          <div className="review-form-group">
-            <label className="review-modal-label">{t.titleLabel}</label>
-            <input
-              type="text"
-              className="review-input"
-               placeholder={t.titlePlaceholder}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={100}
-            />
-          </div>
-
-          <div className="review-form-group">
-            <label className="review-modal-label">{t.contentLabel} <span className="required">{t.contentRequired}</span></label>
-            <textarea
-              className="review-textarea"
-               placeholder={t.contentPlaceholder}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={5}
-              maxLength={1000}
-            />
-            <span className="review-char-count">{content.length}/1000</span>
-          </div>
-
-          <div className="review-form-group">
-            <label className="review-modal-label">{t.imageLabel}</label>
-            <div className="review-images-upload">
-              {images.map((img, index) => (
-                <div key={index} className="review-image-preview">
-                  <img src={img} alt={`Upload ${index + 1}`} />
-                  <button
-                    type="button"
-                    className="review-image-remove"
-                    onClick={() => setImages(images.filter((_, i) => i !== index))}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-              {images.length < 5 && (
-                <button 
-                  type="button" 
-                  className="review-image-add"
-                  onClick={() => fileInputRef.current?.click()}
+        <div className="review-modal-body">
+          <div className="review-modal-rating">
+            <label className="review-modal-label">{t.yourRating}</label>
+            <div className="review-stars-input">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  className={`review-star-btn ${(hoverRating || rating) >= star ? 'active' : ''}`}
+                  onClick={() => handleStarClick(star)}
+                  onMouseEnter={() => handleStarHover(star)}
+                  onMouseLeave={handleStarLeave}
                 >
-                  <Camera size={24} />
-                  <span>{t.addImage}</span>
+                  <Star size={32} fill={(hoverRating || rating) >= star ? '#f59e0b' : 'none'} stroke={(hoverRating || rating) >= star ? '#f59e0b' : '#d1d5db'} />
                 </button>
-              )}
+              ))}
+            </div>
+            <p className="review-rating-text">
+              {t.ratingText[(hoverRating || rating) as keyof typeof t.ratingText]}
+            </p>
+          </div>
+
+          <div className="review-modal-form">
+            <div className="review-form-group">
+              <label className="review-modal-label">{t.titleLabel}</label>
               <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageUpload}
-                style={{ display: 'none' }}
+                type="text"
+                className="review-input"
+                placeholder={t.titlePlaceholder}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={100}
               />
+            </div>
+
+            <div className="review-form-group">
+              <label className="review-modal-label">{t.contentLabel} <span className="required">{t.contentRequired}</span></label>
+              <textarea
+                className="review-textarea"
+                placeholder={t.contentPlaceholder}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={5}
+                maxLength={1000}
+              />
+              <span className="review-char-count">{content.length}/1000</span>
+            </div>
+
+            <div className="review-form-group">
+              <label className="review-modal-label">{t.imageLabel}</label>
+              <div className="review-images-upload">
+                {images.map((img, index) => (
+                  <div key={index} className="review-image-preview">
+                    <img src={img} alt={`Upload ${index + 1}`} />
+                    <button
+                      type="button"
+                      className="review-image-remove"
+                      onClick={() => setImages(images.filter((_, i) => i !== index))}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                {images.length < 5 && (
+                  <button 
+                    type="button" 
+                    className="review-image-add"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera size={24} />
+                    <span>{t.addImage}</span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  style={{ display: 'none' }}
+                />
+              </div>
             </div>
           </div>
         </div>

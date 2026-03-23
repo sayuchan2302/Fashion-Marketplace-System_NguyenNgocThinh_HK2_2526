@@ -15,7 +15,7 @@ import { ADMIN_DICTIONARY } from './adminDictionary';
 import { calculateTier, type LoyaltyTier } from '../../utils/tierUtils';
 
 type AccountStatus = 'active' | 'banned';
-type DrawerTab = 'activity' | 'preferences' | 'notes';
+type DrawerTab = 'activity' | 'body' | 'preferences' | 'notes';
 
 interface PendingLockAction {
   ids: string[];
@@ -842,14 +842,14 @@ const AdminCustomers = () => {
                     <div><p className="admin-muted small">Ngày sinh</p><p className="admin-bold">{formatDate(activeCustomer.dob)}</p></div>
                     <div><p className="admin-muted small">Địa chỉ</p><p className="admin-bold">{activeCustomer.address}</p></div>
                     <div><p className="admin-muted small">Tổng chi tiêu</p><p className="admin-bold">{formatCurrencyVnd(activeCustomer.totalSpent)}</p></div>
-                    {activeCustomer.height && <div><p className="admin-muted small">{t.drawer.preferences.height}</p><p className="admin-bold">{activeCustomer.height} {t.drawer.preferences.heightUnit}</p></div>}
-                    {activeCustomer.weight && <div><p className="admin-muted small">{t.drawer.preferences.weight}</p><p className="admin-bold">{activeCustomer.weight} {t.drawer.preferences.weightUnit}</p></div>}
+                    <div><p className="admin-muted small">{t.drawer.preferences.points}</p><p className="admin-bold">{Math.floor(activeCustomer.totalSpent / 1000).toLocaleString('vi-VN')} điểm</p></div>
                   </div>
                 </section>
 
                 <section className="drawer-section">
                   <div className="customer-drawer-tabs">
                     <button className={drawerTab === 'activity' ? 'active' : ''} onClick={() => setDrawerTab('activity')}>{t.drawer.tabs.activity}</button>
+                    <button className={drawerTab === 'body' ? 'active' : ''} onClick={() => setDrawerTab('body')}>{t.drawer.tabs.body}</button>
                     <button className={drawerTab === 'preferences' ? 'active' : ''} onClick={() => setDrawerTab('preferences')}>{t.drawer.tabs.preferences}</button>
                     <button className={drawerTab === 'notes' ? 'active' : ''} onClick={() => setDrawerTab('notes')}>{t.drawer.tabs.notes}</button>
                   </div>
@@ -871,24 +871,30 @@ const AdminCustomers = () => {
                       </motion.div>
                     )}
 
+                    {drawerTab === 'body' && (
+                      <motion.div key="body" className="customer-tab-content" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
+                        <div className="customer-body-stats">
+                          {activeCustomer.height && (
+                            <div className="body-stat">
+                              <span className="body-stat-label">{t.drawer.preferences.height}</span>
+                              <span className="body-stat-value">{activeCustomer.height}{t.drawer.preferences.heightUnit}</span>
+                            </div>
+                          )}
+                          {activeCustomer.weight && (
+                            <div className="body-stat">
+                              <span className="body-stat-label">{t.drawer.preferences.weight}</span>
+                              <span className="body-stat-value">{activeCustomer.weight}{t.drawer.preferences.weightUnit}</span>
+                            </div>
+                          )}
+                          {!activeCustomer.height && !activeCustomer.weight && (
+                            <p className="admin-muted">Khách hàng chưa cập nhật thông số cơ thể</p>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+
                     {drawerTab === 'preferences' && (
                       <motion.div key="preferences" className="customer-tab-content" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
-                        {(activeCustomer.height || activeCustomer.weight) && (
-                          <div className="customer-body-stats">
-                            {activeCustomer.height && (
-                              <div className="body-stat">
-                                <span className="body-stat-label">{t.drawer.preferences.height}</span>
-                                <span className="body-stat-value">{activeCustomer.height}{t.drawer.preferences.heightUnit}</span>
-                              </div>
-                            )}
-                            {activeCustomer.weight && (
-                              <div className="body-stat">
-                                <span className="body-stat-label">{t.drawer.preferences.weight}</span>
-                                <span className="body-stat-value">{activeCustomer.weight}{t.drawer.preferences.weightUnit}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
                         <ul className="customer-pref-list">
                           {activeCustomer.favoriteCategories.map((item) => (
                             <li key={item.name}>

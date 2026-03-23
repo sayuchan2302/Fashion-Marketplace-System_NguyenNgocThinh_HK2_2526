@@ -21,7 +21,8 @@ import {
   Star,
   Info,
   Trash,
-  CheckCheck
+  CheckCheck,
+  Pencil
 } from 'lucide-react';
 import AddressModal from './AddressModal';
 import EmptyState from '../../components/EmptyState/EmptyState';
@@ -115,6 +116,7 @@ const Profile = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
 
   useEffect(() => {
@@ -127,8 +129,24 @@ const Profile = () => {
     setSavedAddresses(addressService.getAll());
   };
 
+  const handleEditAddress = (address: Address) => {
+    setEditingAddress(address);
+    setIsAddressModalOpen(true);
+  };
+
+  const handleAddAddress = () => {
+    setEditingAddress(null);
+    setIsAddressModalOpen(true);
+  };
+
+  const handleCloseAddressModal = () => {
+    setIsAddressModalOpen(false);
+    setEditingAddress(null);
+  };
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [vouchers, setVouchers] = useState<Coupon[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     if (activeTab === 'orders') {
@@ -293,7 +311,12 @@ const Profile = () => {
                   <div key={order.id} className="order-card">
                     <div className="order-card-header">
                       <div className="order-card-meta">
-                        <Link to={`/profile/orders/${order.id}`} className="order-id">Mã đơn: #{order.id}</Link>
+                        <button 
+                          className="order-id-link"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          Mã đơn: #{order.id}
+                        </button>
                         <span className="order-date">{new Date(order.createdAt).toLocaleDateString('vi-VN')}</span>
                       </div>
                       <span className={`order-status-badge status-${order.status}`}>
@@ -325,7 +348,12 @@ const Profile = () => {
                         <span className="order-total-price">{order.total.toLocaleString('vi-VN')}đ</span>
                       </div>
                       <div className="order-actions">
-                        <Link to={`/profile/orders/${order.id}`} className="order-action-btn order-btn-outline">Xem chi tiết</Link>
+                        <button 
+                          className="order-action-btn order-btn-outline"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          Xem chi tiết
+                        </button>
                         {order.status === 'delivered' && (
                           <button className="order-action-btn order-btn-primary">Đánh giá</button>
                         )}
@@ -384,7 +412,7 @@ const Profile = () => {
           <div className="tab-pane">
             <div className="address-header">
               <h2 className="profile-content-title">Địa chỉ của tôi</h2>
-              <button className="address-add-btn" onClick={() => setIsAddressModalOpen(true)}>
+              <button className="address-add-btn" onClick={handleAddAddress}>
                 <span>+</span> THÊM ĐỊA CHỈ MỚI
               </button>
             </div>
@@ -412,16 +440,26 @@ const Profile = () => {
                         <p className="address-card-detail">{addr.detail}</p>
                         <p className="address-card-region">{addr.ward}, {addr.district}, {addr.province}</p>
                       </div>
-                      <button 
-                        className="address-card-delete" 
-                        onClick={() => {
-                          addressService.remove(addr.id);
-                          refreshAddresses();
-                          addToast('Đã xóa địa chỉ', 'success');
-                        }}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="address-card-actions">
+                        <button 
+                          className="address-card-edit" 
+                          onClick={() => handleEditAddress(addr)}
+                          aria-label="Chỉnh sửa địa chỉ"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button 
+                          className="address-card-delete" 
+                          onClick={() => {
+                            addressService.remove(addr.id);
+                            refreshAddresses();
+                            addToast('Đã xóa địa chỉ', 'success');
+                          }}
+                          aria-label="Xóa địa chỉ"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -552,7 +590,7 @@ const Profile = () => {
             ) : (
               <div className="notifications-list">
                 {notifications.map((notif) => (
-                  <button 
+                  <div 
                     key={notif.id} 
                     className={`notification-card ${!notif.read ? 'unread' : ''}`}
                     onClick={() => {
@@ -563,7 +601,6 @@ const Profile = () => {
                         navigate(notif.link);
                       }
                     }}
-                    type="button"
                   >
                     <div className={`notification-icon notification-icon-${notif.type}`}>
                       {notif.type === 'order' && <Package size={20} />}
@@ -572,11 +609,13 @@ const Profile = () => {
                       {notif.type === 'system' && <Info size={20} />}
                     </div>
                     <div className="notification-content">
-                      <p className="notification-title">{notif.title}</p>
+                      <p className="notification-title">
+                        {notif.title}
+                        <span className="notification-time">
+                          {notificationService.formatTimeAgo(notif.createdAt)}
+                        </span>
+                      </p>
                       <p className="notification-message">{notif.message}</p>
-                      <span className="notification-time">
-                        {notificationService.formatTimeAgo(notif.createdAt)}
-                      </span>
                     </div>
                     <button 
                       className="notification-delete"
@@ -590,7 +629,7 @@ const Profile = () => {
                       <Trash size={16} aria-hidden="true" />
                     </button>
                     {!notif.read && <span className="notification-dot" />}
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -701,103 +740,110 @@ const Profile = () => {
       {isAccountModalOpen && (
         <div className="profile-modal-overlay" onClick={() => setIsAccountModalOpen(false)}>
           <div className="profile-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="profile-modal-close" onClick={() => setIsAccountModalOpen(false)}>
-              <X size={20} />
-            </button>
-            <h2 className="profile-modal-title">Chỉnh sửa thông tin tài khoản</h2>
-            
-            <form className="profile-modal-form" onSubmit={(e) => { e.preventDefault(); setIsAccountModalOpen(false); }}>
-              {/* Name Input */}
-              <div className="modal-input-group mt-10">
-                <span className="modal-floating-label">Họ và tên</span>
-                <User className="modal-input-icon" size={18} aria-hidden="true" />
-                <input type="text" className="modal-input" defaultValue={user.name} autoComplete="name" name="name" />
+            <div className="profile-modal-header">
+              <div>
+                <p className="profile-modal-eyebrow">Hồ sơ cá nhân</p>
+                <h2>Cập nhật thông tin</h2>
               </div>
-              
-              {/* DOB Inputs */}
-              <div className="modal-flex-row mt-10 gap-4">
-                <div className="modal-input-group">
-                  <span className="modal-floating-label">Ngày</span>
-                  <Calendar className="modal-input-icon" size={18} aria-hidden="true" />
-                  <input type="text" className="modal-input select-arrow-pad" defaultValue="23" autoComplete="bday-day" name="bday-day" aria-label="Ngày sinh" />
-                  <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
-                </div>
-                <div className="modal-input-group">
-                  <span className="modal-floating-label">Tháng</span>
-                  <Calendar className="modal-input-icon" size={18} aria-hidden="true" />
-                  <input type="text" className="modal-input select-arrow-pad" defaultValue="2" autoComplete="bday-month" name="bday-month" aria-label="Tháng sinh" />
-                  <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
-                </div>
-                <div className="modal-input-group">
-                  <span className="modal-floating-label">Năm</span>
-                  <Calendar className="modal-input-icon" size={18} aria-hidden="true" />
-                  <input type="text" className="modal-input select-arrow-pad" defaultValue="2004" autoComplete="bday-year" name="bday-year" aria-label="Năm sinh" />
-                  <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
-                </div>
-              </div>
-              
-              {/* Gender Radio */}
-              <div className="modal-flex-row mt-10 mb-2 gap-6 items-center">
-                <label className="modal-radio-label">
-                  <input type="radio" name="gender" value="Nam" defaultChecked />
-                  <span className="radio-custom"></span>
-                  Nam
-                </label>
-                <label className="modal-radio-label">
-                  <input type="radio" name="gender" value="Nữ" />
-                  <span className="radio-custom"></span>
-                  Nữ
-                </label>
-                <label className="modal-radio-label">
-                  <input type="radio" name="gender" value="Khác" />
-                  <span className="radio-custom"></span>
-                  Không tiết lộ
-                </label>
-              </div>
-              
-              {/* Phone Input */}
-              <div className="modal-input-group mt-10">
-                <span className="modal-floating-label">Số điện thoại</span>
-                <div className="modal-input-icon">
-                  <img src="https://flagcdn.com/w20/vn.png" alt="VN Flag" className="w-5 h-auto rounded-sm" />
-                </div>
-                <input type="text" className="modal-input" defaultValue={user.phone} />
-              </div>
-              
-              {/* Height Slider */}
-              <div className="modal-slider-group mt-10">
-                <span className="modal-slider-label">Chiều cao</span>
-                <input 
-                  type="range" 
-                  min="100" 
-                  max="190" 
-                  value={height} 
-                  onChange={(e) => setHeight(e.target.value)}
-                  className="modal-slider mx-4" 
-                  style={{ '--val': `${((Number(height) - 100) / (190 - 100)) * 100}%` } as React.CSSProperties}
-                />
-                <span className="modal-slider-val text-co-black font-bold">{height}cm</span>
-              </div>
-              
-              {/* Weight Slider */}
-              <div className="modal-slider-group mt-10 mb-8">
-                <span className="modal-slider-label">Cân nặng</span>
-                <input 
-                  type="range" 
-                  min="30" 
-                  max="90" 
-                  value={weight} 
-                  onChange={(e) => setWeight(e.target.value)}
-                  className="modal-slider mx-4" 
-                  style={{ '--val': `${((Number(weight) - 30) / (90 - 30)) * 100}%` } as React.CSSProperties}
-                />
-                <span className="modal-slider-val text-co-black font-bold">{weight}kg</span>
-              </div>
-              
-              <button type="submit" className="modal-submit-btn">
-                CẬP NHẬT THÔNG TIN <span className="ml-2">→</span>
+              <button className="profile-modal-close" onClick={() => setIsAccountModalOpen(false)} aria-label="Đóng">
+                <X size={18} />
               </button>
-            </form>
+            </div>
+            
+            <div className="profile-modal-body">
+              <form className="profile-modal-form" onSubmit={(e) => { e.preventDefault(); setIsAccountModalOpen(false); }}>
+                {/* Name Input */}
+                <div className="modal-input-group">
+                  <span className="modal-floating-label">Họ và tên</span>
+                  <User className="modal-input-icon" size={18} aria-hidden="true" />
+                  <input type="text" className="modal-input" defaultValue={user.name} autoComplete="name" name="name" />
+                </div>
+                
+                {/* DOB Inputs */}
+                <div className="modal-flex-row gap-4">
+                  <div className="modal-input-group">
+                    <span className="modal-floating-label">Ngày</span>
+                    <Calendar className="modal-input-icon" size={18} aria-hidden="true" />
+                    <input type="text" className="modal-input select-arrow-pad" defaultValue="23" autoComplete="bday-day" name="bday-day" aria-label="Ngày sinh" />
+                    <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
+                  </div>
+                  <div className="modal-input-group">
+                    <span className="modal-floating-label">Tháng</span>
+                    <Calendar className="modal-input-icon" size={18} aria-hidden="true" />
+                    <input type="text" className="modal-input select-arrow-pad" defaultValue="2" autoComplete="bday-month" name="bday-month" aria-label="Tháng sinh" />
+                    <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
+                  </div>
+                  <div className="modal-input-group">
+                    <span className="modal-floating-label">Năm</span>
+                    <Calendar className="modal-input-icon" size={18} aria-hidden="true" />
+                    <input type="text" className="modal-input select-arrow-pad" defaultValue="2004" autoComplete="bday-year" name="bday-year" aria-label="Năm sinh" />
+                    <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
+                  </div>
+                </div>
+                
+                {/* Gender Radio */}
+                <div className="modal-flex-row gap-6 items-center">
+                  <label className="modal-radio-label">
+                    <input type="radio" name="gender" value="Nam" defaultChecked />
+                    <span className="radio-custom"></span>
+                    Nam
+                  </label>
+                  <label className="modal-radio-label">
+                    <input type="radio" name="gender" value="Nữ" />
+                    <span className="radio-custom"></span>
+                    Nữ
+                  </label>
+                  <label className="modal-radio-label">
+                    <input type="radio" name="gender" value="Khác" />
+                    <span className="radio-custom"></span>
+                    Không tiết lộ
+                  </label>
+                </div>
+                
+                {/* Phone Input */}
+                <div className="modal-input-group">
+                  <span className="modal-floating-label">Số điện thoại</span>
+                  <div className="modal-input-icon">
+                    <img src="https://flagcdn.com/w20/vn.png" alt="VN Flag" className="w-5 h-auto rounded-sm" />
+                  </div>
+                  <input type="text" className="modal-input" defaultValue={user.phone} />
+                </div>
+                
+                {/* Height Slider */}
+                <div className="modal-slider-group">
+                  <span className="modal-slider-label">Chiều cao</span>
+                  <input 
+                    type="range" 
+                    min="100" 
+                    max="190" 
+                    value={height} 
+                    onChange={(e) => setHeight(e.target.value)}
+                    className="modal-slider mx-4" 
+                    style={{ '--val': `${((Number(height) - 100) / (190 - 100)) * 100}%` } as React.CSSProperties}
+                  />
+                  <span className="modal-slider-val text-co-black font-bold">{height}cm</span>
+                </div>
+                
+                {/* Weight Slider */}
+                <div className="modal-slider-group">
+                  <span className="modal-slider-label">Cân nặng</span>
+                  <input 
+                    type="range" 
+                    min="30" 
+                    max="90" 
+                    value={weight} 
+                    onChange={(e) => setWeight(e.target.value)}
+                    className="modal-slider mx-4" 
+                    style={{ '--val': `${((Number(weight) - 30) / (90 - 30)) * 100}%` } as React.CSSProperties}
+                  />
+                  <span className="modal-slider-val text-co-black font-bold">{weight}kg</span>
+                </div>
+                
+                <button type="submit" className="modal-submit-btn">
+                  CẬP NHẬT THÔNG TIN
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -806,60 +852,65 @@ const Profile = () => {
       {isPasswordModalOpen && (
         <div className="profile-modal-overlay" onClick={() => setIsPasswordModalOpen(false)}>
           <div className="profile-modal modal-sm" onClick={(e) => e.stopPropagation()}>
-            <button className="profile-modal-close" onClick={() => setIsPasswordModalOpen(false)}>
-              <X size={20} />
-            </button>
-            <h2 className="profile-modal-title leading-tight whitespace-pre-line">
-              {"Chỉnh sửa thông tin\ntài khoản"}
-            </h2>
-            
-            <form className="profile-modal-form mt-8" onSubmit={(e) => { e.preventDefault(); setIsPasswordModalOpen(false); }}>
-              {/* Old Password */}
-              <div className="modal-input-group mt-10">
-                <span className="modal-floating-label">Mật khẩu cũ</span>
-                <Lock className="modal-input-icon text-gray-400" size={18} />
-                <input 
-                  type={showOldPassword ? "text" : "password"} 
-                  className="modal-input pr-10" 
-                  defaultValue="password123" 
-                />
-                <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} className="profile-modal-icon-btn">
-                  {showOldPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
-                </button>
+            <div className="profile-modal-header">
+              <div>
+                <p className="profile-modal-eyebrow">Bảo mật</p>
+                <h2>Đổi mật khẩu</h2>
               </div>
-
-              {/* New Password */}
-              <div className="modal-input-group mt-10">
-                <span className="modal-floating-label hidden-if-empty">Mật khẩu mới</span>
-                <Lock className="modal-input-icon text-gray-300" size={18} />
-                <input 
-                  type={showNewPassword ? "text" : "password"} 
-                  className="modal-input pr-10 text-gray-400" 
-                  placeholder="Mật khẩu mới" 
-                />
-                <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="profile-modal-icon-btn">
-                  {showNewPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
-                </button>
-              </div>
-
-              {/* Confirm Password */}
-              <div className="modal-input-group mt-10 mb-10">
-                <span className="modal-floating-label hidden-if-empty">Nhập lại mật khẩu</span>
-                <Lock className="modal-input-icon text-gray-300" size={18} />
-                <input 
-                  type={showConfirmPassword ? "text" : "password"} 
-                  className="modal-input pr-10 text-gray-400" 
-                  placeholder="Nhập lại mật khẩu" 
-                />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="profile-modal-icon-btn">
-                  {showConfirmPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
-                </button>
-              </div>
-
-              <button type="submit" className="modal-submit-btn">
-                CẬP NHẬT MẬT KHẨU
+              <button className="profile-modal-close" onClick={() => setIsPasswordModalOpen(false)} aria-label="Đóng">
+                <X size={18} />
               </button>
-            </form>
+            </div>
+            
+            <div className="profile-modal-body">
+              <form className="profile-modal-form" onSubmit={(e) => { e.preventDefault(); setIsPasswordModalOpen(false); }}>
+                {/* Old Password */}
+                <div className="modal-input-group">
+                  <span className="modal-floating-label">Mật khẩu cũ</span>
+                  <Lock className="modal-input-icon text-gray-400" size={18} />
+                  <input 
+                    type={showOldPassword ? "text" : "password"} 
+                    className="modal-input pr-10" 
+                    defaultValue="password123" 
+                  />
+                  <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} className="profile-modal-icon-btn" aria-label={showOldPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}>
+                    {showOldPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
+                  </button>
+                </div>
+
+                {/* New Password */}
+                <div className="modal-input-group">
+                  <span className="modal-floating-label hidden-if-empty">Mật khẩu mới</span>
+                  <Lock className="modal-input-icon text-gray-300" size={18} />
+                  <input 
+                    type={showNewPassword ? "text" : "password"} 
+                    className="modal-input pr-10 text-gray-400" 
+                    placeholder="Mật khẩu mới" 
+                  />
+                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="profile-modal-icon-btn" aria-label={showNewPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}>
+                    {showNewPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
+                  </button>
+                </div>
+
+                {/* Confirm Password */}
+                <div className="modal-input-group">
+                  <span className="modal-floating-label hidden-if-empty">Nhập lại mật khẩu</span>
+                  <Lock className="modal-input-icon text-gray-300" size={18} />
+                  <input 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    className="modal-input pr-10 text-gray-400" 
+                    placeholder="Nhập lại mật khẩu" 
+                  />
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="profile-modal-icon-btn" aria-label={showConfirmPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}>
+                    {showConfirmPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
+                  </button>
+                </div>
+
+                <button type="submit" className="modal-submit-btn">
+                  CẬP NHẬT MẬT KHẨU
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -867,9 +918,153 @@ const Profile = () => {
       {/* Address Modal */}
       <AddressModal
         isOpen={isAddressModalOpen}
-        onClose={() => setIsAddressModalOpen(false)}
+        onClose={handleCloseAddressModal}
         onSave={refreshAddresses}
+        editingAddress={editingAddress}
       />
+
+      {/* Order Detail Drawer */}
+      {selectedOrder && (
+        <div className="profile-modal-overlay" onClick={() => setSelectedOrder(null)}>
+          <div className="profile-modal order-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="profile-modal-header">
+              <div>
+                <p className="profile-modal-eyebrow">Chi tiết đơn hàng</p>
+                <h2>#{selectedOrder.id}</h2>
+              </div>
+              <button className="profile-modal-close" onClick={() => setSelectedOrder(null)} aria-label="Đóng">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="profile-modal-body">
+              {/* Status & Date */}
+              <div className="order-drawer-status">
+                <span className={`order-status-badge status-${selectedOrder.status}`}>
+                  {tCommon.status[selectedOrder.status]}
+                </span>
+                <span className="order-drawer-date">
+                  {new Date(selectedOrder.createdAt).toLocaleString('vi-VN')}
+                </span>
+              </div>
+
+              {/* Products */}
+              <div className="order-drawer-section">
+                <h4>Sản phẩm ({selectedOrder.items.length})</h4>
+                <div className="order-drawer-items">
+                  {selectedOrder.items.map((item, idx) => (
+                    <div key={idx} className="order-drawer-item">
+                      <img src={item.image} alt={item.name} className="order-drawer-item-img" />
+                      <div className="order-drawer-item-info">
+                        <p className="order-drawer-item-name">{item.name}</p>
+                        {item.color && <p className="order-drawer-item-variant">Màu: {item.color}</p>}
+                        {item.size && <p className="order-drawer-item-variant">Size: {item.size}</p>}
+                        <p className="order-drawer-item-qty">x{item.quantity}</p>
+                      </div>
+                      <span className="order-drawer-item-price">{(item.price * item.quantity).toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              <div className="order-drawer-section">
+                <h4>Địa chỉ giao hàng</h4>
+                <p className="order-drawer-address">{selectedOrder.addressSummary}</p>
+              </div>
+
+              {/* Payment Method */}
+              <div className="order-drawer-section">
+                <h4>Phương thức thanh toán</h4>
+                <p className="order-drawer-payment">
+                  {selectedOrder.paymentMethod === 'cod' && 'Thanh toán khi nhận hàng (COD)'}
+                  {selectedOrder.paymentMethod === 'banking' && 'Chuyển khoản ngân hàng'}
+                  {selectedOrder.paymentMethod === 'vnpay' && 'VNPay'}
+                  {selectedOrder.paymentMethod === 'momo' && 'MoMo'}
+                  {!selectedOrder.paymentMethod && 'Chưa cập nhật'}
+                </p>
+              </div>
+
+              {/* Tracking Timeline */}
+              {selectedOrder.statusSteps && selectedOrder.statusSteps.length > 0 && (
+                <div className="order-drawer-section">
+                  <h4>Hành trình đơn hàng</h4>
+                  <div className="order-drawer-timeline">
+                    {selectedOrder.statusSteps.map((step, idx) => (
+                      <div key={idx} className={`order-timeline-step ${step.timestamp ? 'completed' : ''}`}>
+                        <div className="order-timeline-dot"></div>
+                        <div className="order-timeline-content">
+                          <p className="order-timeline-label">{step.label}</p>
+                          {step.timestamp && (
+                            <p className="order-timeline-time">
+                              {new Date(step.timestamp).toLocaleString('vi-VN')}
+                            </p>
+                          )}
+                          {step.description && (
+                            <p className="order-timeline-desc">{step.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="order-drawer-summary">
+                <div className="order-drawer-summary-row">
+                  <span>Tạm tính</span>
+                  <span>{selectedOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0).toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="order-drawer-summary-row">
+                  <span>Phí vận chuyển</span>
+                  <span>{selectedOrder.shippingFee?.toLocaleString('vi-VN') || '30.000'}đ</span>
+                </div>
+                <div className="order-drawer-summary-row">
+                  <span>Giảm giá</span>
+                  <span>-{selectedOrder.discount?.toLocaleString('vi-VN') || '0'}đ</span>
+                </div>
+                <div className="order-drawer-summary-row total">
+                  <span>Tổng cộng</span>
+                  <span>{selectedOrder.total.toLocaleString('vi-VN')}đ</span>
+                </div>
+              </div>
+
+              {/* Cancel Reason (if cancelled) */}
+              {selectedOrder.status === 'cancelled' && selectedOrder.cancelReason && (
+                <div className="order-drawer-section order-drawer-cancel-info">
+                  <h4>Lý do hủy</h4>
+                  <p className="order-drawer-cancel-reason">{selectedOrder.cancelReason}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="profile-modal-footer">
+              {selectedOrder.status === 'pending' && (
+                <button 
+                  className="order-action-btn order-btn-danger"
+                  onClick={() => {
+                    if (confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
+                      orderService.cancel(selectedOrder.id, 'Khách hàng hủy đơn');
+                      setOrders(orderService.list());
+                      setSelectedOrder(null);
+                      addToast('Đã hủy đơn hàng thành công', 'success');
+                    }
+                  }}
+                >
+                  Hủy đơn hàng
+                </button>
+              )}
+              <button 
+                className="order-action-btn order-btn-outline"
+                onClick={() => setSelectedOrder(null)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Review Modal */}
       {reviewProduct && (

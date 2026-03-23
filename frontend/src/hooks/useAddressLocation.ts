@@ -38,6 +38,7 @@ export interface UseAddressLocationReturn {
   setSelectedDistrictCode: (code: string) => void;
   setSelectedWardCode: (code: string) => void;
   clearSelection: () => void;
+  setLocationByNames: (provinceName: string, districtName: string, wardName: string) => Promise<void>;
   getProvinceName: (code: string) => string;
   getDistrictName: (code: string) => string;
   getWardName: (code: string) => string;
@@ -124,6 +125,47 @@ export function useAddressLocation(options: UseAddressLocationOptions = {}): Use
     setWards([]);
   }, []);
 
+  const setLocationByNames = useCallback(async (provinceName: string, districtName: string, wardName: string) => {
+    const province = provinces.find(p => p.name === provinceName);
+    if (!province) return;
+    
+    setSelectedProvinceCodeState(String(province.code));
+    setSelectedProvinceName(provinceName);
+    setLoadingDistricts(true);
+    
+    try {
+      const distRes = await fetch(`${API_BASE}/p/${province.code}?depth=2`);
+      const distData: { districts: District[] } = await distRes.json();
+      setDistricts(distData.districts || []);
+      
+      const district = distData.districts?.find(d => d.name === districtName);
+      if (!district) {
+        setLoadingDistricts(false);
+        return;
+      }
+      
+      setSelectedDistrictCodeState(String(district.code));
+      setSelectedDistrictName(districtName);
+      setLoadingWards(true);
+      
+      try {
+        const wardRes = await fetch(`${API_BASE}/d/${district.code}?depth=2`);
+        const wardData: { wards: Ward[] } = await wardRes.json();
+        setWards(wardData.wards || []);
+        
+        const ward = wardData.wards?.find(w => w.name === wardName);
+        if (ward) {
+          setSelectedWardCodeState(String(ward.code));
+          setSelectedWardName(wardName);
+        }
+      } finally {
+        setLoadingWards(false);
+      }
+    } finally {
+      setLoadingDistricts(false);
+    }
+  }, [provinces]);
+
   useEffect(() => {
     if (!loadOnMount) return;
     setLoadingProvinces(true);
@@ -183,6 +225,7 @@ export function useAddressLocation(options: UseAddressLocationOptions = {}): Use
     setSelectedDistrictCode,
     setSelectedWardCode,
     clearSelection,
+    setLocationByNames,
     getProvinceName,
     getDistrictName,
     getWardName,
