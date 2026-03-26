@@ -7,6 +7,7 @@ import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminStateBlock } from './AdminStateBlocks';
 import { PanelStatsGrid, PanelTabs, PanelViewSummary } from '../../components/Panel/PanelPrimitives';
 import { useToast } from '../../contexts/ToastContext';
+import Drawer from '../../components/Drawer/Drawer';
 import { listAdminOrders, subscribeAdminOrders } from './adminOrderService';
 import type { AdminOrderRecord } from './adminOrderService';
 
@@ -44,7 +45,7 @@ const FINANCIAL_TABS: Array<{ key: FinancialFilter; label: string }> = [
 const DEFAULT_COMMISSION_RATE = 0.05;
 const PAGE_SIZE = 8;
 
-const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')} đ`;
+const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')} ₫`;
 
 const formatStatusLabel = (status: FinancialStatus) => {
   if (status === 'PENDING_PAYOUT') return 'Chờ đối soát';
@@ -460,10 +461,9 @@ const AdminFinancials = () => {
         onConfirm={applyPayout}
       />
 
-      {detailRecord && (
-        <>
-          <div className="drawer-overlay" onClick={() => setDetailRecord(null)} />
-          <div className="drawer financial-drawer">
+      <Drawer open={Boolean(detailRecord)} onClose={() => setDetailRecord(null)} className="financial-drawer">
+        {detailRecord ? (
+          <>
             <div className="drawer-header">
               <div>
                 <p className="drawer-eyebrow">Chi tiết tài chính</p>
@@ -536,9 +536,9 @@ const AdminFinancials = () => {
                 </button>
               )}
             </div>
-          </div>
-        </>
-      )}
+          </>
+        ) : null}
+      </Drawer>
     </AdminLayout>
   );
 };

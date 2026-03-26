@@ -26,7 +26,7 @@ const AdminContent = () => {
       const list = await contentService.list(mapTabToType(tab));
       setItems(list);
     } catch (error) {
-      pushToast(t.messages.loadFailed || 'Khong tai duoc noi dung');
+      pushToast('Kh?ng t?i ???c noi dung');
     } finally {
       setLoading(false);
     }
@@ -103,7 +103,7 @@ const AdminContent = () => {
           <div className="admin-search">
             <Search size={16} />
             <input
-              placeholder="Tim noi dung..."
+              placeholder="T?m noi dung..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -128,10 +128,10 @@ const AdminContent = () => {
       </div>
 
       <div className="admin-content-list">
-        {loading && <p className="admin-muted">Dang tai noi dung...</p>}
+        {loading && <p className="admin-muted">?ang t?i noi dung...</p>}
         {!loading && filteredItems.length === 0 ? (
           <div className="admin-empty-state">
-            <p>Chua co noi dung nao</p>
+            <p>Ch?a co noi dung nao</p>
             <button className="admin-primary-btn" onClick={() => setIsCreating(true)}>
               <Plus size={16} /> Them noi dung dau tien
             </button>

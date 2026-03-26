@@ -5,6 +5,7 @@ import VendorLayout from './VendorLayout';
 import { calculateCommission, formatCurrency } from '../../services/commissionService';
 import { vendorPortalService } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 
 type Period = 'today' | 'week' | 'month';
@@ -59,7 +60,7 @@ const VendorAnalytics = () => {
         setAnalytics(next);
       } catch (err: unknown) {
         if (!active) return;
-        addToast((err as Error)?.message || 'Không tải được thống kê của shop', 'error');
+        addToast(getUiErrorMessage(err, 'Không tải được thống kê của shop'), 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -123,7 +124,7 @@ const VendorAnalytics = () => {
   return (
     <VendorLayout
       title="Doanh thu thực nhận và hiệu suất shop"
-      breadcrumbs={[{ label: 'Bảng điều khiển', to: '/vendor/dashboard' }, { label: 'Thống kê người bán' }]}
+      breadcrumbs={['Kênh Người Bán', 'Doanh thu thực nhận']}
       actions={(
         <>
           <div className="admin-tabs vendor-inline-tabs">

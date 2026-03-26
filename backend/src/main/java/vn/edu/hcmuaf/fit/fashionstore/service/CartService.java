@@ -33,7 +33,7 @@ public class CartService {
     }
 
     public Cart getCartByUserId(UUID userId) {
-        return cartRepository.findByUserId(userId)
+        return cartRepository.findByUserIdWithItems(userId)
                 .orElseGet(() -> createCartForUser(userId));
     }
 

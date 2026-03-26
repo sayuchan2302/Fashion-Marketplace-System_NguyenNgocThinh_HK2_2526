@@ -3,6 +3,7 @@ package vn.edu.hcmuaf.fit.fashionstore.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,6 +17,10 @@ import java.util.UUID;
 public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     Optional<Product> findBySlug(String slug);
+
+    boolean existsBySlugIgnoreCase(String slug);
+
+    boolean existsBySlugIgnoreCaseAndIdNot(String slug, UUID id);
 
     @Query("""
             SELECT p FROM Product p
@@ -75,6 +80,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     /**
      * Find all products belonging to a specific store (vendor)
      */
+    @EntityGraph(attributePaths = {"category", "variants"})
     Page<Product> findByStoreId(UUID storeId, Pageable pageable);
 
     /**
@@ -95,6 +101,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     /**
      * Find product by ID only if it belongs to the specified store (ownership check)
      */
+    @EntityGraph(attributePaths = {"category", "variants"})
     Optional<Product> findByIdAndStoreId(UUID id, UUID storeId);
 
     /**
@@ -115,9 +122,106 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
      */
     long countByStoreId(UUID storeId);
 
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.storeId = :storeId AND p.status = :status")
+    long countByStoreIdAndStatus(@Param("storeId") UUID storeId, @Param("status") Product.ProductStatus status);
+
+    @Query("""
+            SELECT COUNT(p) FROM Product p
+            WHERE p.storeId = :storeId
+              AND p.status <> 'ARCHIVED'
+            """)
+    long countByStoreIdExcludingArchived(@Param("storeId") UUID storeId);
+
     /**
      * Count active products by store
      */
     @Query("SELECT COUNT(p) FROM Product p WHERE p.storeId = :storeId AND p.status = 'ACTIVE'")
     long countActiveByStoreId(@Param("storeId") UUID storeId);
+
+    @Query("""
+            SELECT COUNT(p) FROM Product p
+            WHERE p.storeId = :storeId
+              AND p.status = 'ACTIVE'
+              AND (
+                SELECT COALESCE(SUM(v.stockQuantity), 0)
+                FROM ProductVariant v
+                WHERE v.product = p
+                  AND COALESCE(v.isActive, true) = true
+              ) <= 0
+            """)
+    long countOutOfStockByStoreId(@Param("storeId") UUID storeId);
+
+    @Query("""
+            SELECT COUNT(p) FROM Product p
+            WHERE p.storeId = :storeId
+              AND p.status = 'ACTIVE'
+              AND (
+                SELECT COALESCE(SUM(v.stockQuantity), 0)
+                FROM ProductVariant v
+                WHERE v.product = p
+                  AND COALESCE(v.isActive, true) = true
+              ) > 0
+              AND (
+                SELECT COALESCE(SUM(v.stockQuantity), 0)
+                FROM ProductVariant v
+                WHERE v.product = p
+                  AND COALESCE(v.isActive, true) = true
+              ) < :threshold
+            """)
+    long countLowStockByStoreId(@Param("storeId") UUID storeId, @Param("threshold") int threshold);
+
+    @Query("""
+            SELECT p FROM Product p
+            LEFT JOIN p.category c
+            WHERE p.storeId = :storeId
+              AND (
+                :status IS NULL
+                OR (:status = 'DRAFT' AND p.status IN ('DRAFT', 'INACTIVE'))
+                OR p.status = :status
+              )
+              AND (:categoryId IS NULL OR c.id = :categoryId)
+              AND (
+                COALESCE(:keyword, '') = ''
+                OR LOWER(COALESCE(p.name, '')) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+                OR LOWER(COALESCE(p.slug, '')) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+                OR LOWER(COALESCE(c.name, '')) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+              )
+              AND (
+                :inventoryState IS NULL
+                OR (
+                  :inventoryState = 'OUT'
+                  AND (
+                    SELECT COALESCE(SUM(v.stockQuantity), 0)
+                    FROM ProductVariant v
+                    WHERE v.product = p
+                      AND COALESCE(v.isActive, true) = true
+                  ) <= 0
+                )
+                OR (
+                  :inventoryState = 'LOW'
+                  AND (
+                    SELECT COALESCE(SUM(v.stockQuantity), 0)
+                    FROM ProductVariant v
+                    WHERE v.product = p
+                      AND COALESCE(v.isActive, true) = true
+                  ) > 0
+                  AND (
+                    SELECT COALESCE(SUM(v.stockQuantity), 0)
+                    FROM ProductVariant v
+                    WHERE v.product = p
+                      AND COALESCE(v.isActive, true) = true
+                  ) < :lowStockThreshold
+                )
+              )
+              AND p.status <> 'ARCHIVED'
+            """)
+    Page<Product> searchVendorProducts(
+            @Param("storeId") UUID storeId,
+            @Param("status") Product.ProductStatus status,
+            @Param("keyword") String keyword,
+            @Param("categoryId") UUID categoryId,
+            @Param("inventoryState") String inventoryState,
+            @Param("lowStockThreshold") int lowStockThreshold,
+            Pageable pageable
+    );
 }

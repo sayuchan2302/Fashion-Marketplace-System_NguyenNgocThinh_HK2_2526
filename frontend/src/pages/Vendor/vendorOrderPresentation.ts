@@ -1,36 +1,34 @@
-import type { FulfillmentStatus } from '../Admin/orderWorkflow';
+import type { VendorOrderLifecycleStatus } from '../../services/vendorPortalService';
 
 type VendorStatusTone = 'pending' | 'teal' | 'success' | 'error' | 'neutral';
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ xác nhận',
-  packing: 'Đang đóng gói',
-  shipping: 'Đang giao',
-  done: 'Hoàn tất',
-  canceled: 'Đã hủy',
   confirmed: 'Đã xác nhận',
   processing: 'Đang xử lý',
+  shipped: 'Đang giao',
   delivered: 'Đã giao',
-  completed: 'Hoàn thành',
   cancelled: 'Đã hủy',
+  canceled: 'Đã hủy',
+  shipping: 'Đang giao',
+  completed: 'Đã giao',
+  done: 'Đã giao',
 };
 
 const STATUS_TONES: Record<string, VendorStatusTone> = {
   pending: 'pending',
-  packing: 'teal',
-  shipping: 'teal',
-  done: 'success',
-  canceled: 'error',
   confirmed: 'teal',
   processing: 'teal',
+  shipped: 'teal',
   delivered: 'success',
-  completed: 'success',
+  done: 'success',
   cancelled: 'error',
+  canceled: 'error',
 };
 
-export const getVendorOrderStatusLabel = (status: FulfillmentStatus | string) => STATUS_LABELS[status] || status;
+export const getVendorOrderStatusLabel = (status: VendorOrderLifecycleStatus | string) => STATUS_LABELS[status] || status;
 
-export const getVendorOrderStatusTone = (status: FulfillmentStatus | string): VendorStatusTone =>
+export const getVendorOrderStatusTone = (status: VendorOrderLifecycleStatus | string): VendorStatusTone =>
   STATUS_TONES[status] || 'neutral';
 
 export const formatVendorOrderDate = (dateStr: string, withTime = false) => {

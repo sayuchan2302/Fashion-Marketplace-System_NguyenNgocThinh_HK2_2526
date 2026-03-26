@@ -12,9 +12,11 @@ import {
 } from '../../components/Panel/PanelPrimitives';
 import { adminReviewService } from '../Admin/adminReviewService';
 import { reviewService, type Review } from '../../services/reviewService';
+import { authService } from '../../services/authService';
 import { useToast } from '../../contexts/ToastContext';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
+import Drawer from '../../components/Drawer/Drawer';
 
 const TABS = [
   { key: 'all', label: 'Tất cả' },
@@ -39,6 +41,7 @@ const RatingStars = ({ rating }: { rating: number }) => (
 
 const VendorReviews = () => {
   const { addToast } = useToast();
+  const storeId = authService.getSession()?.user.storeId || '';
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'need_reply' | 'negative'>('all');
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
@@ -49,7 +52,7 @@ const VendorReviews = () => {
 
   const reviews = useMemo(() => {
     void version;
-    const rows = reviewService.getReviews();
+    const rows = reviewService.getReviewsByStore(storeId);
     return rows.filter((review) => {
       const keyword = query.trim().toLowerCase();
       const matchesSearch =
@@ -62,11 +65,11 @@ const VendorReviews = () => {
             : review.rating <= 3;
       return matchesSearch && matchesTab;
     });
-  }, [activeTab, query, version]);
+  }, [activeTab, query, storeId, version]);
 
   const stats = useMemo(() => {
     void version;
-    const rows = reviewService.getReviews();
+    const rows = reviewService.getReviewsByStore(storeId);
     return {
       total: rows.length,
       needReply: rows.filter((review) => !review.shopReply).length,
@@ -155,7 +158,7 @@ const VendorReviews = () => {
   return (
     <VendorLayout
       title="Đánh giá, phản hồi và uy tín shop"
-      breadcrumbs={[{ label: 'Đánh giá và phản hồi' }, { label: 'Uy tín gian hàng' }]}
+      breadcrumbs={['Kênh Người Bán', 'Đánh giá và phản hồi']}
       actions={
         <>
           <PanelSearchField
@@ -309,10 +312,9 @@ const VendorReviews = () => {
         onConfirm={() => confirmReplyIds?.forEach((id) => submitReply(id))}
       />
 
-      {activeReview ? (
-        <>
-          <div className="drawer-overlay" onClick={() => setActiveReview(null)} />
-          <div className="drawer">
+      <Drawer open={Boolean(activeReview)} onClose={() => setActiveReview(null)}>
+        {activeReview ? (
+          <>
             <PanelDrawerHeader
               eyebrow="Chi tiết đánh giá"
               title={activeReview.productName}
@@ -367,9 +369,9 @@ const VendorReviews = () => {
                 </button>
               ) : null}
             </PanelDrawerFooter>
-          </div>
-        </>
-      ) : null}
+          </>
+        ) : null}
+      </Drawer>
     </VendorLayout>
   );
 };

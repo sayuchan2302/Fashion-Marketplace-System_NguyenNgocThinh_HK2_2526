@@ -1,5 +1,6 @@
 package vn.edu.hcmuaf.fit.fashionstore.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -16,6 +17,7 @@ import lombok.experimental.SuperBuilder;
 @Table(name = "addresses")
 public class Address extends BaseEntity {
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

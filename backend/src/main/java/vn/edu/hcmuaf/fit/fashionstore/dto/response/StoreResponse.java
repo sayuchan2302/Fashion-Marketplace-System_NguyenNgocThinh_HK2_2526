@@ -38,6 +38,36 @@ public class StoreResponse {
 
     private String address;
 
+    private String bankName;
+
+    private String bankAccountNumber;
+
+    private String bankAccountHolder;
+
+    private Boolean bankVerified;
+
+    private Boolean notifyNewOrder;
+
+    private Boolean notifyOrderStatusChange;
+
+    private Boolean notifyLowStock;
+
+    private Boolean notifyPayoutComplete;
+
+    private Boolean notifyPromotions;
+
+    private Boolean shipGhn;
+
+    private Boolean shipGhtk;
+
+    private Boolean shipExpress;
+
+    private String warehouseAddress;
+
+    private String warehouseContact;
+
+    private String warehousePhone;
+
     private Double commissionRate;
 
     private String status;

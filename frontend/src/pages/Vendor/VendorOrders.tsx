@@ -1,12 +1,11 @@
 import './Vendor.css';
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Filter, Link2, ShieldCheck, Truck } from 'lucide-react';
+import { Eye, Link2, ShieldCheck, Truck, XCircle, PackageCheck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import {
   PanelFloatingBar,
-  PanelSearchField,
   PanelStatsGrid,
   PanelTableFooter,
   PanelTabs,
@@ -18,134 +17,291 @@ import {
   getVendorOrderStatusTone,
 } from './vendorOrderPresentation';
 import { formatCurrency } from '../../services/commissionService';
-import { vendorPortalService, type VendorOrderSummary } from '../../services/vendorPortalService';
+import { vendorPortalService, type VendorOrdersPage } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
-import { AdminStateBlock } from '../Admin/AdminStateBlocks';
+import { getUiErrorMessage } from '../../utils/errorMessage';
+import { AdminStateBlock, AdminTableSkeleton } from '../Admin/AdminStateBlocks';
 import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
 
-const TABS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'pending', label: 'Chờ xác nhận' },
-  { key: 'processing', label: 'Đang xử lý' },
-  { key: 'shipping', label: 'Đang giao' },
-  { key: 'completed', label: 'Hoàn thành' },
-  { key: 'cancelled', label: 'Đã hủy' },
-] as const;
+type VendorOrderTab =
+  | 'all'
+  | 'pending'
+  | 'confirmed'
+  | 'processing'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
+
+type OrderUpdateStatus = 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 type PendingAction = {
   ids: string[];
-  nextStatus: 'CONFIRMED' | 'SHIPPED';
+  nextStatus: OrderUpdateStatus;
   title: string;
   description: string;
   confirmLabel: string;
   selectedItems: string[];
+  requireTracking?: boolean;
+  requireReason?: boolean;
+};
+
+const PAGE_SIZE = 8;
+
+const TABS: Array<{ key: VendorOrderTab; label: string }> = [
+  { key: 'all', label: 'Tất cả' },
+  { key: 'pending', label: 'Chờ xác nhận' },
+  { key: 'processing', label: 'Đang xử lý' },
+  { key: 'shipped', label: 'Đang giao' },
+  { key: 'delivered', label: 'Đã giao' },
+  { key: 'cancelled', label: 'Đã hủy' },
+];
+
+const emptyOrdersPage: VendorOrdersPage = {
+  items: [],
+  totalElements: 0,
+  totalPages: 1,
+  page: 1,
+  pageSize: PAGE_SIZE,
+  statusCounts: {
+    all: 0,
+    pending: 0,
+    confirmed: 0,
+    processing: 0,
+    shipped: 0,
+    delivered: 0,
+    cancelled: 0,
+  },
+};
+
+const normalizeTab = (value: string | null): VendorOrderTab => {
+  if (
+    value === 'pending'
+    || value === 'confirmed'
+    || value === 'processing'
+    || value === 'shipped'
+    || value === 'delivered'
+    || value === 'cancelled'
+  ) {
+    return value;
+  }
+
+  return 'all';
+};
+
+const normalizePositiveInteger = (value: string | null, fallback = 1) => {
+  const parsed = Number(value || fallback);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+};
+
+const buildActionMeta = (status: OrderUpdateStatus): {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  requireTracking?: boolean;
+  requireReason?: boolean;
+} => {
+  switch (status) {
+    case 'CONFIRMED':
+      return {
+        title: 'Xác nhận đơn hàng con',
+        description: 'Đơn đã chọn sẽ chuyển sang trạng thái đã xác nhận để shop tiếp nhận.',
+        confirmLabel: 'Xác nhận đơn',
+      };
+    case 'PROCESSING':
+      return {
+        title: 'Bắt đầu xử lý đơn',
+        description: 'Đơn đã chọn sẽ chuyển sang trạng thái đang xử lý để kho đóng gói.',
+        confirmLabel: 'Bắt đầu xử lý',
+      };
+    case 'SHIPPED':
+      return {
+        title: 'Bàn giao đơn cho vận chuyển',
+        description: 'Cần nhập mã vận đơn và đơn vị vận chuyển trước khi chuyển sang đang giao.',
+        confirmLabel: 'Bàn giao vận chuyển',
+        requireTracking: true,
+      };
+    case 'DELIVERED':
+      return {
+        title: 'Xác nhận đã giao thành công',
+        description: 'Đơn đã chọn sẽ được đánh dấu đã giao và cập nhật đối soát payout.',
+        confirmLabel: 'Xác nhận đã giao',
+      };
+    case 'CANCELLED':
+      return {
+        title: 'Hủy đơn hàng con',
+        description: 'Cần nhập lý do hủy để hệ thống audit và thông báo cho khách hàng.',
+        confirmLabel: 'Xác nhận hủy',
+        requireReason: true,
+      };
+    default:
+      return {
+        title: 'Cập nhật trạng thái',
+        description: 'Bạn có chắc chắn muốn cập nhật trạng thái đơn?',
+        confirmLabel: 'Cập nhật',
+      };
+  }
 };
 
 const VendorOrders = () => {
   const { addToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('status') || 'all';
-  const [orders, setOrders] = useState<VendorOrderSummary[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(1);
+
+  const activeTab = normalizeTab(searchParams.get('status'));
+  const page = normalizePositiveInteger(searchParams.get('page'));
+  const keyword = (searchParams.get('q') || '').trim();
+  const dateFrom = searchParams.get('date_from') || '';
+  const dateTo = searchParams.get('date_to') || '';
+
+  const [searchQuery, setSearchQuery] = useState(keyword);
+  const [ordersPage, setOrdersPage] = useState<VendorOrdersPage>(emptyOrdersPage);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
-  const perPage = 8;
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [carrier, setCarrier] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
+
+  const updateQuery = useCallback(
+    (mutate: (query: URLSearchParams) => void, replace = false) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          mutate(next);
+          return next;
+        },
+        { replace },
+      );
+    },
+    [setSearchParams],
+  );
 
   useEffect(() => {
-    let active = true;
+    if (searchQuery !== keyword) {
+      setSearchQuery(keyword);
+    }
+  }, [keyword, searchQuery]);
 
-    const load = async () => {
-      try {
-        const next = await vendorPortalService.getOrders();
-        if (!active) return;
-        startTransition(() => setOrders(next));
-      } catch (err: unknown) {
-        if (!active) return;
-        addToast((err as Error)?.message || 'Không tải được danh sách đơn hàng con', 'error');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    load();
-    return () => {
-      active = false;
-    };
-  }, [addToast]);
-
-  const filteredOrders = useMemo(() => {
-    let next = orders;
-
-    if (activeTab !== 'all') {
-      if (activeTab === 'processing') {
-        next = next.filter((order) => order.status === 'packing');
-      } else if (activeTab === 'completed') {
-        next = next.filter((order) => order.status === 'done');
-      } else {
-        next = next.filter((order) => order.status === activeTab);
-      }
+  useEffect(() => {
+    if (searchQuery.trim() === keyword) {
+      return;
     }
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      next = next.filter((order) =>
-        order.id.toLowerCase().includes(query) ||
-        order.customer.toLowerCase().includes(query) ||
-        order.email.toLowerCase().includes(query),
+    const timer = window.setTimeout(() => {
+      setSelected(new Set());
+      updateQuery(
+        (query) => {
+          const normalized = searchQuery.trim();
+          if (normalized) {
+            query.set('q', normalized);
+          } else {
+            query.delete('q');
+          }
+          query.set('page', '1');
+        },
+        true,
       );
+    }, 260);
+
+    return () => window.clearTimeout(timer);
+  }, [keyword, searchQuery, updateQuery]);
+
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const next = await vendorPortalService.getOrders({
+        status: activeTab,
+        page,
+        size: PAGE_SIZE,
+        keyword: keyword || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+
+      startTransition(() => {
+        setOrdersPage(next);
+      });
+
+      setSelected((prev) => {
+        const availableIds = new Set(next.items.map((item) => item.id));
+        return new Set(Array.from(prev).filter((id) => availableIds.has(id)));
+      });
+
+      if (page > next.totalPages) {
+        updateQuery((query) => {
+          query.set('page', String(next.totalPages));
+        }, true);
+      }
+    } catch (err: unknown) {
+      addToast(getUiErrorMessage(err, 'Không tải được danh sách đơn hàng shop'), 'error');
+    } finally {
+      setLoading(false);
     }
+  }, [activeTab, addToast, dateFrom, dateTo, keyword, page, updateQuery]);
 
-    return next;
-  }, [activeTab, orders, searchQuery]);
+  useEffect(() => {
+    void loadOrders();
+  }, [loadOrders]);
 
-  const tabCounts = useMemo(() => ({
-    all: orders.length,
-    pending: orders.filter((order) => order.status === 'pending').length,
-    processing: orders.filter((order) => order.status === 'packing').length,
-    shipping: orders.filter((order) => order.status === 'shipping').length,
-    completed: orders.filter((order) => order.status === 'done').length,
-    cancelled: orders.filter((order) => order.status === 'canceled').length,
-  }), [orders]);
+  const paginatedOrders = ordersPage.items;
+  const totalPages = Math.max(ordersPage.totalPages || 1, 1);
+  const startIndex = paginatedOrders.length === 0 ? 0 : (ordersPage.page - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(ordersPage.page * PAGE_SIZE, ordersPage.totalElements);
 
-  const totalPages = Math.max(Math.ceil(filteredOrders.length / perPage), 1);
-  const safePage = Math.min(page, totalPages);
-  const startIndex = filteredOrders.length === 0 ? 0 : (safePage - 1) * perPage + 1;
-  const endIndex = Math.min(safePage * perPage, filteredOrders.length);
+  const tabCounts = useMemo(() => {
+    const source = ordersPage.statusCounts || {};
+    const activeTotal = ordersPage.totalElements;
+    const resolvedActiveKey = activeTab === 'all' ? 'all' : activeTab;
+    return {
+      all: Number(source.all || (activeTab === 'all' ? activeTotal : 0)),
+      pending: Number(source.pending || (resolvedActiveKey === 'pending' ? activeTotal : 0)),
+      confirmed: Number(source.confirmed || (resolvedActiveKey === 'confirmed' ? activeTotal : 0)),
+      processing: Number(source.processing || (resolvedActiveKey === 'processing' ? activeTotal : 0)),
+      shipped: Number(source.shipped || (resolvedActiveKey === 'shipped' ? activeTotal : 0)),
+      delivered: Number(source.delivered || (resolvedActiveKey === 'delivered' ? activeTotal : 0)),
+      cancelled: Number(source.cancelled || (resolvedActiveKey === 'cancelled' ? activeTotal : 0)),
+    };
+  }, [activeTab, ordersPage.statusCounts, ordersPage.totalElements]);
 
-  const paginatedOrders = useMemo(() => {
-    const start = (safePage - 1) * perPage;
-    return filteredOrders.slice(start, start + perPage);
-  }, [filteredOrders, safePage]);
-
-  const hasViewContext = activeTab !== 'all' || Boolean(searchQuery.trim());
+  const hasViewContext = activeTab !== 'all' || Boolean(keyword) || Boolean(dateFrom) || Boolean(dateTo);
 
   const handleTabChange = (key: string) => {
-    setSearchParams({ status: key });
-    setPage(1);
+    const nextTab = normalizeTab(key);
     setSelected(new Set());
+    updateQuery((query) => {
+      if (nextTab === 'all') {
+        query.delete('status');
+      } else {
+        query.set('status', nextTab);
+      }
+      query.set('page', '1');
+    });
+  };
+
+  const setPage = (nextPage: number) => {
+    updateQuery((query) => {
+      query.set('page', String(Math.max(1, nextPage)));
+    });
   };
 
   const resetCurrentView = () => {
     setSearchQuery('');
-    setSearchParams({ status: 'all' });
-    setPage(1);
     setSelected(new Set());
+    setSearchParams(new URLSearchParams());
   };
 
   const shareCurrentView = async () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('status', activeTab);
-    if (searchQuery.trim()) url.searchParams.set('q', searchQuery.trim());
-    await navigator.clipboard.writeText(url.toString());
-    addToast('Đã sao chép bộ lọc hiện tại của đơn hàng shop', 'success');
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      addToast('Đã sao chép bộ lọc hiện tại của đơn hàng shop', 'success');
+    } catch {
+      addToast('Không thể sao chép bộ lọc', 'error');
+    }
   };
 
   const toggleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelected(new Set(filteredOrders.map((order) => order.id)));
+      setSelected(new Set(paginatedOrders.map((order) => order.id)));
       return;
     }
     setSelected(new Set());
@@ -158,55 +314,82 @@ const VendorOrders = () => {
     setSelected(next);
   };
 
-  const askStatusUpdate = (ids: string[], nextStatus: 'CONFIRMED' | 'SHIPPED') => {
-    const selectedOrders = orders.filter((order) => ids.includes(order.id));
+  const askStatusUpdate = (ids: string[], nextStatus: OrderUpdateStatus) => {
+    const selectedOrders = paginatedOrders.filter((order) => ids.includes(order.id));
     if (selectedOrders.length === 0) return;
 
+    const meta = buildActionMeta(nextStatus);
+
+    setTrackingNumber('');
+    setCarrier('');
+    setCancelReason('');
     setPendingAction({
       ids,
       nextStatus,
-      title: nextStatus === 'CONFIRMED' ? 'Xác nhận đơn hàng con' : 'Bàn giao đơn cho vận chuyển',
-      description:
-        nextStatus === 'CONFIRMED'
-          ? 'Các đơn hàng con đã chọn sẽ chuyển sang trạng thái đã xác nhận để đội shop bắt đầu xử lý.'
-          : 'Các đơn hàng con đã chọn sẽ chuyển sang trạng thái đang giao để đồng bộ fulfillment.',
-      confirmLabel: nextStatus === 'CONFIRMED' ? 'Xác nhận đơn' : 'Bàn giao vận chuyển',
+      title: meta.title,
+      description: meta.description,
+      confirmLabel: meta.confirmLabel,
+      requireTracking: meta.requireTracking,
+      requireReason: meta.requireReason,
       selectedItems: selectedOrders.map((order) => order.id),
     });
-  };
-
-  const performStatusUpdate = async (orderId: string, status: 'CONFIRMED' | 'SHIPPED') => {
-    setUpdatingId(orderId);
-    await vendorPortalService.updateOrderStatus(orderId, status);
-    setOrders((current) =>
-      current.map((order) => {
-        if (order.id !== orderId) return order;
-        if (status === 'CONFIRMED') return { ...order, status: 'packing' };
-        return { ...order, status: 'shipping' };
-      }),
-    );
-    setUpdatingId(null);
   };
 
   const confirmPendingAction = async () => {
     if (!pendingAction) return;
 
-    const ids = pendingAction.ids;
+    if (pendingAction.requireTracking) {
+      if (!trackingNumber.trim()) {
+        addToast('Cần nhập mã vận đơn trước khi bàn giao', 'error');
+        return;
+      }
+      if (!carrier.trim()) {
+        addToast('Cần nhập đơn vị vận chuyển trước khi bàn giao', 'error');
+        return;
+      }
+    }
+
+    if (pendingAction.requireReason && !cancelReason.trim()) {
+      addToast('Cần nhập lý do hủy đơn', 'error');
+      return;
+    }
+
+    setUpdating(true);
     try {
-      setUpdatingId(ids[0] ?? 'bulk');
-      await Promise.all(ids.map((id) => performStatusUpdate(id, pendingAction.nextStatus)));
+      await Promise.all(
+        pendingAction.ids.map((id) =>
+          vendorPortalService.updateOrderStatus(id, pendingAction.nextStatus, {
+            trackingNumber: pendingAction.requireTracking ? trackingNumber.trim() : undefined,
+            carrier: pendingAction.requireTracking ? carrier.trim() : undefined,
+            reason: pendingAction.requireReason ? cancelReason.trim() : undefined,
+          }),
+        ),
+      );
+
       setSelected(new Set());
-      addToast('Đã cập nhật trạng thái đơn hàng con', 'success');
-    } catch (err: unknown) {
-      addToast((err as Error)?.message || 'Không thể cập nhật trạng thái đơn hàng con', 'error');
-    } finally {
-      setUpdatingId(null);
       setPendingAction(null);
+      addToast('Đã cập nhật trạng thái đơn hàng con', 'success');
+      await loadOrders();
+    } catch (err: unknown) {
+      addToast(getUiErrorMessage(err, 'Không thể cập nhật trạng thái đơn hàng'), 'error');
+    } finally {
+      setUpdating(false);
     }
   };
 
-  const actionablePendingIds = Array.from(selected).filter((id) => orders.find((order) => order.id === id)?.status === 'pending');
-  const actionablePackingIds = Array.from(selected).filter((id) => orders.find((order) => order.id === id)?.status === 'packing');
+  const actionablePendingIds = Array.from(selected).filter(
+    (id) => paginatedOrders.find((order) => order.id === id)?.status === 'pending',
+  );
+  const actionableConfirmedIds = Array.from(selected).filter(
+    (id) => paginatedOrders.find((order) => order.id === id)?.status === 'confirmed',
+  );
+  const actionableProcessingIds = Array.from(selected).filter(
+    (id) => paginatedOrders.find((order) => order.id === id)?.status === 'processing',
+  );
+  const actionableCancelableIds = Array.from(selected).filter((id) => {
+    const status = paginatedOrders.find((order) => order.id === id)?.status;
+    return status === 'pending' || status === 'confirmed' || status === 'processing';
+  });
 
   const statItems = [
     {
@@ -220,27 +403,27 @@ const VendorOrders = () => {
       key: 'pending',
       label: 'Chờ xác nhận',
       value: tabCounts.pending,
-      sub: 'Cần shop kiểm tra ngay',
-      tone: 'warning',
+      sub: 'Cần shop tiếp nhận ngay',
+      tone: 'warning' as const,
       onClick: () => handleTabChange('pending'),
     },
     {
-      key: 'shipping',
-      label: 'Đang giao',
-      value: tabCounts.shipping,
-      sub: 'Đang bàn giao cho đối tác vận chuyển',
-      tone: 'info',
-      onClick: () => handleTabChange('shipping'),
+      key: 'processing',
+      label: 'Đang xử lý',
+      value: tabCounts.processing,
+      sub: 'Đang đóng gói và chuẩn bị giao',
+      tone: 'info' as const,
+      onClick: () => handleTabChange('processing'),
     },
     {
-      key: 'completed',
-      label: 'Hoàn thành',
-      value: tabCounts.completed,
-      sub: 'Đơn đã kết toán cho shop',
-      tone: 'success',
-      onClick: () => handleTabChange('completed'),
+      key: 'delivered',
+      label: 'Đã giao',
+      value: tabCounts.delivered,
+      sub: 'Đơn đã hoàn tất đối soát',
+      tone: 'success' as const,
+      onClick: () => handleTabChange('delivered'),
     },
-  ] as const;
+  ];
 
   const tabItems = TABS.map((tab) => ({
     key: tab.key,
@@ -252,191 +435,262 @@ const VendorOrders = () => {
     ...(activeTab !== 'all'
       ? [{ key: 'status', label: `Trạng thái: ${TABS.find((tab) => tab.key === activeTab)?.label || 'Tất cả'}` }]
       : []),
-    ...(searchQuery.trim() ? [{ key: 'query', label: `Từ khóa: ${searchQuery.trim()}` }] : []),
+    ...(keyword ? [{ key: 'query', label: `Từ khóa: ${keyword}` }] : []),
+    ...(dateFrom ? [{ key: 'from', label: `Từ ngày: ${dateFrom}` }] : []),
+    ...(dateTo ? [{ key: 'to', label: `Đến ngày: ${dateTo}` }] : []),
   ];
+
+  const allSelected = paginatedOrders.length > 0 && selected.size === paginatedOrders.length;
 
   return (
     <VendorLayout
       title="Đơn hàng shop"
-      breadcrumbs={[{ label: 'Đơn hàng shop' }, { label: 'Xử lý đơn hàng con' }]}
+      breadcrumbs={['Kênh Người Bán', 'Đơn hàng']}
       actions={(
-        <>
-          <PanelSearchField
-            placeholder="Tìm theo mã đơn, tên khách hoặc email"
-            value={searchQuery}
-            onChange={(value) => {
-              setSearchQuery(value);
-              setPage(1);
-            }}
-          />
+        <div className="admin-actions-inline">
           <button className="admin-ghost-btn" onClick={() => void shareCurrentView()}>
             <Link2 size={16} />
-            Chia sẻ bộ lọc
+            Sao chép bộ lọc
           </button>
-          <button className="admin-ghost-btn" onClick={resetCurrentView}>
-            <Filter size={16} />
-            Đặt lại
-          </button>
-        </>
+        </div>
       )}
     >
-      <PanelStatsGrid items={[...statItems]} accentClassName="vendor-stat-button" />
+      <div className="admin-top-grid">
+        <PanelStatsGrid items={statItems} />
+      </div>
 
-      <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
-
-      {hasViewContext && <PanelViewSummary chips={summaryChips} clearLabel="Xóa bộ lọc" onClear={resetCurrentView} />}
-
-      <section className="admin-panels single">
+      <div className="admin-panels single">
         <div className="admin-panel">
+
+          <div className="admin-toolbar">
+            <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
+          </div>
+
+          {hasViewContext && (
+            <PanelViewSummary chips={summaryChips} clearLabel="Xóa bộ lọc" onClear={resetCurrentView} />
+          )}
+
           {loading ? (
+            <AdminTableSkeleton columns={8} rows={6} />
+          ) : paginatedOrders.length === 0 ? (
             <AdminStateBlock
-              type="empty"
-              title="Đang tải đơn hàng con"
-              description="Dữ liệu fulfillment của shop đang được đồng bộ từ marketplace."
-            />
-          ) : filteredOrders.length === 0 ? (
-            <AdminStateBlock
-              type={searchQuery.trim() ? 'search-empty' : 'empty'}
-              title={searchQuery.trim() ? 'Không tìm thấy đơn hàng phù hợp' : 'Chưa có đơn hàng con phù hợp'}
+              type={hasViewContext ? 'search-empty' : 'empty'}
+              title={hasViewContext ? 'Không tìm thấy đơn hàng phù hợp' : 'Chưa có đơn hàng'}
               description={
-                searchQuery.trim()
-                  ? 'Thử đổi từ khóa hoặc quay về toàn bộ đơn hàng để tiếp tục xử lý fulfillment.'
-                  : 'Khi shop phát sinh sub-order mới, danh sách xử lý sẽ xuất hiện tại đây.'
+                hasViewContext
+                  ? 'Thử đổi bộ lọc, từ khóa, hoặc khoảng ngày để tìm kết quả.'
+                  : 'Đơn sẽ hiển thị tại đây khi shop có đơn mới.'
               }
-              actionLabel={searchQuery.trim() ? 'Đặt lại bộ lọc' : undefined}
-              onAction={searchQuery.trim() ? resetCurrentView : undefined}
+              actionLabel={hasViewContext ? 'Xóa bộ lọc' : undefined}
+              onAction={hasViewContext ? resetCurrentView : undefined}
             />
           ) : (
             <>
-              <div className="admin-table" role="table" aria-label="Bảng đơn hàng con của shop">
-                <div className="admin-table-row vendor-orders admin-table-head" role="row">
-                  <div role="columnheader">
+              <div className="admin-table vendor-table">
+                <div className="admin-table-head admin-table-row vendor-orders">
+                  <div>
                     <input
                       type="checkbox"
-                      aria-label="Chọn tất cả đơn hàng"
-                      checked={selected.size === filteredOrders.length && filteredOrders.length > 0}
+                      checked={allSelected}
                       onChange={(event) => toggleSelectAll(event.target.checked)}
                     />
                   </div>
-                  <div role="columnheader">Đơn hàng</div>
-                  <div role="columnheader">Khách hàng</div>
-                  <div role="columnheader">Tổng tiền</div>
-                  <div role="columnheader">Phí sàn</div>
-                  <div role="columnheader">Thực nhận</div>
-                  <div role="columnheader">Trạng thái</div>
-                  <div role="columnheader">Vận hành</div>
-                  <div role="columnheader">Hành động</div>
+                  <div>Mã đơn</div>
+                  <div>Khách hàng</div>
+                  <div>Giá trị</div>
+                  <div>Trạng thái</div>
+                  <div>Vận hành</div>
+                  <div>Ngày tạo</div>
+                  <div>Hành động</div>
                 </div>
 
-                {paginatedOrders.map((order, index) => (
-                  <motion.div
-                    key={order.id}
-                    className="admin-table-row vendor-orders"
-                    role="row"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2, delay: Math.min(index * 0.025, 0.14) }}
-                    whileHover={{ y: -1 }}
-                  >
-                    <div role="cell">
-                      <input
-                        type="checkbox"
-                        aria-label={`Chọn ${order.id}`}
-                        checked={selected.has(order.id)}
-                        onChange={(event) => toggleOne(order.id, event.target.checked)}
-                      />
-                    </div>
-                    <div role="cell">
+                {paginatedOrders.map((order) => {
+                  const statusTone = getVendorOrderStatusTone(order.status);
+                  const statusLabel = getVendorOrderStatusLabel(order.status);
+                  const payout = formatCurrency(order.vendorPayout);
+                  const commission = formatCurrency(order.commissionFee);
+                  const isSelected = selected.has(order.id);
+
+                  return (
+                    <motion.div
+                      key={order.id}
+                      className="admin-table-row vendor-orders"
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.12 }}
+                    >
+                      <div>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(event) => toggleOne(order.id, event.target.checked)}
+                        />
+                      </div>
                       <div className="admin-bold">{order.id}</div>
+                      <div>
+                        <div className="admin-bold">{order.customer}</div>
+                        <div className="admin-muted small">{order.email}</div>
+                      </div>
+                      <div>
+                        <div className="admin-bold">{formatCurrency(order.total)}</div>
+                        <div className="admin-muted small">Payout {payout} · Fee {commission}</div>
+                      </div>
+                      <div>
+                        <span className={`admin-pill ${statusTone}`}>{statusLabel}</span>
+                      </div>
+                      <div className="admin-muted small">{order.items} SP</div>
                       <div className="admin-muted small">{formatVendorOrderDate(order.date)}</div>
-                    </div>
-                    <div role="cell">
-                      <div className="admin-bold">{order.customer}</div>
-                      <div className="admin-muted small">{order.items} sản phẩm • {order.email}</div>
-                    </div>
-                    <div role="cell" className="admin-bold">{formatCurrency(order.total)}</div>
-                    <div role="cell"><span className="badge amber">-{formatCurrency(order.commissionFee)}</span></div>
-                    <div role="cell"><span className="badge green">{formatCurrency(order.vendorPayout)}</span></div>
-                    <div role="cell">
-                      <span className={`admin-pill ${getVendorOrderStatusTone(order.status)}`}>
-                        {getVendorOrderStatusLabel(order.status)}
-                      </span>
-                    </div>
-                    <div role="cell" className="vendor-order-ops">
-                      {order.status === 'shipping' ? <Truck size={14} /> : <ShieldCheck size={14} />}
-                      <span>{order.status === 'shipping' ? 'Đang giao cho đối tác vận chuyển' : 'Chờ shop xử lý'}</span>
-                    </div>
-                    <div role="cell" className="admin-actions">
-                      {order.status === 'pending' && (
-                        <button
-                          className="admin-primary-btn vendor-admin-primary vendor-inline-btn"
-                          onClick={() => askStatusUpdate([order.id], 'CONFIRMED')}
-                          disabled={updatingId === order.id || updatingId === 'bulk'}
-                        >
-                          Xác nhận
-                        </button>
-                      )}
-                      {order.status === 'packing' && (
-                        <button
-                          className="admin-primary-btn vendor-admin-primary vendor-inline-btn"
-                          onClick={() => askStatusUpdate([order.id], 'SHIPPED')}
-                          disabled={updatingId === order.id || updatingId === 'bulk'}
-                        >
-                          Bàn giao
-                        </button>
-                      )}
-                      <Link to={`/vendor/orders/${order.id}`} className="admin-ghost-btn vendor-inline-link">
-                        Chi tiết
-                      </Link>
-                    </div>
-                  </motion.div>
-                ))}
+                      <div className="admin-actions">
+                        {order.status === 'pending' && (
+                          <button
+                            className="admin-icon-btn subtle"
+                            title="Xác nhận đơn"
+                            onClick={() => askStatusUpdate([order.id], 'CONFIRMED')}
+                            disabled={updating}
+                          >
+                            <ShieldCheck size={16} />
+                          </button>
+                        )}
+                        {order.status === 'confirmed' && (
+                          <button
+                            className="admin-icon-btn subtle"
+                            title="Bắt đầu xử lý"
+                            onClick={() => askStatusUpdate([order.id], 'PROCESSING')}
+                            disabled={updating}
+                          >
+                            <PackageCheck size={16} />
+                          </button>
+                        )}
+                        {order.status === 'processing' && (
+                          <button
+                            className="admin-icon-btn subtle"
+                            title="Bàn giao vận chuyển"
+                            onClick={() => askStatusUpdate([order.id], 'SHIPPED')}
+                            disabled={updating}
+                          >
+                            <Truck size={16} />
+                          </button>
+                        )}
+                        {order.status === 'shipped' && (
+                          <button
+                            className="admin-icon-btn subtle"
+                            title="Xác nhận đã giao"
+                            onClick={() => askStatusUpdate([order.id], 'DELIVERED')}
+                            disabled={updating}
+                          >
+                            <PackageCheck size={16} />
+                          </button>
+                        )}
+                        {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') && (
+                          <button
+                            className="admin-icon-btn subtle danger-icon"
+                            title="Hủy đơn"
+                            onClick={() => askStatusUpdate([order.id], 'CANCELLED')}
+                            disabled={updating}
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        )}
+                        <Link to={`/vendor/orders/${order.id}`} className="admin-icon-btn subtle" title="Chi tiết đơn hàng">
+                          <Eye size={16} />
+                        </Link>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
 
+              <PanelFloatingBar show={selected.size > 0} className="vendor-floating-bar">
+                <div className="admin-floating-content">
+                  <span>Đã chọn {selected.size} đơn</span>
+                  <div className="admin-actions">
+                    <button
+                      className="admin-primary-btn"
+                      disabled={actionablePendingIds.length === 0 || updating}
+                      onClick={() => askStatusUpdate(actionablePendingIds, 'CONFIRMED')}
+                    >
+                      <ShieldCheck size={16} /> Xác nhận
+                    </button>
+                    <button
+                      className="admin-ghost-btn"
+                      disabled={actionableConfirmedIds.length === 0 || updating}
+                      onClick={() => askStatusUpdate(actionableConfirmedIds, 'PROCESSING')}
+                    >
+                      <PackageCheck size={16} /> Xử lý
+                    </button>
+                    <button
+                      className="admin-ghost-btn"
+                      disabled={actionableProcessingIds.length === 0 || updating}
+                      onClick={() => askStatusUpdate(actionableProcessingIds, 'SHIPPED')}
+                    >
+                      <Truck size={16} /> Bàn giao VC
+                    </button>
+                    <button
+                      className="admin-ghost-btn danger"
+                      disabled={actionableCancelableIds.length === 0 || updating}
+                      onClick={() => askStatusUpdate(actionableCancelableIds, 'CANCELLED')}
+                    >
+                      <XCircle size={16} /> Hủy đơn
+                    </button>
+                  </div>
+                </div>
+              </PanelFloatingBar>
+
               <PanelTableFooter
-                meta={`Hiển thị ${startIndex}-${endIndex} trên ${filteredOrders.length} đơn hàng con`}
-                page={safePage}
+                page={ordersPage.page}
                 totalPages={totalPages}
+                meta={<span>Hiển thị {startIndex}–{endIndex} / {ordersPage.totalElements} đơn</span>}
                 onPageChange={setPage}
-                activePageClassName="vendor-active-page"
-                nextLabel="Sau"
               />
             </>
           )}
         </div>
-      </section>
-
-      <PanelFloatingBar show={selected.size > 0} className="vendor-floating-bar">
-        <div className="admin-floating-content">
-          <span>Đã chọn {selected.size} đơn hàng con</span>
-          <div className="admin-actions">
-            {actionablePendingIds.length > 0 && (
-              <button className="admin-ghost-btn" onClick={() => askStatusUpdate(actionablePendingIds, 'CONFIRMED')}>
-                Xác nhận đã chọn
-              </button>
-            )}
-            {actionablePackingIds.length > 0 && (
-              <button className="admin-ghost-btn" onClick={() => askStatusUpdate(actionablePackingIds, 'SHIPPED')}>
-                Bàn giao đã chọn
-              </button>
-            )}
-            <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>Bỏ chọn</button>
-          </div>
-        </div>
-      </PanelFloatingBar>
+      </div>
 
       <AdminConfirmDialog
         open={Boolean(pendingAction)}
-        title={pendingAction?.title || 'Cập nhật trạng thái'}
+        title={pendingAction?.title || ''}
         description={pendingAction?.description || ''}
         selectedItems={pendingAction?.selectedItems}
-        selectedNoun="đơn hàng"
         confirmLabel={pendingAction?.confirmLabel || 'Xác nhận'}
         onCancel={() => setPendingAction(null)}
         onConfirm={() => void confirmPendingAction()}
-      />
+      >
+        {pendingAction?.requireTracking && (
+          <div className="confirm-form-grid">
+            <label className="form-field">
+              <span>Mã vận đơn</span>
+              <input
+                value={trackingNumber}
+                onChange={(event) => setTrackingNumber(event.target.value)}
+                placeholder="VD: GHN123456789"
+              />
+            </label>
+            <label className="form-field">
+              <span>Đơn vị vận chuyển</span>
+              <input
+                value={carrier}
+                onChange={(event) => setCarrier(event.target.value)}
+                placeholder="VD: GHN"
+              />
+            </label>
+          </div>
+        )}
+        {pendingAction?.requireReason && (
+          <label className="form-field full" style={{ marginTop: 10 }}>
+            <span>Lý do hủy</span>
+            <textarea
+              rows={3}
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder="Nhập lý do hủy đơn"
+            />
+          </label>
+        )}
+      </AdminConfirmDialog>
     </VendorLayout>
   );
 };
 
 export default VendorOrders;
+

@@ -18,7 +18,7 @@ export const vendorPanelNav: PanelNavItem[] = [
   { label: 'Kho', to: '/vendor/products' },
   { label: 'Đơn hàng', to: '/vendor/orders' },
   { label: 'Gian hàng', to: '/vendor/storefront' },
-  { label: 'Voucher shop', to: '/vendor/promotions' },
+  { label: 'Ưu đãi cửa hàng', to: '/vendor/promotions' },
   { label: 'Đánh giá và phản hồi', to: '/vendor/reviews' },
   { label: 'Doanh thu thực nhận', to: '/vendor/analytics' },
   { label: 'Cài đặt vận hành', to: '/vendor/settings' },

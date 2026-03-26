@@ -7,6 +7,7 @@ import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminStateBlock } from './AdminStateBlocks';
 import { PanelStatsGrid, PanelTabs, PanelViewSummary } from '../../components/Panel/PanelPrimitives';
 import { useToast } from '../../contexts/ToastContext';
+import Drawer from '../../components/Drawer/Drawer';
 
 type UserRole = 'CUSTOMER' | 'VENDOR' | 'SUPER_ADMIN';
 type UserStatus = 'ACTIVE' | 'LOCKED' | 'PENDING_VENDOR';
@@ -219,16 +220,16 @@ const AdminUsers = () => {
       prev.map((user) =>
         confirmState.ids.includes(user.id)
           ? {
-              ...user,
-              status:
-                confirmState.mode === 'lock'
-                  ? 'LOCKED'
-                  : user.role === 'CUSTOMER'
-                    ? 'ACTIVE'
-                    : user.status === 'PENDING_VENDOR'
-                      ? 'PENDING_VENDOR'
-                      : 'ACTIVE',
-            }
+            ...user,
+            status:
+              confirmState.mode === 'lock'
+                ? 'LOCKED'
+                : user.role === 'CUSTOMER'
+                  ? 'ACTIVE'
+                  : user.status === 'PENDING_VENDOR'
+                    ? 'PENDING_VENDOR'
+                    : 'ACTIVE',
+          }
           : user,
       ),
     );
@@ -237,16 +238,16 @@ const AdminUsers = () => {
       setDetailUser((current) =>
         current
           ? {
-              ...current,
-              status:
-                confirmState.mode === 'lock'
-                  ? 'LOCKED'
-                  : current.role === 'CUSTOMER'
-                    ? 'ACTIVE'
-                    : current.status === 'PENDING_VENDOR'
-                      ? 'PENDING_VENDOR'
-                      : 'ACTIVE',
-            }
+            ...current,
+            status:
+              confirmState.mode === 'lock'
+                ? 'LOCKED'
+                : current.role === 'CUSTOMER'
+                  ? 'ACTIVE'
+                  : current.status === 'PENDING_VENDOR'
+                    ? 'PENDING_VENDOR'
+                    : 'ACTIVE',
+          }
           : null,
       );
     }
@@ -391,7 +392,7 @@ const AdminUsers = () => {
                       </div>
                       <div className="admin-muted small">
                         {user.role === 'CUSTOMER'
-                          ? `${(user.totalSpent || 0).toLocaleString('vi-VN')} đ đã chi`
+                          ? `${(user.totalSpent || 0).toLocaleString('vi-VN')} ₫ đã chi`
                           : user.status === 'PENDING_VENDOR'
                             ? 'Đang chờ duyệt onboarding'
                             : user.role === 'VENDOR'
@@ -464,24 +465,36 @@ const AdminUsers = () => {
             exit={{ opacity: 0, y: 22 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
           >
-            <div className="admin-floating-content">
-              <span>Đã chọn {selected.size} tài khoản</span>
-              <div className="admin-actions">
-                <button
-                  className="admin-ghost-btn"
-                  onClick={() => openConfirm('unlock', Array.from(selected).filter((id) => users.find((user) => user.id === id)?.status === 'LOCKED'))}
-                >
-                  Mở khóa đã chọn
-                </button>
-                <button
-                  className="admin-ghost-btn danger"
-                  onClick={() => openConfirm('lock', Array.from(selected).filter((id) => users.find((user) => user.id === id)?.status !== 'LOCKED'))}
-                >
-                  Khóa đã chọn
-                </button>
-                <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>Bỏ chọn</button>
-              </div>
-            </div>
+            {(() => {
+              const selectedUsers = users.filter((user) => selected.has(user.id));
+              const hasLocked = selectedUsers.some((user) => user.status === 'LOCKED');
+              const hasActive = selectedUsers.some((user) => user.status !== 'LOCKED');
+
+              return (
+                <div className="admin-floating-content">
+                  <span>Đã chọn {selected.size} tài khoản</span>
+                  <div className="admin-actions">
+                    {hasActive && (
+                      <button
+                        className="admin-ghost-btn danger"
+                        onClick={() => openConfirm('lock', Array.from(selected).filter((id) => users.find((user) => user.id === id)?.status !== 'LOCKED'))}
+                      >
+                        Khóa đã chọn
+                      </button>
+                    )}
+                    {hasLocked && (
+                      <button
+                        className="admin-ghost-btn"
+                        onClick={() => openConfirm('unlock', Array.from(selected).filter((id) => users.find((user) => user.id === id)?.status === 'LOCKED'))}
+                      >
+                        Mở khóa đã chọn
+                      </button>
+                    )}
+                    <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>Bỏ chọn</button>
+                  </div>
+                </div>
+              );
+            })()}
           </motion.div>
         )}
       </AnimatePresence>
@@ -502,10 +515,9 @@ const AdminUsers = () => {
         onConfirm={applyStatusChange}
       />
 
-      {detailUser && (
-        <>
-          <div className="drawer-overlay" onClick={() => setDetailUser(null)} />
-          <div className="drawer user-drawer">
+      <Drawer open={Boolean(detailUser)} onClose={() => setDetailUser(null)} className="user-drawer">
+        {detailUser ? (
+          <>
             <div className="drawer-header">
               <div>
                 <p className="drawer-eyebrow">Hồ sơ người dùng</p>
@@ -574,7 +586,7 @@ const AdminUsers = () => {
                   </div>
                   <div className="user-signal-card">
                     <span className="admin-muted small">Chi tiêu</span>
-                    <strong>{(detailUser.totalSpent || 0).toLocaleString('vi-VN')} đ</strong>
+                    <strong>{(detailUser.totalSpent || 0).toLocaleString('vi-VN')} ₫</strong>
                   </div>
                   <div className="user-signal-card">
                     <span className="admin-muted small">Trạng thái</span>
@@ -605,9 +617,9 @@ const AdminUsers = () => {
                 </button>
               )}
             </div>
-          </div>
-        </>
-      )}
+          </>
+        ) : null}
+      </Drawer>
     </AdminLayout>
   );
 };

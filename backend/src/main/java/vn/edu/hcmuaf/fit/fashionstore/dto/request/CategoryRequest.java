@@ -1,5 +1,7 @@
 package vn.edu.hcmuaf.fit.fashionstore.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,4 +20,14 @@ public class CategoryRequest {
     private String image;
     private UUID parentId;
     private Integer sortOrder;
+
+    @JsonIgnore
+    @Builder.Default
+    private boolean parentIdProvided = false;
+
+    @JsonSetter("parentId")
+    public void setParentId(UUID parentId) {
+        this.parentId = parentId;
+        this.parentIdProvided = true;
+    }
 }

@@ -2,6 +2,7 @@ package vn.edu.hcmuaf.fit.fashionstore.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -51,17 +52,22 @@ public class Product extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
+    @Builder.Default
     private ProductStatus status = ProductStatus.ACTIVE;
 
     @Column(name = "is_featured")
+    @Builder.Default
     private Boolean isFeatured = false;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<ProductImage> images = new ArrayList<>();
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<ProductVariant> variants = new ArrayList<>();
 
+    @Builder.Default
     private Integer viewCount = 0;
 
     public enum Gender {
@@ -69,7 +75,7 @@ public class Product extends BaseEntity {
     }
 
     public enum ProductStatus {
-        ACTIVE, INACTIVE, DRAFT
+        ACTIVE, INACTIVE, DRAFT, ARCHIVED
     }
 
     public Double getEffectivePrice() {

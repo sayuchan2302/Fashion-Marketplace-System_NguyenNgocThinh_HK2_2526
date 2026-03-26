@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import AdminVariantModal from './AdminVariantModal';
 import type { VariantRow } from './AdminVariantModal';
 import { AdminStateBlock } from './AdminStateBlocks';
+import Portal from '../../components/Portal/Portal';
 import AdminReasonDialog from './AdminReasonDialog';
 import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
@@ -414,7 +415,7 @@ const AdminProducts = () => {
                     />
                   ) : (
                     <button className="inline-edit" onClick={() => setEditingPrice({ sku: p.sku, value: p.price.toString() })}>
-                      {p.price.toLocaleString('vi-VN')} đ
+                      {p.price.toLocaleString('vi-VN')} ₫
                       <Pencil size={14} className="inline-icon" />
                     </button>
                   )}
@@ -503,7 +504,7 @@ const AdminProducts = () => {
       />
 
       {showDrawer && (
-        <>
+        <Portal>
           <div className="drawer-overlay" onClick={closeDrawer} />
           <div className="drawer">
             <div className="drawer-header">
@@ -659,7 +660,7 @@ const AdminProducts = () => {
               <button className="admin-primary-btn" onClick={handleSaveDrawer}>{c.save}</button>
             </div>
           </div>
-        </>
+        </Portal>
       )}
 
       {toast && <div className="toast success">{toast}</div>}

@@ -9,6 +9,7 @@ import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
+import Drawer from '../../components/Drawer/Drawer';
 import { promotionStore, type Promotion, type PromotionStatus, type DiscountType } from '../../services/promotionStore';
 import { promotionStatusClass, promotionStatusLabel } from './adminStatusMaps';
 
@@ -29,7 +30,7 @@ const emptyPromotion: Promotion = {
   status: 'paused',
 };
 
-const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')} đ`;
+const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')} ₫`;
 const formatDate = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -352,92 +353,85 @@ const AdminPromotions = () => {
         onConfirm={deleteSelected}
       />
 
-      <AnimatePresence>
-        {isDrawerOpen && (
-          <>
-            <motion.div className="drawer-overlay" onClick={() => setIsDrawerOpen(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
-            <motion.div className="drawer promo-drawer" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ duration: 0.25, ease: 'easeOut' }}>
-              <div className="drawer-header">
-                <div>
-                  <p className="drawer-eyebrow">Chiến dịch nền tảng</p>
-                  <h3>{editingId ? 'Cập nhật chiến dịch toàn sàn' : 'Tạo chiến dịch toàn sàn'}</h3>
-                </div>
-                <button className="admin-icon-btn" onClick={() => setIsDrawerOpen(false)} aria-label="Đóng"><X size={16} /></button>
-              </div>
-              <div className="drawer-body">
-                <section className="drawer-section">
-                  <h4>Thông tin</h4>
-                  <div className="form-grid">
-                    <label className="form-field">
-                      <span>Tên chiến dịch</span>
-                      <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
-                    </label>
-                    <label className="form-field">
-                      <span>Mã voucher</span>
-                      <input value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase().replace(/\s+/g, '') }))} />
-                    </label>
-                    <label className="form-field full">
-                      <span>Mô tả chiến dịch</span>
-                      <textarea rows={3} value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} />
-                    </label>
-                  </div>
-                </section>
-                <section className="drawer-section">
-                  <h4>Giảm giá</h4>
-                  <div className="form-grid">
-                    <label className="form-field">
-                      <span>Loại giảm giá</span>
-                      <select value={form.discountType} onChange={(e) => setForm((prev) => ({ ...prev, discountType: e.target.value as DiscountType }))}>
-                        <option value="percent">Giảm %</option>
-                        <option value="fixed">Giảm tiền</option>
-                      </select>
-                    </label>
-                    <label className="form-field">
-                      <span>Giá trị giảm</span>
-                      <input type="number" value={form.discountValue} onChange={(e) => setForm((prev) => ({ ...prev, discountValue: Number(e.target.value) || 0 }))} />
-                    </label>
-                    <label className="form-field">
-                      <span>Giảm tối đa</span>
-                      <input type="number" value={form.maxDiscount} onChange={(e) => setForm((prev) => ({ ...prev, maxDiscount: Number(e.target.value) || 0 }))} />
-                    </label>
-                    <label className="form-field">
-                      <span>Đơn tối thiểu</span>
-                      <input type="number" value={form.minOrderValue} onChange={(e) => setForm((prev) => ({ ...prev, minOrderValue: Number(e.target.value) || 0 }))} />
-                    </label>
-                    <label className="form-field">
-                      <span>Giới hạn người dùng</span>
-                      <input type="number" value={form.userLimit} onChange={(e) => setForm((prev) => ({ ...prev, userLimit: Number(e.target.value) || 1 }))} />
-                    </label>
-                    <label className="form-field">
-                      <span>Tổng số lượng phát hành</span>
-                      <input type="number" value={form.totalIssued} onChange={(e) => setForm((prev) => ({ ...prev, totalIssued: Number(e.target.value) || 0 }))} />
-                    </label>
-                    <label className="form-field">
-                      <span>Ngày bắt đầu</span>
-                      <input type="date" value={form.startDate} onChange={(e) => setForm((prev) => ({ ...prev, startDate: e.target.value }))} />
-                    </label>
-                    <label className="form-field">
-                      <span>Ngày kết thúc</span>
-                      <input type="date" value={form.endDate} onChange={(e) => setForm((prev) => ({ ...prev, endDate: e.target.value }))} />
-                    </label>
-                    <label className="form-field">
-                      <span>Trạng thái</span>
-                      <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value as PromotionStatus }))}>
-                        <option value="running">Đang chạy</option>
-                        <option value="paused">Tạm dừng</option>
-                      </select>
-                    </label>
-                  </div>
-                </section>
-              </div>
-              <div className="drawer-footer">
-                <button className="admin-ghost-btn" onClick={() => setIsDrawerOpen(false)}>Hủy</button>
-                <button className="admin-primary-btn" onClick={savePromotion}>Lưu chiến dịch</button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <Drawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} className="promo-drawer">
+        <div className="drawer-header">
+          <div>
+            <p className="drawer-eyebrow">Chiến dịch nền tảng</p>
+            <h3>{editingId ? 'Cập nhật chiến dịch toàn sàn' : 'Tạo chiến dịch toàn sàn'}</h3>
+          </div>
+          <button className="admin-icon-btn" onClick={() => setIsDrawerOpen(false)} aria-label="Đóng"><X size={16} /></button>
+        </div>
+        <div className="drawer-body">
+          <section className="drawer-section">
+            <h4>Thông tin</h4>
+            <div className="form-grid">
+              <label className="form-field">
+                <span>Tên chiến dịch</span>
+                <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+              </label>
+              <label className="form-field">
+                <span>Mã voucher</span>
+                <input value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase().replace(/\s+/g, '') }))} />
+              </label>
+              <label className="form-field full">
+                <span>Mô tả chiến dịch</span>
+                <textarea rows={3} value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} />
+              </label>
+            </div>
+          </section>
+          <section className="drawer-section">
+            <h4>Giảm giá</h4>
+            <div className="form-grid">
+              <label className="form-field">
+                <span>Loại giảm giá</span>
+                <select value={form.discountType} onChange={(e) => setForm((prev) => ({ ...prev, discountType: e.target.value as DiscountType }))}>
+                  <option value="percent">Giảm %</option>
+                  <option value="fixed">Giảm tiền</option>
+                </select>
+              </label>
+              <label className="form-field">
+                <span>Giá trị giảm</span>
+                <input type="number" value={form.discountValue} onChange={(e) => setForm((prev) => ({ ...prev, discountValue: Number(e.target.value) || 0 }))} />
+              </label>
+              <label className="form-field">
+                <span>Giảm tối đa</span>
+                <input type="number" value={form.maxDiscount} onChange={(e) => setForm((prev) => ({ ...prev, maxDiscount: Number(e.target.value) || 0 }))} />
+              </label>
+              <label className="form-field">
+                <span>Đơn tối thiểu</span>
+                <input type="number" value={form.minOrderValue} onChange={(e) => setForm((prev) => ({ ...prev, minOrderValue: Number(e.target.value) || 0 }))} />
+              </label>
+              <label className="form-field">
+                <span>Giới hạn người dùng</span>
+                <input type="number" value={form.userLimit} onChange={(e) => setForm((prev) => ({ ...prev, userLimit: Number(e.target.value) || 1 }))} />
+              </label>
+              <label className="form-field">
+                <span>Tổng số lượng phát hành</span>
+                <input type="number" value={form.totalIssued} onChange={(e) => setForm((prev) => ({ ...prev, totalIssued: Number(e.target.value) || 0 }))} />
+              </label>
+              <label className="form-field">
+                <span>Ngày bắt đầu</span>
+                <input type="date" value={form.startDate} onChange={(e) => setForm((prev) => ({ ...prev, startDate: e.target.value }))} />
+              </label>
+              <label className="form-field">
+                <span>Ngày kết thúc</span>
+                <input type="date" value={form.endDate} onChange={(e) => setForm((prev) => ({ ...prev, endDate: e.target.value }))} />
+              </label>
+              <label className="form-field">
+                <span>Trạng thái</span>
+                <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value as PromotionStatus }))}>
+                  <option value="running">Đang chạy</option>
+                  <option value="paused">Tạm dừng</option>
+                </select>
+              </label>
+            </div>
+          </section>
+        </div>
+        <div className="drawer-footer">
+          <button className="admin-ghost-btn" onClick={() => setIsDrawerOpen(false)}>Hủy</button>
+          <button className="admin-primary-btn" onClick={savePromotion}>Lưu chiến dịch</button>
+        </div>
+      </Drawer>
 
       {toast && <div className="toast success">{toast}</div>}
     </AdminLayout>

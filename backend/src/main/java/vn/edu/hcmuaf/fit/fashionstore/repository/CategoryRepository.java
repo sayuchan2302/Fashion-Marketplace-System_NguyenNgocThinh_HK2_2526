@@ -18,4 +18,6 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     List<Category> findByParentIsNullOrderBySortOrder();
 
     Page<Category> findByParentId(UUID parentId, Pageable pageable);
+
+    boolean existsByParentId(UUID parentId);
 }

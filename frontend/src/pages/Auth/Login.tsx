@@ -1,29 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import './Auth.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-
-const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+import { getReasonToastMessage, getUiErrorMessage } from '../../utils/errorMessage';
 
 const Login = () => {
   const { login } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = (location.state as { from?: string } | null)?.from || '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
 
+  const redirectTo = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    const redirectFromQuery = query.get('redirect');
+    const redirectFromState = (location.state as { from?: string } | null)?.from;
+    return redirectFromQuery || redirectFromState || '/';
+  }, [location.search, location.state]);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const reason = params.get('reason');
-    if (reason === 'session-expired') {
-      addToast('Hết phiên, đăng nhập lại', 'error');
+    const reasonMessage = getReasonToastMessage(params.get('reason'));
+    if (reasonMessage) {
+      addToast(reasonMessage, 'error');
     }
   }, [location.search, addToast]);
 
@@ -46,7 +51,7 @@ const Login = () => {
       addToast('Đăng nhập thành công', 'success');
       navigate(redirectTo, { replace: true });
     } catch (error: unknown) {
-      addToast(getErrorMessage(error, 'Đăng nhập thất bại'), 'error');
+      addToast(getUiErrorMessage(error, 'Đăng nhập thất bại'), 'error');
     } finally {
       setLoading(false);
     }
@@ -111,3 +116,4 @@ const Login = () => {
 };
 
 export default Login;
+

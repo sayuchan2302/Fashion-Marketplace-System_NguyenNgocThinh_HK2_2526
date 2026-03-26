@@ -2,6 +2,7 @@ export type ReviewStatus = 'pending' | 'approved' | 'hidden';
 
 export interface Review {
   id: string;
+  storeId: string;
   productId: string;
   productName: string;
   productImage: string;
@@ -20,6 +21,7 @@ export interface Review {
 const initialReviews: Review[] = [
   {
     id: 'rev-001',
+    storeId: 'store_001',
     productId: 'prod-101',
     productName: 'Áo Polo Nam Excool',
     productImage: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=80&h=80&fit=crop',
@@ -35,6 +37,7 @@ const initialReviews: Review[] = [
   },
   {
     id: 'rev-002',
+    storeId: 'store_001',
     productId: 'prod-201',
     productName: 'Áo Thun Nam Cổ Tròn Cotton',
     productImage: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=80&h=80&fit=crop',
@@ -50,6 +53,7 @@ const initialReviews: Review[] = [
   },
   {
     id: 'rev-003',
+    storeId: 'store_002',
     productId: 'prod-301',
     productName: 'Quần Jeans Nam Slim Fit',
     productImage: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=80&h=80&fit=crop',
@@ -65,6 +69,7 @@ const initialReviews: Review[] = [
   },
   {
     id: 'rev-004',
+    storeId: 'store_001',
     productId: 'prod-401',
     productName: 'Áo Hoodie Oversize Unisex',
     productImage: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=80&h=80&fit=crop',
@@ -80,6 +85,7 @@ const initialReviews: Review[] = [
   },
   {
     id: 'rev-005',
+    storeId: 'store_002',
     productId: 'prod-101',
     productName: 'Áo Polo Nam Excool',
     productImage: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=80&h=80&fit=crop',
@@ -100,6 +106,10 @@ const reviews = [...initialReviews];
 export const adminReviewService = {
   getAll: (): Review[] => {
     return [...reviews];
+  },
+
+  getByStore: (storeId: string): Review[] => {
+    return reviews.filter(r => r.storeId === storeId);
   },
 
   getById: (id: string): Review | undefined => {

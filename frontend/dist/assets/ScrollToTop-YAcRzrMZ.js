@@ -1,0 +1,1 @@
+import{u as o,r}from"./vendor-react-BpT5lzFL.js";const a=()=>{const{pathname:t}=o();return r.useEffect(()=>{t.startsWith("/admin")||t.startsWith("/vendor")||window.scrollTo(0,0)},[t]),null};export{a as default};

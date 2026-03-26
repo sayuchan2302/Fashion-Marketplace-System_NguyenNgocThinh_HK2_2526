@@ -1,17 +1,23 @@
 package vn.edu.hcmuaf.fit.fashionstore.controller;
 
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.OrderRequest;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderDetailResponse;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderPageResponse;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Order;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext.UserContext;
 import vn.edu.hcmuaf.fit.fashionstore.service.OrderService;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -96,67 +102,89 @@ public class OrderController {
      * Get orders for vendor's store
      */
     @GetMapping("/my-store")
-    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
-    public ResponseEntity<Page<Order>> getMyStoreOrders(
+    public ResponseEntity<VendorOrderPageResponse> getMyStoreOrders(
             @RequestHeader("Authorization") String authHeader,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, name = "q") String keyword,
+            @RequestParam(required = false, name = "date_from") String dateFrom,
+            @RequestParam(required = false, name = "date_to") String dateTo) {
         UserContext ctx = authContext.requireVendor(authHeader);
         Pageable pageable = PageRequest.of(page, size);
-        
-        if (status != null && !status.isEmpty()) {
-            Order.OrderStatus orderStatus = Order.OrderStatus.valueOf(status.toUpperCase());
-            return ResponseEntity.ok(orderService.findByStoreIdAndStatus(ctx.getStoreId(), orderStatus, pageable));
-        }
-        
-        return ResponseEntity.ok(orderService.findByStoreId(ctx.getStoreId(), pageable));
+
+        Order.OrderStatus parsedStatus = parseOrderStatus(status);
+        LocalDateTime parsedDateFrom = parseDateStart(dateFrom);
+        LocalDateTime parsedDateToExclusive = parseDateExclusiveEnd(dateTo);
+
+        return ResponseEntity.ok(
+                orderService.getVendorOrderPage(
+                        ctx.getStoreId(),
+                        parsedStatus,
+                        keyword,
+                        parsedDateFrom,
+                        parsedDateToExclusive,
+                        pageable
+                )
+        );
     }
 
     /**
      * Get specific order for vendor's store
      */
     @GetMapping("/my-store/{id}")
-    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
-    public ResponseEntity<Order> getMyStoreOrderById(
+    public ResponseEntity<VendorOrderDetailResponse> getMyStoreOrderById(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable UUID id) {
         UserContext ctx = authContext.requireVendor(authHeader);
-        return ResponseEntity.ok(orderService.findByIdForStore(id, ctx.getStoreId()));
+        return ResponseEntity.ok(orderService.getVendorOrderDetail(id, ctx.getStoreId()));
     }
 
     /**
      * Update order status - vendor can only update their own store's orders
      */
     @PatchMapping("/my-store/{id}/status")
-    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
-    public ResponseEntity<Order> updateStoreOrderStatus(
+    public ResponseEntity<VendorOrderDetailResponse> updateStoreOrderStatus(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable UUID id,
             @RequestBody StatusUpdateRequest request) {
         UserContext ctx = authContext.requireVendor(authHeader);
-        Order.OrderStatus status = Order.OrderStatus.valueOf(request.getStatus().toUpperCase());
-        return ResponseEntity.ok(orderService.updateStatusForStore(id, ctx.getStoreId(), status));
+        Order.OrderStatus status = parseOrderStatus(request.getStatus());
+        if (status == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status is required");
+        }
+        if (status == Order.OrderStatus.CANCELLED
+                && (request.getReason() == null || request.getReason().trim().isEmpty())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cancellation reason is required");
+        }
+        return ResponseEntity.ok(
+                orderService.updateVendorOrderStatus(
+                        id,
+                        ctx.getStoreId(),
+                        status,
+                        request.getTrackingNumber(),
+                        request.getCarrier(),
+                        request.getReason()
+                )
+        );
     }
 
     /**
      * Update tracking number for vendor's order
      */
     @PatchMapping("/my-store/{id}/tracking")
-    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
-    public ResponseEntity<Order> updateStoreOrderTracking(
+    public ResponseEntity<VendorOrderDetailResponse> updateStoreOrderTracking(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable UUID id,
             @RequestBody TrackingUpdateRequest request) {
         UserContext ctx = authContext.requireVendor(authHeader);
-        return ResponseEntity.ok(orderService.updateTrackingForStore(id, ctx.getStoreId(), request.getTrackingNumber()));
+        return ResponseEntity.ok(orderService.updateVendorOrderTracking(id, ctx.getStoreId(), request.getTrackingNumber()));
     }
 
     /**
      * Get store order statistics (dashboard)
      */
     @GetMapping("/my-store/stats")
-    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
     public ResponseEntity<Map<String, Object>> getMyStoreStats(
             @RequestHeader("Authorization") String authHeader) {
         UserContext ctx = authContext.requireVendor(authHeader);
@@ -165,8 +193,11 @@ public class OrderController {
         return ResponseEntity.ok(Map.of(
                 "totalOrders", orderService.countByStoreId(storeId),
                 "pendingOrders", orderService.countByStoreIdAndStatus(storeId, Order.OrderStatus.PENDING),
+                "confirmedOrders", orderService.countByStoreIdAndStatus(storeId, Order.OrderStatus.CONFIRMED),
                 "processingOrders", orderService.countByStoreIdAndStatus(storeId, Order.OrderStatus.PROCESSING),
+                "shippedOrders", orderService.countByStoreIdAndStatus(storeId, Order.OrderStatus.SHIPPED),
                 "deliveredOrders", orderService.countByStoreIdAndStatus(storeId, Order.OrderStatus.DELIVERED),
+                "cancelledOrders", orderService.countByStoreIdAndStatus(storeId, Order.OrderStatus.CANCELLED),
                 "totalRevenue", orderService.calculateRevenueByStoreId(storeId),
                 "totalPayout", orderService.calculatePayoutByStoreId(storeId)
         ));
@@ -191,8 +222,53 @@ public class OrderController {
     public ResponseEntity<Order> updateOrderStatus(
             @PathVariable UUID id,
             @RequestBody StatusUpdateRequest request) {
-        Order.OrderStatus status = Order.OrderStatus.valueOf(request.getStatus().toUpperCase());
+        Order.OrderStatus status = parseOrderStatus(request.getStatus());
+        if (status == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status is required");
+        }
         return ResponseEntity.ok(orderService.updateStatus(id, status));
+    }
+
+    private Order.OrderStatus parseOrderStatus(String rawStatus) {
+        if (rawStatus == null || rawStatus.isBlank()) {
+            return null;
+        }
+
+        String normalized = rawStatus.trim().toUpperCase(Locale.ROOT);
+        String resolved = switch (normalized) {
+            case "SHIPPING" -> "SHIPPED";
+            case "COMPLETED", "DONE" -> "DELIVERED";
+            case "CANCELED" -> "CANCELLED";
+            default -> normalized;
+        };
+
+        try {
+            return Order.OrderStatus.valueOf(resolved);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported status: " + rawStatus);
+        }
+    }
+
+    private LocalDateTime parseDateStart(String rawDate) {
+        if (rawDate == null || rawDate.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(rawDate).atStartOfDay();
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date_from format. Use YYYY-MM-DD");
+        }
+    }
+
+    private LocalDateTime parseDateExclusiveEnd(String rawDate) {
+        if (rawDate == null || rawDate.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(rawDate).plusDays(1).atStartOfDay();
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date_to format. Use YYYY-MM-DD");
+        }
     }
 
     // ─── Request DTOs ──────────────────────────────────────────────────────────
@@ -211,6 +287,9 @@ public class OrderController {
 
     public static class StatusUpdateRequest {
         private String status;
+        private String trackingNumber;
+        private String carrier;
+        private String reason;
 
         public String getStatus() {
             return status;
@@ -218,6 +297,30 @@ public class OrderController {
 
         public void setStatus(String status) {
             this.status = status;
+        }
+
+        public String getTrackingNumber() {
+            return trackingNumber;
+        }
+
+        public void setTrackingNumber(String trackingNumber) {
+            this.trackingNumber = trackingNumber;
+        }
+
+        public String getCarrier() {
+            return carrier;
+        }
+
+        public void setCarrier(String carrier) {
+            this.carrier = carrier;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
         }
     }
 

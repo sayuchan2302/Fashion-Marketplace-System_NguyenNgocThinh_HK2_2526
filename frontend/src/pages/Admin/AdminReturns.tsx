@@ -1,19 +1,18 @@
 import './Admin.css';
 import { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   Search, X, Check, XCircle,
-  Eye, Package
+  Eye
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { AdminStateBlock } from './AdminStateBlocks';
-import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminPagination } from './AdminPagination';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
 import { ADMIN_DICTIONARY } from './adminDictionary';
 import { returnService, type ReturnRequest, type ReturnStatus } from '../../services/returnService';
+import Drawer from '../../components/Drawer/Drawer';
 
 const statusConfig: Record<ReturnStatus, { label: string; pillClass: string }> = {
   PENDING:   { label: ADMIN_DICTIONARY.returns.status.pending,  pillClass: 'admin-pill pending'  },
@@ -34,7 +33,6 @@ type TabKey = typeof TABS[number]['key'];
 
 const AdminReturns = () => {
   const t = ADMIN_DICTIONARY.returns;
-  const c = ADMIN_DICTIONARY.common;
 
   const view = useAdminViewState({
     storageKey: ADMIN_VIEW_KEYS.returns ?? 'admin_returns_view',
@@ -50,9 +48,7 @@ const AdminReturns = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [drawerItem, setDrawerItem] = useState<ReturnRequest | null>(null);
   const [drawerNote, setDrawerNote] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-
-  const { toast, pushToast } = useAdminToast();
+  const { pushToast } = useAdminToast();
 
   const statusFilter: ReturnStatus | null =
     view.status === 'pending' ? 'PENDING'
@@ -73,7 +69,7 @@ const AdminReturns = () => {
       setTotalPages(res.totalPages || 1);
       setPage(res.number || 0);
     } catch {
-      pushToast(ADMIN_DICTIONARY.messages.loadFailed);
+      pushToast('Kh?ng t?i ???c danh sach doi tra');
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +122,7 @@ const AdminReturns = () => {
       if (drawerItem?.id === id) setDrawerItem(updated);
       pushToast(ADMIN_DICTIONARY.messages.returns.statusUpdated(statusConfig[status].label));
     } catch {
-      pushToast(ADMIN_DICTIONARY.messages.actionFailed);
+      pushToast('Kh?ng the cap nhat tr?ng th?i');
     }
   };
 
@@ -150,6 +146,8 @@ const AdminReturns = () => {
     }
   };
 
+  const hasViewContext = view.status !== 'all' || Boolean(view.search.trim());
+
   return (
     <AdminLayout
       title={t.title}
@@ -163,8 +161,8 @@ const AdminReturns = () => {
               onChange={(e) => view.setSearch(e.target.value)}
             />
           </div>
-          <button className="admin-secondary-btn" onClick={shareCurrentView}><LinkIcon /> {c.share}</button>
-          <button className="admin-secondary-btn" onClick={resetCurrentView}><RefreshIcon /> {c.reset}</button>
+          <button className="admin-secondary-btn" onClick={shareCurrentView}><LinkIcon /> {ADMIN_DICTIONARY.actions.shareView}</button>
+          <button className="admin-secondary-btn" onClick={resetCurrentView}><RefreshIcon /> {ADMIN_DICTIONARY.actions.resetView}</button>
         </>
       }
     >
@@ -181,14 +179,14 @@ const AdminReturns = () => {
         ))}
       </div>
 
-      {isLoading && <p className="admin-muted">{c.loading}</p>}
+      {isLoading && <p className="admin-muted">?ang tai...</p>}
 
       {!isLoading && pagedItems.length === 0 && (
         <AdminStateBlock
-          icon={Package}
-          title={t.empty.title}
-          description={t.empty.description}
-          actionLabel={c.reset}
+          type={hasViewContext ? 'search-empty' : 'empty'}
+          title={hasViewContext ? t.empty.searchTitle : t.empty.defaultTitle}
+          description={hasViewContext ? t.empty.searchDescription : t.empty.defaultDescription}
+          actionLabel={ADMIN_DICTIONARY.actions.resetView}
           onAction={resetCurrentView}
         />
       )}
@@ -204,7 +202,7 @@ const AdminReturns = () => {
                   onChange={(e) => toggleAll(e.target.checked)}
                 />
               </div>
-              <div className="admin-table-cell grow">{t.columns.request}</div>
+              <div className="admin-table-cell grow">{t.columns.requestId}</div>
               <div className="admin-table-cell">{t.columns.customer}</div>
               <div className="admin-table-cell">{t.columns.reason}</div>
               <div className="admin-table-cell">{t.columns.status}</div>
@@ -233,7 +231,7 @@ const AdminReturns = () => {
                   <span className={statusConfig[item.status].pillClass}>{statusConfig[item.status].label}</span>
                 </div>
                 <div className="admin-table-cell right">
-                  <button className="admin-icon-btn" onClick={() => setDrawerItem(item)} title={c.view}>
+                  <button className="admin-icon-btn" onClick={() => setDrawerItem(item)} title={ADMIN_DICTIONARY.actionTitles.viewDetail}>
                     <Eye size={16} />
                   </button>
                 </div>
@@ -244,32 +242,20 @@ const AdminReturns = () => {
           <AdminPagination
             page={page + 1}
             totalPages={totalPages}
+            startIndex={pagedItems.length === 0 ? 0 : page * 20 + 1}
+            endIndex={page * 20 + pagedItems.length}
+            total={pagedItems.length}
             onPageChange={(next) => void loadReturns(next - 1)}
+            onPrev={() => void loadReturns(Math.max(page - 1, 0))}
+            onNext={() => void loadReturns(Math.min(page + 1, Math.max(totalPages - 1, 0)))}
+            selectedNoun={t.selectedNoun}
           />
         </>
       )}
 
-      <AnimatePresence>
-        {drawerItem && (
-          <motion.div
-            className="drawer-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setDrawerItem(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {drawerItem && (
-          <motion.div
-            className="drawer"
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-          >
+      <Drawer open={Boolean(drawerItem)} onClose={() => setDrawerItem(null)}>
+        {drawerItem ? (
+          <>
             <div className="drawer-header">
               <div>
                 <p className="drawer-eyebrow">{drawerItem.orderId}</p>
@@ -280,7 +266,7 @@ const AdminReturns = () => {
             </div>
             <div className="drawer-body">
               <section className="drawer-section">
-                <h4>{t.details.items}</h4>
+                <h4>{t.drawer.returnProducts}</h4>
                 <div className="admin-return-items">
                   {drawerItem.items.map((item) => (
                     <div key={item.orderItemId} className="admin-return-item">
@@ -296,13 +282,13 @@ const AdminReturns = () => {
               </section>
 
               <section className="drawer-section">
-                <h4>{t.details.reason}</h4>
+                <h4>{t.drawer.reason}</h4>
                 <p>{drawerItem.reason}</p>
                 {drawerItem.note && <p className="admin-muted">{drawerItem.note}</p>}
               </section>
 
               <section className="drawer-section">
-                <h4>{t.details.adminNote}</h4>
+                <h4>{t.drawer.internalNotes}</h4>
                 <textarea
                   value={drawerNote}
                   onChange={(e) => setDrawerNote(e.target.value)}
@@ -315,23 +301,23 @@ const AdminReturns = () => {
                 {drawerItem.status === 'PENDING' && (
                   <>
                     <button className="admin-secondary-btn" onClick={() => applyStatus(drawerItem.id, 'REJECTED')}>
-                      <XCircle size={16} /> {t.actions.reject}
+                      <XCircle size={16} /> {t.actionTitles.reject}
                     </button>
                     <button className="admin-primary-btn" onClick={() => applyStatus(drawerItem.id, 'APPROVED')}>
-                      <Check size={16} /> {t.actions.approve}
+                      <Check size={16} /> {t.actionTitles.approve}
                     </button>
                   </>
                 )}
                 {drawerItem.status === 'APPROVED' && (
                   <button className="admin-primary-btn" onClick={() => applyStatus(drawerItem.id, 'COMPLETED')}>
-                    <Check size={16} /> {t.actions.complete}
+                    <Check size={16} /> {t.actionTitles.complete}
                   </button>
                 )}
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </>
+        ) : null}
+      </Drawer>
     </AdminLayout>
   );
 };

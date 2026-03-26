@@ -22,6 +22,7 @@ import { getVendorOrderStatusLabel, getVendorOrderStatusTone } from './vendorOrd
 import { calculateCommission, formatCurrency } from '../../services/commissionService';
 import { vendorPortalService, type VendorDashboardData, type VendorOrderSummary } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 
 const initialData: VendorDashboardData = {
   stats: {
@@ -53,7 +54,7 @@ const VendorDashboard = () => {
         startTransition(() => setData(next));
       } catch (err: unknown) {
         if (!active) return;
-        addToast((err as Error)?.message || 'Không tải được bảng điều khiển gian hàng', 'error');
+        addToast(getUiErrorMessage(err, 'Không tải được bảng điều khiển gian hàng'), 'error');
       } finally {
         if (active) {
           setLoading(false);
@@ -115,8 +116,8 @@ const VendorDashboard = () => {
     },
     {
       label: 'Voucher đang chạy',
-      value: 3,
-      change: '+1',
+      value: data.stats.totalProducts > 0 ? 3 : 0,
+      change: data.stats.totalProducts > 0 ? '+1' : '0',
       tone: 'up',
       icon: <TicketPercent size={18} />,
       to: '/vendor/promotions',
@@ -142,7 +143,7 @@ const VendorDashboard = () => {
           item.id === order.id
             ? {
                 ...item,
-                status: 'packing',
+                status: 'confirmed',
               }
             : item,
         ),
@@ -154,8 +155,8 @@ const VendorDashboard = () => {
 
   return (
     <VendorLayout
-      title="Tổng quan shop"
-      hideTopbarTitle
+      title="Dashboard"
+      breadcrumbs={['Kênh Người Bán', 'Tổng quan']}
       actions={(
         <>
           <Link to="/vendor/storefront" className="vendor-ghost-btn">Gian hàng công khai</Link>

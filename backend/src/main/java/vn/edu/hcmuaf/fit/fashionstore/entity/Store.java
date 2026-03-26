@@ -42,6 +42,51 @@ public class Store extends BaseEntity {
 
     private String address;
 
+    @Column(name = "bank_name")
+    private String bankName;
+
+    @Column(name = "bank_account_number")
+    private String bankAccountNumber;
+
+    @Column(name = "bank_account_holder")
+    private String bankAccountHolder;
+
+    @Column(name = "bank_verified")
+    private Boolean bankVerified;
+
+    @Column(name = "notify_new_order")
+    private Boolean notifyNewOrder;
+
+    @Column(name = "notify_order_status_change")
+    private Boolean notifyOrderStatusChange;
+
+    @Column(name = "notify_low_stock")
+    private Boolean notifyLowStock;
+
+    @Column(name = "notify_payout_complete")
+    private Boolean notifyPayoutComplete;
+
+    @Column(name = "notify_promotions")
+    private Boolean notifyPromotions;
+
+    @Column(name = "ship_ghn")
+    private Boolean shipGhn;
+
+    @Column(name = "ship_ghtk")
+    private Boolean shipGhtk;
+
+    @Column(name = "ship_express")
+    private Boolean shipExpress;
+
+    @Column(name = "warehouse_address")
+    private String warehouseAddress;
+
+    @Column(name = "warehouse_contact")
+    private String warehouseContact;
+
+    @Column(name = "warehouse_phone")
+    private String warehousePhone;
+
     @Column(name = "commission_rate")
     private Double commissionRate = 5.0;
 

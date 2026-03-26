@@ -56,6 +56,21 @@ public class StoreService {
                 .contactEmail(request.getContactEmail() != null ? request.getContactEmail() : owner.getEmail())
                 .phone(request.getPhone())
                 .address(request.getAddress())
+                .bankName(request.getBankName())
+                .bankAccountNumber(request.getBankAccountNumber())
+                .bankAccountHolder(request.getBankAccountHolder())
+                .bankVerified(defaultIfNull(request.getBankVerified(), false))
+                .notifyNewOrder(defaultIfNull(request.getNotifyNewOrder(), true))
+                .notifyOrderStatusChange(defaultIfNull(request.getNotifyOrderStatusChange(), true))
+                .notifyLowStock(defaultIfNull(request.getNotifyLowStock(), true))
+                .notifyPayoutComplete(defaultIfNull(request.getNotifyPayoutComplete(), true))
+                .notifyPromotions(defaultIfNull(request.getNotifyPromotions(), false))
+                .shipGhn(defaultIfNull(request.getShipGhn(), true))
+                .shipGhtk(defaultIfNull(request.getShipGhtk(), true))
+                .shipExpress(defaultIfNull(request.getShipExpress(), false))
+                .warehouseAddress(request.getWarehouseAddress() != null ? request.getWarehouseAddress() : request.getAddress())
+                .warehouseContact(request.getWarehouseContact())
+                .warehousePhone(request.getWarehousePhone() != null ? request.getWarehousePhone() : request.getPhone())
                 .commissionRate(5.0)
                 .status(Store.StoreStatus.INACTIVE)
                 .approvalStatus(Store.ApprovalStatus.PENDING)
@@ -224,6 +239,51 @@ public class StoreService {
         if (request.getAddress() != null) {
             store.setAddress(request.getAddress());
         }
+        if (request.getBankName() != null) {
+            store.setBankName(request.getBankName());
+        }
+        if (request.getBankAccountNumber() != null) {
+            store.setBankAccountNumber(request.getBankAccountNumber());
+        }
+        if (request.getBankAccountHolder() != null) {
+            store.setBankAccountHolder(request.getBankAccountHolder());
+        }
+        if (request.getBankVerified() != null) {
+            store.setBankVerified(request.getBankVerified());
+        }
+        if (request.getNotifyNewOrder() != null) {
+            store.setNotifyNewOrder(request.getNotifyNewOrder());
+        }
+        if (request.getNotifyOrderStatusChange() != null) {
+            store.setNotifyOrderStatusChange(request.getNotifyOrderStatusChange());
+        }
+        if (request.getNotifyLowStock() != null) {
+            store.setNotifyLowStock(request.getNotifyLowStock());
+        }
+        if (request.getNotifyPayoutComplete() != null) {
+            store.setNotifyPayoutComplete(request.getNotifyPayoutComplete());
+        }
+        if (request.getNotifyPromotions() != null) {
+            store.setNotifyPromotions(request.getNotifyPromotions());
+        }
+        if (request.getShipGhn() != null) {
+            store.setShipGhn(request.getShipGhn());
+        }
+        if (request.getShipGhtk() != null) {
+            store.setShipGhtk(request.getShipGhtk());
+        }
+        if (request.getShipExpress() != null) {
+            store.setShipExpress(request.getShipExpress());
+        }
+        if (request.getWarehouseAddress() != null) {
+            store.setWarehouseAddress(request.getWarehouseAddress());
+        }
+        if (request.getWarehouseContact() != null) {
+            store.setWarehouseContact(request.getWarehouseContact());
+        }
+        if (request.getWarehousePhone() != null) {
+            store.setWarehousePhone(request.getWarehousePhone());
+        }
 
         Store saved = storeRepository.save(store);
         return toResponse(saved);
@@ -259,6 +319,21 @@ public class StoreService {
                 .contactEmail(store.getContactEmail())
                 .phone(store.getPhone())
                 .address(store.getAddress())
+                .bankName(store.getBankName())
+                .bankAccountNumber(store.getBankAccountNumber())
+                .bankAccountHolder(store.getBankAccountHolder())
+                .bankVerified(defaultIfNull(store.getBankVerified(), false))
+                .notifyNewOrder(defaultIfNull(store.getNotifyNewOrder(), true))
+                .notifyOrderStatusChange(defaultIfNull(store.getNotifyOrderStatusChange(), true))
+                .notifyLowStock(defaultIfNull(store.getNotifyLowStock(), true))
+                .notifyPayoutComplete(defaultIfNull(store.getNotifyPayoutComplete(), true))
+                .notifyPromotions(defaultIfNull(store.getNotifyPromotions(), false))
+                .shipGhn(defaultIfNull(store.getShipGhn(), true))
+                .shipGhtk(defaultIfNull(store.getShipGhtk(), true))
+                .shipExpress(defaultIfNull(store.getShipExpress(), false))
+                .warehouseAddress(store.getWarehouseAddress())
+                .warehouseContact(store.getWarehouseContact())
+                .warehousePhone(store.getWarehousePhone())
                 .commissionRate(store.getCommissionRate())
                 .status(store.getStatus().name())
                 .approvalStatus(store.getApprovalStatus().name())
@@ -271,5 +346,9 @@ public class StoreService {
                 .createdAt(store.getCreatedAt())
                 .updatedAt(store.getUpdatedAt())
                 .build();
+    }
+
+    private static Boolean defaultIfNull(Boolean value, boolean fallback) {
+        return value != null ? value : fallback;
     }
 }

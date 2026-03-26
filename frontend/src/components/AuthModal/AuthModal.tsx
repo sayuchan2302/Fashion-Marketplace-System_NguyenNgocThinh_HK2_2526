@@ -6,6 +6,7 @@ import { Eye, EyeOff, Facebook, Loader2, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { authService } from '../../services/authService';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 import './AuthModal.css';
 
 interface AuthModalProps {
@@ -29,9 +30,6 @@ interface RegisterErrors {
 type RedirectLocationState = {
   from?: string;
 };
-
-const getErrorMessage = (error: unknown, fallback: string) =>
-  error instanceof Error ? error.message : fallback;
 
 const isValidEmailOrPhone = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || /^(0[3|5|7|8|9])+([0-9]{8})$/.test(value);
@@ -89,15 +87,15 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
     const errors: LoginErrors = {};
 
     if (!email.trim()) {
-      errors.email = 'Vui lòng nhập email hoặc số điện thoại';
+      errors.email = 'Vui lÃ²ng nháº­p email hoáº·c sá»‘ Ä‘iá»‡n thoáº¡i';
     } else if (!isValidEmailOrPhone(email.trim())) {
-      errors.email = 'Email hoặc số điện thoại không hợp lệ';
+      errors.email = 'Email hoáº·c sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng há»£p lá»‡';
     }
 
     if (!password) {
-      errors.password = 'Vui lòng nhập mật khẩu';
+      errors.password = 'Vui lÃ²ng nháº­p máº­t kháº©u';
     } else if (password.length < 6) {
-      errors.password = 'Mật khẩu tối thiểu 6 ký tự';
+      errors.password = 'Máº­t kháº©u tá»‘i thiá»ƒu 6 kÃ½ tá»±';
     }
 
     return errors;
@@ -107,25 +105,25 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
     const errors: RegisterErrors = {};
 
     if (!fullName.trim()) {
-      errors.fullName = 'Vui lòng nhập họ và tên';
+      errors.fullName = 'Vui lÃ²ng nháº­p há» vÃ  tÃªn';
     }
 
     if (!email.trim()) {
-      errors.email = 'Vui lòng nhập email hoặc số điện thoại';
+      errors.email = 'Vui lÃ²ng nháº­p email hoáº·c sá»‘ Ä‘iá»‡n thoáº¡i';
     } else if (!isValidEmailOrPhone(email.trim())) {
-      errors.email = 'Email hoặc số điện thoại không hợp lệ';
+      errors.email = 'Email hoáº·c sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng há»£p lá»‡';
     }
 
     if (!password) {
-      errors.password = 'Vui lòng nhập mật khẩu';
+      errors.password = 'Vui lÃ²ng nháº­p máº­t kháº©u';
     } else if (password.length < 6) {
-      errors.password = 'Mật khẩu tối thiểu 6 ký tự';
+      errors.password = 'Máº­t kháº©u tá»‘i thiá»ƒu 6 kÃ½ tá»±';
     }
 
     if (!confirmPassword) {
-      errors.confirmPassword = 'Vui lòng nhập lại mật khẩu';
+      errors.confirmPassword = 'Vui lÃ²ng nháº­p láº¡i máº­t kháº©u';
     } else if (confirmPassword !== password) {
-      errors.confirmPassword = 'Mật khẩu không khớp';
+      errors.confirmPassword = 'Máº­t kháº©u khÃ´ng khá»›p';
     }
 
     return errors;
@@ -168,33 +166,21 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
 
       if (activeTab === 'login') {
         await login(email.trim(), password.trim());
-        addToast('Đăng nhập thành công', 'success');
+        addToast('ÄÄƒng nháº­p thÃ nh cÃ´ng', 'success');
 
-        const currentSession = authService.getSession() || authService.getAdminSession();
-        const role = currentSession?.user?.role;
-
-        if (role === 'SUPER_ADMIN') {
-          onClose();
-          navigate('/admin', { replace: true });
-          return;
-        }
-
-        if (role === 'VENDOR') {
-          onClose();
-          navigate('/vendor', { replace: true });
-          return;
-        }
+        // For admin and vendor, stay on home page (like customers)
+        // User can manually navigate to their panel via header dropdown
+        
+        const redirectState = location.state as RedirectLocationState | null;
+        const redirectTo = redirectState?.from || '/';
+        onClose();
+        navigate(redirectTo, { replace: true });
       } else {
         await register(fullName.trim(), email.trim(), password.trim());
-        addToast('Tạo tài khoản thành công', 'success');
+        addToast('Táº¡o tÃ i khoáº£n thÃ nh cÃ´ng', 'success');
       }
-
-      const redirectState = location.state as RedirectLocationState | null;
-      const redirectTo = redirectState?.from || '/';
-      onClose();
-      navigate(redirectTo, { replace: true });
     } catch (error: unknown) {
-      addToast(getErrorMessage(error, 'Thao tác thất bại'), 'error');
+      addToast(getUiErrorMessage(error, 'Thao tÃ¡c tháº¥t báº¡i'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -204,7 +190,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
     event.preventDefault();
 
     if (!forgotEmail.trim()) {
-      setForgotError('Vui lòng nhập email');
+      setForgotError('Vui lÃ²ng nháº­p email');
       return;
     }
 
@@ -213,11 +199,11 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
     try {
       setIsLoading(true);
       await authService.forgot(forgotEmail.trim());
-      addToast('Đã gửi hướng dẫn đặt lại mật khẩu', 'success');
+      addToast('ÄÃ£ gá»­i hÆ°á»›ng dáº«n Ä‘áº·t láº¡i máº­t kháº©u', 'success');
       setIsForgot(false);
       setForgotEmail('');
     } catch (error: unknown) {
-      addToast(getErrorMessage(error, 'Gửi yêu cầu thất bại'), 'error');
+      addToast(getUiErrorMessage(error, 'Gá»­i yÃªu cáº§u tháº¥t báº¡i'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -230,17 +216,17 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
   return createPortal(
     <div className="auth-modal-overlay" onClick={onClose}>
       <div className="auth-modal-content" onClick={(event) => event.stopPropagation()}>
-        <button className="auth-modal-close" onClick={onClose} aria-label="Đóng">
+        <button className="auth-modal-close" onClick={onClose} aria-label="ÄÃ³ng">
           <X size={24} />
         </button>
 
         {!isForgot ? (
           <div className="auth-tabs">
             <button className={`auth-tab-btn ${activeTab === 'login' ? 'active' : ''}`} onClick={() => handleTabChange('login')}>
-              Đăng nhập
+              ÄÄƒng nháº­p
             </button>
             <button className={`auth-tab-btn ${activeTab === 'register' ? 'active' : ''}`} onClick={() => handleTabChange('register')}>
-              Đăng ký
+              ÄÄƒng kÃ½
             </button>
           </div>
         ) : null}
@@ -250,8 +236,8 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
             <div key={activeTab} className="auth-tab-content">
               <p className="auth-subtitle">
                 {activeTab === 'login'
-                  ? 'Đăng nhập để không bỏ lỡ quyền lợi tích lũy và hoàn tiền cho bất kỳ đơn hàng nào.'
-                  : 'Trở thành thành viên để nhận nhiều ưu đãi độc quyền và theo dõi đơn hàng dễ dàng hơn.'}
+                  ? 'ÄÄƒng nháº­p Ä‘á»ƒ khÃ´ng bá» lá»¡ quyá»n lá»£i tÃ­ch lÅ©y vÃ  hoÃ n tiá»n cho báº¥t ká»³ Ä‘Æ¡n hÃ ng nÃ o.'
+                  : 'Trá»Ÿ thÃ nh thÃ nh viÃªn Ä‘á»ƒ nháº­n nhiá»u Æ°u Ä‘Ã£i Ä‘á»™c quyá»n vÃ  theo dÃµi Ä‘Æ¡n hÃ ng dá»… dÃ ng hÆ¡n.'}
               </p>
 
               <form className="auth-form" onSubmit={handleSubmit} noValidate>
@@ -262,7 +248,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                       name="fullName"
                       autoComplete="name"
                       className={`form-input ${registerErrors.fullName ? 'input-error' : ''}`}
-                      placeholder="Họ và tên *"
+                      placeholder="Há» vÃ  tÃªn *"
                       value={fullName}
                       onChange={(event) => {
                         setFullName(event.target.value);
@@ -279,7 +265,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                     name="email"
                     autoComplete="email"
                     className={`form-input ${(activeTab === 'login' ? loginErrors.email : registerErrors.email) ? 'input-error' : ''}`}
-                    placeholder="Email / Số điện thoại *"
+                    placeholder="Email / Sá»‘ Ä‘iá»‡n thoáº¡i *"
                     value={email}
                     onChange={(event) => {
                       setEmail(event.target.value);
@@ -301,7 +287,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                       name="password"
                       autoComplete={activeTab === 'login' ? 'current-password' : 'new-password'}
                       className={`form-input ${(activeTab === 'login' ? loginErrors.password : registerErrors.password) ? 'input-error' : ''}`}
-                      placeholder="Mật khẩu *"
+                      placeholder="Máº­t kháº©u *"
                       value={password}
                       onChange={(event) => {
                         setPassword(event.target.value);
@@ -316,7 +302,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                       type="button"
                       className="password-toggle-btn"
                       onClick={() => setShowPassword((current) => !current)}
-                      aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                      aria-label={showPassword ? 'áº¨n máº­t kháº©u' : 'Hiá»‡n máº­t kháº©u'}
                       tabIndex={-1}
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -328,7 +314,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                   {activeTab === 'register' && password.length > 0 ? (
                     <div className="password-strength">
                       <div className={`strength-bar ${password.length < 6 ? 'weak' : password.length < 10 ? 'medium' : 'strong'}`} />
-                      <span className="strength-label">{password.length < 6 ? 'Yếu' : password.length < 10 ? 'Trung bình' : 'Mạnh'}</span>
+                      <span className="strength-label">{password.length < 6 ? 'Yáº¿u' : password.length < 10 ? 'Trung bÃ¬nh' : 'Máº¡nh'}</span>
                     </div>
                   ) : null}
                 </div>
@@ -341,7 +327,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                         name="confirmPassword"
                         autoComplete="new-password"
                         className={`form-input ${registerErrors.confirmPassword ? 'input-error' : ''}`}
-                        placeholder="Nhập lại mật khẩu *"
+                        placeholder="Nháº­p láº¡i máº­t kháº©u *"
                         value={confirmPassword}
                         onChange={(event) => {
                           setConfirmPassword(event.target.value);
@@ -352,7 +338,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                         type="button"
                         className="password-toggle-btn"
                         onClick={() => setShowConfirmPassword((current) => !current)}
-                        aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                        aria-label={showConfirmPassword ? 'áº¨n máº­t kháº©u' : 'Hiá»‡n máº­t kháº©u'}
                         tabIndex={-1}
                       >
                         {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -361,7 +347,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                     {registerErrors.confirmPassword ? <span className="field-error">{registerErrors.confirmPassword}</span> : null}
                     {confirmPassword.length > 0 ? (
                       <span className={`match-indicator ${confirmPassword === password ? 'match' : 'no-match'}`}>
-                        {confirmPassword === password ? 'Mật khẩu khớp' : 'Mật khẩu chưa khớp'}
+                        {confirmPassword === password ? 'Máº­t kháº©u khá»›p' : 'Máº­t kháº©u chÆ°a khá»›p'}
                       </span>
                     ) : null}
                   </div>
@@ -378,7 +364,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                         setForgotError(null);
                       }}
                     >
-                      Quên mật khẩu?
+                      QuÃªn máº­t kháº©u?
                     </button>
                   </div>
                 ) : null}
@@ -387,19 +373,19 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                   {isLoading ? (
                     <>
                       <Loader2 size={18} className="auth-spinner" />
-                      Đang xử lý...
+                      Äang xá»­ lÃ½...
                     </>
                   ) : activeTab === 'login' ? (
-                    'Đăng nhập'
+                    'ÄÄƒng nháº­p'
                   ) : (
-                    'Đăng ký'
+                    'ÄÄƒng kÃ½'
                   )}
                 </button>
               </form>
             </div>
           ) : (
             <div className="auth-tab-content">
-              <p className="auth-subtitle">Nhập email để nhận hướng dẫn đặt lại mật khẩu.</p>
+              <p className="auth-subtitle">Nháº­p email Ä‘á»ƒ nháº­n hÆ°á»›ng dáº«n Ä‘áº·t láº¡i máº­t kháº©u.</p>
               <form className="auth-form" onSubmit={handleForgotSubmit}>
                 <div className="form-group">
                   <input
@@ -419,10 +405,10 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                   {isLoading ? (
                     <>
                       <Loader2 size={18} className="auth-spinner" />
-                      Đang gửi...
+                      Äang gá»­i...
                     </>
                   ) : (
-                    'Gửi hướng dẫn'
+                    'Gá»­i hÆ°á»›ng dáº«n'
                   )}
                 </button>
 
@@ -435,7 +421,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
                       setForgotError(null);
                     }}
                   >
-                    Quay lại đăng nhập
+                    Quay láº¡i Ä‘Äƒng nháº­p
                   </button>
                 </div>
               </form>
@@ -443,7 +429,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
           )}
 
           <div className="auth-divider">
-            <span>hoặc</span>
+            <span>hoáº·c</span>
           </div>
 
           <div className="auth-social-btns">

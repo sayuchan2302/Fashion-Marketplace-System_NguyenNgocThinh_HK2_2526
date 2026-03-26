@@ -1,6 +1,6 @@
 export const VENDOR_DICTIONARY = {
   layout: {
-    logo: 'Seller Panel',
+    logo: 'Kênh Người Bán',
     nav: {
       dashboard: 'Tổng quan',
       orders: 'Đơn hàng',

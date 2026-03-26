@@ -11,6 +11,7 @@ import { useAdminToast } from './useAdminToast';
 import { adminReviewService, type Review, type ReviewStatus } from './adminReviewService';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import AdminConfirmDialog from './AdminConfirmDialog';
+import Drawer from '../../components/Drawer/Drawer';
 
 const ReviewStatusBadge = ({ status }: { status: ReviewStatus }) => {
   const config: Record<ReviewStatus, { label: string; pillClass: string }> = {
@@ -356,91 +357,88 @@ const AdminReviews = () => {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {drawerReview && (
+      <Drawer open={Boolean(drawerReview)} onClose={() => setDrawerReview(null)}>
+        {drawerReview ? (
           <>
-            <motion.div className="drawer-overlay" onClick={() => { setDrawerReview(null); }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
-            <motion.div className="drawer" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ duration: 0.25, ease: 'easeOut' }}>
-              <div className="drawer-header">
-                <div>
-                  <p className="drawer-eyebrow">Duyệt đánh giá</p>
-                  <h3>{drawerReview.productName}</h3>
+            <div className="drawer-header">
+              <div>
+                <p className="drawer-eyebrow">Duyệt đánh giá</p>
+                <h3>{drawerReview.productName}</h3>
+              </div>
+              <button className="admin-icon-btn" onClick={() => { setDrawerReview(null); }} aria-label="Đóng">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="drawer-body">
+              <section className="drawer-section">
+                <p className="admin-label" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Product signal</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <img src={drawerReview.productImage} alt={drawerReview.productName} style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                  <div>
+                    <p className="admin-bold" style={{ margin: 0 }}>{drawerReview.productName}</p>
+                    <p className="admin-muted small" style={{ margin: 0 }}>Product ID: {drawerReview.productId}</p>
+                    {drawerReview.orderId && <p className="admin-muted small" style={{ margin: 0 }}>Order ID: #{drawerReview.orderId}</p>}
+                  </div>
                 </div>
-                <button className="admin-icon-btn" onClick={() => { setDrawerReview(null); }} aria-label="Đóng">
-                  <X size={16} />
-                </button>
-              </div>
+              </section>
 
-              <div className="drawer-body">
-                <section className="drawer-section">
-                  <p className="admin-label" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Product signal</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <img src={drawerReview.productImage} alt={drawerReview.productName} style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
-                    <div>
-                      <p className="admin-bold" style={{ margin: 0 }}>{drawerReview.productName}</p>
-                      <p className="admin-muted small" style={{ margin: 0 }}>Product ID: {drawerReview.productId}</p>
-                      {drawerReview.orderId && <p className="admin-muted small" style={{ margin: 0 }}>Order ID: #{drawerReview.orderId}</p>}
-                    </div>
+              <section className="drawer-section">
+                <p className="admin-label" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Customer feedback</p>
+                <div className="admin-card-list">
+                  <div className="admin-card-row">
+                    <span className="admin-bold">{drawerReview.customerName}</span>
+                    <RatingStars rating={drawerReview.rating} size={16} />
                   </div>
-                </section>
-
-                <section className="drawer-section">
-                  <p className="admin-label" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Customer feedback</p>
-                  <div className="admin-card-list">
-                    <div className="admin-card-row">
-                      <span className="admin-bold">{drawerReview.customerName}</span>
-                      <RatingStars rating={drawerReview.rating} size={16} />
-                    </div>
-                    <div className="admin-card-row">
-                      <span className="admin-muted small">{formatDate(drawerReview.date)}</span>
-                      <ReviewStatusBadge status={drawerReview.status} />
-                    </div>
+                  <div className="admin-card-row">
+                    <span className="admin-muted small">{formatDate(drawerReview.date)}</span>
+                    <ReviewStatusBadge status={drawerReview.status} />
                   </div>
-                </section>
+                </div>
+              </section>
 
-                <section className="drawer-section">
-                  <p className="admin-label" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Review content</p>
-                  <div className="admin-note">{drawerReview.content}</div>
-                </section>
+              <section className="drawer-section">
+                <p className="admin-label" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Review content</p>
+                <div className="admin-note">{drawerReview.content}</div>
+              </section>
 
-                <section className="drawer-section">
-                  <p className="admin-label" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Phản hồi từ người bán</p>
-                  {drawerReview.reply ? (
-                    <div className="admin-note" style={{ background: '#eff6ff', color: '#1e40af' }}>{drawerReview.reply}</div>
-                  ) : (
-                    <p className="admin-muted small" style={{ fontStyle: 'italic' }}>Chưa có phản hồi từ shop. Admin chỉ theo dõi và kiểm duyệt, còn seller sẽ phản hồi ở panel riêng.</p>
-                  )}
-                </section>
+              <section className="drawer-section">
+                <p className="admin-label" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Phản hồi từ người bán</p>
+                {drawerReview.reply ? (
+                  <div className="admin-note" style={{ background: '#eff6ff', color: '#1e40af' }}>{drawerReview.reply}</div>
+                ) : (
+                  <p className="admin-muted small" style={{ fontStyle: 'italic' }}>Chưa có phản hồi từ shop. Admin chỉ theo dõi và kiểm duyệt, còn seller sẽ phản hồi ở panel riêng.</p>
+                )}
+              </section>
 
-                <section className="drawer-section">
-                  <div className="admin-actions" style={{ flexWrap: 'wrap' }}>
-                    {drawerReview.status === 'pending' && (
-                      <button className="admin-primary-btn" onClick={() => { handleApprove(drawerReview.id); setDrawerReview(null); }}>
-                        <CheckCircle size={15} />
-                        Duyệt
-                      </button>
-                    )}
-                    {drawerReview.status !== 'hidden' && (
-                      <button className="admin-ghost-btn" onClick={() => { handleHide(drawerReview.id); setDrawerReview(null); }}>
-                        <EyeOff size={15} />
-                        Ẩn
-                      </button>
-                    )}
-                    <button className="admin-ghost-btn danger" style={{ marginLeft: 'auto' }} onClick={() => setDeleteTarget({ ids: [drawerReview.id], names: [drawerReview.productName] })}>
-                      <Trash2 size={15} />
-                      Xóa
+              <section className="drawer-section">
+                <div className="admin-actions" style={{ flexWrap: 'wrap' }}>
+                  {drawerReview.status === 'pending' && (
+                    <button className="admin-primary-btn" onClick={() => { handleApprove(drawerReview.id); setDrawerReview(null); }}>
+                      <CheckCircle size={15} />
+                      Duyệt
                     </button>
-                  </div>
-                </section>
-              </div>
+                  )}
+                  {drawerReview.status !== 'hidden' && (
+                    <button className="admin-ghost-btn" onClick={() => { handleHide(drawerReview.id); setDrawerReview(null); }}>
+                      <EyeOff size={15} />
+                      Ẩn
+                    </button>
+                  )}
+                  <button className="admin-ghost-btn danger" style={{ marginLeft: 'auto' }} onClick={() => setDeleteTarget({ ids: [drawerReview.id], names: [drawerReview.productName] })}>
+                    <Trash2 size={15} />
+                    Xóa
+                  </button>
+                </div>
+              </section>
+            </div>
 
-              <div className="drawer-footer">
-                <button className="admin-ghost-btn" onClick={() => { setDrawerReview(null); }}>Đóng</button>
-              </div>
-            </motion.div>
+            <div className="drawer-footer">
+              <button className="admin-ghost-btn" onClick={() => { setDrawerReview(null); }}>Đóng</button>
+            </div>
           </>
-        )}
-      </AnimatePresence>
+        ) : null}
+      </Drawer>
 
       <AdminConfirmDialog
         open={Boolean(deleteTarget)}

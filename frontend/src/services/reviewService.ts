@@ -2,6 +2,7 @@ import { adminReviewService, type Review as AdminReview, type ReviewStatus } fro
 
 export interface Review {
   id: string;
+  storeId: string;
   productId: string;
   productName: string;
   productImage: string;
@@ -22,6 +23,7 @@ export interface Review {
 }
 
 export interface ReviewSubmission {
+  storeId?: string;
   productId: string;
   productName?: string;
   productImage?: string;
@@ -34,6 +36,7 @@ export interface ReviewSubmission {
 
 const mapAdminToClient = (item: AdminReview): Review => ({
   id: item.id,
+  storeId: item.storeId,
   productId: item.productId,
   productName: item.productName,
   productImage: item.productImage,
@@ -55,6 +58,10 @@ export const reviewService = {
     return adminReviewService.getAll().map(mapAdminToClient);
   },
 
+  getReviewsByStore(storeId: string): Review[] {
+    return adminReviewService.getByStore(storeId).map(mapAdminToClient);
+  },
+
   getReviewsByOrder(orderId: string): Review[] {
     return this.getReviews().filter((r) => r.orderId === orderId && r.status === 'approved');
   },
@@ -73,6 +80,7 @@ export const reviewService = {
   submitReview(submission: ReviewSubmission): Review {
     const newReview: AdminReview = {
       id: `rev_${Date.now()}`,
+      storeId: submission.storeId || 'store_001',
       productId: submission.productId,
       productName: submission.productName || 'Sản phẩm',
       productImage: submission.productImage || '',

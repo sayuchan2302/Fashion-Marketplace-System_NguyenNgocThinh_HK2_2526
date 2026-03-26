@@ -20,6 +20,21 @@ export interface StoreProfile {
   phone?: string;
   contactEmail?: string;
   address?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
+  bankVerified?: boolean;
+  notifyNewOrder?: boolean;
+  notifyOrderStatusChange?: boolean;
+  notifyLowStock?: boolean;
+  notifyPayoutComplete?: boolean;
+  notifyPromotions?: boolean;
+  shipGhn?: boolean;
+  shipGhtk?: boolean;
+  shipExpress?: boolean;
+  warehouseAddress?: string;
+  warehouseContact?: string;
+  warehousePhone?: string;
   rejectionReason?: string;
 }
 
@@ -75,6 +90,21 @@ interface StoreUpdateRequest {
   contactEmail?: string;
   phone?: string;
   address?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
+  bankVerified?: boolean;
+  notifyNewOrder?: boolean;
+  notifyOrderStatusChange?: boolean;
+  notifyLowStock?: boolean;
+  notifyPayoutComplete?: boolean;
+  notifyPromotions?: boolean;
+  shipGhn?: boolean;
+  shipGhtk?: boolean;
+  shipExpress?: boolean;
+  warehouseAddress?: string;
+  warehouseContact?: string;
+  warehousePhone?: string;
 }
 
 export interface StoreRegistrationResponse {
@@ -104,6 +134,21 @@ interface BackendStoreResponse {
   contactEmail?: string;
   phone?: string;
   address?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
+  bankVerified?: boolean;
+  notifyNewOrder?: boolean;
+  notifyOrderStatusChange?: boolean;
+  notifyLowStock?: boolean;
+  notifyPayoutComplete?: boolean;
+  notifyPromotions?: boolean;
+  shipGhn?: boolean;
+  shipGhtk?: boolean;
+  shipExpress?: boolean;
+  warehouseAddress?: string;
+  warehouseContact?: string;
+  warehousePhone?: string;
   commissionRate?: number;
   status: StoreProfile['status'];
   approvalStatus: StoreProfile['approvalStatus'];
@@ -286,6 +331,21 @@ const mapBackendStore = (store: BackendStoreResponse): StoreProfile => ({
   phone: store.phone,
   contactEmail: store.contactEmail,
   address: store.address,
+  bankName: store.bankName,
+  bankAccountNumber: store.bankAccountNumber,
+  bankAccountHolder: store.bankAccountHolder,
+  bankVerified: Boolean(store.bankVerified),
+  notifyNewOrder: store.notifyNewOrder ?? true,
+  notifyOrderStatusChange: store.notifyOrderStatusChange ?? true,
+  notifyLowStock: store.notifyLowStock ?? true,
+  notifyPayoutComplete: store.notifyPayoutComplete ?? true,
+  notifyPromotions: store.notifyPromotions ?? false,
+  shipGhn: store.shipGhn ?? true,
+  shipGhtk: store.shipGhtk ?? true,
+  shipExpress: store.shipExpress ?? false,
+  warehouseAddress: store.warehouseAddress,
+  warehouseContact: store.warehouseContact,
+  warehousePhone: store.warehousePhone,
   rejectionReason: store.rejectionReason,
 });
 
@@ -393,13 +453,8 @@ export const storeService = {
   },
 
   async getMyStore(): Promise<StoreProfile> {
-    try {
-      const store = await apiRequest<BackendStoreResponse>('/api/stores/my-store', {}, { auth: true });
-      return mapBackendStore(store);
-    } catch {
-      await delay(200);
-      return mockStores['store-001'];
-    }
+    const store = await apiRequest<BackendStoreResponse>('/api/stores/my-store', {}, { auth: true });
+    return mapBackendStore(store);
   },
 
   async registerStore(payload: StoreRegistrationRequest): Promise<StoreRegistrationResponse> {
@@ -491,18 +546,10 @@ export const storeService = {
   },
 
   async updateMyStore(payload: StoreUpdateRequest): Promise<StoreProfile> {
-    try {
-      const store = await apiRequest<BackendStoreResponse>('/api/stores/my-store', {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      }, { auth: true });
-      return mapBackendStore(store);
-    } catch {
-      await delay(250);
-      return {
-        ...mockStores['store-001'],
-        ...payload,
-      };
-    }
+    const store = await apiRequest<BackendStoreResponse>('/api/stores/my-store', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }, { auth: true });
+    return mapBackendStore(store);
   },
 };

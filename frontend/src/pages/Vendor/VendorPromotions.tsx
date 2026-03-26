@@ -1,7 +1,8 @@
 import './Vendor.css';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link2, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import {
   PanelDrawerFooter,
@@ -14,24 +15,25 @@ import {
   PanelTabs,
   PanelViewSummary,
 } from '../../components/Panel/PanelPrimitives';
-import { AdminStateBlock, AdminToast } from '../Admin/AdminStateBlocks';
+import { AdminStateBlock, AdminTableSkeleton } from '../Admin/AdminStateBlocks';
 import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
+import { useToast } from '../../contexts/ToastContext';
+import { getUiErrorMessage } from '../../utils/errorMessage';
+import {
+  vendorVoucherService,
+  type VendorVoucherDiscountType,
+  type VendorVoucherListResult,
+  type VendorVoucherRecord,
+  type VendorVoucherStatus,
+  type VendorVoucherStatusFilter,
+  type VendorVoucherUpsertInput,
+} from '../../services/vendorVoucherService';
+import Drawer from '../../components/Drawer/Drawer';
 
-type VoucherStatus = 'running' | 'paused' | 'draft';
-type DiscountType = 'percent' | 'fixed';
+type VoucherTab = VendorVoucherStatusFilter;
 
-interface ShopVoucher {
-  id: string;
-  name: string;
-  code: string;
-  discountType: DiscountType;
-  discountValue: number;
-  minOrderValue: number;
-  usedCount: number;
-  totalIssued: number;
-  status: VoucherStatus;
-  endDate: string;
-  description: string;
+interface VoucherFormState extends VendorVoucherUpsertInput {
+  id?: string;
 }
 
 type DeleteState = {
@@ -42,250 +44,508 @@ type DeleteState = {
   confirmLabel: string;
 };
 
-const INITIAL_VOUCHERS: ShopVoucher[] = [
-  { id: 'sv-1', name: 'Flash sale áo thun', code: 'TEE15', discountType: 'percent', discountValue: 15, minOrderValue: 299000, usedCount: 182, totalIssued: 500, status: 'running', endDate: '2026-04-10', description: 'Ưu đãi đẩy sell-through cho nhóm áo thun bán nhanh.' },
-  { id: 'sv-2', name: 'Voucher khách quay lại', code: 'RETURN50', discountType: 'fixed', discountValue: 50000, minOrderValue: 599000, usedCount: 64, totalIssued: 250, status: 'running', endDate: '2026-04-20', description: 'Giữ chân khách cũ với mức giảm cố định cho đơn giá trị cao.' },
-  { id: 'sv-3', name: 'Bản nháp cuối tuần', code: 'WKND10', discountType: 'percent', discountValue: 10, minOrderValue: 399000, usedCount: 0, totalIssued: 600, status: 'draft', endDate: '2026-05-01', description: 'Campaign cuối tuần chờ chốt lịch chạy từ đội bán hàng.' },
-  { id: 'sv-4', name: 'Đẩy hàng tồn thấp', code: 'LAST30K', discountType: 'fixed', discountValue: 30000, minOrderValue: 249000, usedCount: 18, totalIssued: 150, status: 'paused', endDate: '2026-04-05', description: 'Voucher xử lý tồn kho cho nhóm SKU sắp ngừng bán.' },
-];
+const PAGE_SIZE = 8;
 
-const TABS = [
+const TABS: Array<{ key: VoucherTab; label: string }> = [
   { key: 'all', label: 'Tất cả' },
   { key: 'running', label: 'Đang chạy' },
   { key: 'paused', label: 'Tạm dừng' },
   { key: 'draft', label: 'Bản nháp' },
-] as const;
+];
 
-const emptyVoucher = (): ShopVoucher => ({
-  id: '',
-  name: '',
-  code: '',
-  discountType: 'percent',
-  discountValue: 10,
-  minOrderValue: 0,
-  usedCount: 0,
-  totalIssued: 100,
-  status: 'draft',
-  endDate: '',
-  description: '',
+const EMPTY_RESULT: VendorVoucherListResult = {
+  items: [],
+  totalElements: 0,
+  totalPages: 1,
+  page: 1,
+  pageSize: PAGE_SIZE,
+  totalUsage: 0,
+  counts: {
+    all: 0,
+    running: 0,
+    paused: 0,
+    draft: 0,
+  },
+};
+
+const normalizeTab = (value: string | null): VoucherTab => {
+  if (value === 'running' || value === 'paused' || value === 'draft') {
+    return value;
+  }
+  return 'all';
+};
+
+const normalizePage = (value: string | null): number => {
+  const parsed = Number(value || '1');
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+};
+
+const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')} ₫`;
+
+const formatDateInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const emptyVoucher = (): VoucherFormState => {
+  const start = new Date();
+  const end = new Date(start);
+  end.setDate(start.getDate() + 30);
+
+  return {
+    name: '',
+    code: '',
+    discountType: 'percent',
+    discountValue: 10,
+    minOrderValue: 0,
+    totalIssued: 100,
+    status: 'draft',
+    startDate: formatDateInput(start),
+    endDate: formatDateInput(end),
+    description: '',
+  };
+};
+
+const toStatusLabel = (status: VendorVoucherStatus) => {
+  switch (status) {
+    case 'running':
+      return 'Đang chạy';
+    case 'paused':
+      return 'Tạm dừng';
+    default:
+      return 'Bản nháp';
+  }
+};
+
+const toStatusClass = (status: VendorVoucherStatus) => {
+  if (status === 'running') return 'success';
+  if (status === 'paused') return 'pending';
+  return 'neutral';
+};
+
+const validateVoucherForm = (form: VoucherFormState): string | null => {
+  if (!form.name.trim()) return 'Tên voucher là bắt buộc';
+  if (!form.code.trim()) return 'Mã voucher là bắt buộc';
+  if (!form.startDate) return 'Cần chọn ngày bắt đầu';
+  if (!form.endDate) return 'Cần chọn ngày kết thúc';
+  if (form.endDate < form.startDate) return 'Ngày kết thúc phải sau ngày bắt đầu';
+  if (!Number.isFinite(form.discountValue) || form.discountValue <= 0) return 'Giá trị giảm phải lớn hơn 0';
+  if (!Number.isFinite(form.totalIssued) || form.totalIssued < 1) return 'Tổng phát hành phải từ 1 trở lên';
+  if (!Number.isFinite(form.minOrderValue) || form.minOrderValue < 0) return 'Đơn tối thiểu không được âm';
+  return null;
+};
+
+const toPayload = (form: VoucherFormState): VendorVoucherUpsertInput => ({
+  name: form.name,
+  code: form.code,
+  description: form.description,
+  discountType: form.discountType,
+  discountValue: Number(form.discountValue),
+  minOrderValue: Number(form.minOrderValue),
+  totalIssued: Number(form.totalIssued),
+  status: form.status,
+  startDate: form.startDate,
+  endDate: form.endDate,
 });
 
-const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')} đ`;
-
 const VendorPromotions = () => {
-  const [vouchers, setVouchers] = useState<ShopVoucher[]>(INITIAL_VOUCHERS);
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | VoucherStatus>('all');
+  const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const activeTab = normalizeTab(searchParams.get('status'));
+  const currentPage = normalizePage(searchParams.get('page'));
+  const keyword = (searchParams.get('q') || '').trim();
+
+  const [searchInput, setSearchInput] = useState(keyword);
+  const [result, setResult] = useState<VendorVoucherListResult>(EMPTY_RESULT);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [voucherForm, setVoucherForm] = useState<ShopVoucher>(emptyVoucher());
+  const [voucherForm, setVoucherForm] = useState<VoucherFormState>(emptyVoucher());
   const [deleteState, setDeleteState] = useState<DeleteState | null>(null);
-  const [toast, setToast] = useState('');
-  const perPage = 6;
-  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
-  const filtered = useMemo(
-    () =>
-      vouchers.filter((voucher) => {
-        const matchesStatus = activeTab === 'all' || voucher.status === activeTab;
-        const keyword = search.trim().toLowerCase();
-        const matchesSearch = !keyword || `${voucher.name} ${voucher.code} ${voucher.description}`.toLowerCase().includes(keyword);
-        return matchesStatus && matchesSearch;
-      }),
-    [activeTab, search, vouchers],
+  const updateQuery = useCallback(
+    (mutate: (query: URLSearchParams) => void, replace = false) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          mutate(next);
+          return next;
+        },
+        { replace },
+      );
+    },
+    [setSearchParams],
   );
 
-  const paged = useMemo(() => {
-    const start = (page - 1) * perPage;
-    return filtered.slice(start, start + perPage);
-  }, [filtered, page]);
+  const setPage = useCallback(
+    (page: number) => {
+      updateQuery((query) => {
+        query.set('page', String(Math.max(1, page)));
+      });
+    },
+    [updateQuery],
+  );
 
-  const totalPages = Math.max(Math.ceil(filtered.length / perPage), 1);
+  const setTab = useCallback(
+    (tab: VoucherTab) => {
+      setSelected(new Set());
+      updateQuery((query) => {
+        if (tab === 'all') {
+          query.delete('status');
+        } else {
+          query.set('status', tab);
+        }
+        query.set('page', '1');
+      });
+    },
+    [updateQuery],
+  );
 
-  const stats = useMemo(() => ({
-    running: vouchers.filter((voucher) => voucher.status === 'running').length,
-    paused: vouchers.filter((voucher) => voucher.status === 'paused').length,
-    draft: vouchers.filter((voucher) => voucher.status === 'draft').length,
-    totalUsage: vouchers.reduce((sum, voucher) => sum + voucher.usedCount, 0),
-  }), [vouchers]);
+  useEffect(() => {
+    if (searchInput !== keyword) {
+      setSearchInput(keyword);
+    }
+  }, [keyword, searchInput]);
 
-  const pushToast = (message: string) => {
-    setToast(message);
-    window.clearTimeout((pushToast as typeof pushToast & { timer?: number }).timer);
-    (pushToast as typeof pushToast & { timer?: number }).timer = window.setTimeout(() => setToast(''), 2600);
-  };
+  useEffect(() => {
+    if (searchInput.trim() === keyword) {
+      return;
+    }
 
-  const resetCurrentView = () => {
-    setSearch('');
-    setActiveTab('all');
-    setSelected(new Set());
-    setPage(1);
-  };
+    const timeoutId = window.setTimeout(() => {
+      setSelected(new Set());
+      updateQuery(
+        (query) => {
+          const normalized = searchInput.trim();
+          if (normalized) {
+            query.set('q', normalized);
+          } else {
+            query.delete('q');
+          }
+          query.set('page', '1');
+        },
+        true,
+      );
+    }, 250);
 
-  const shareCurrentView = async () => {
-    await navigator.clipboard.writeText(window.location.href);
-    pushToast('Đã sao chép bộ lọc hiện tại của voucher shop');
-  };
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput, keyword, updateQuery]);
 
-  const toggleVoucher = (ids: string[], nextStatus?: VoucherStatus) => {
-    setVouchers((current) =>
-      current.map((voucher) => {
-        if (!ids.includes(voucher.id)) return voucher;
-        if (nextStatus) return { ...voucher, status: nextStatus };
-        return { ...voucher, status: voucher.status === 'running' ? 'paused' : 'running' };
-      }),
-    );
-    setSelected(new Set());
-    pushToast('Đã cập nhật trạng thái voucher shop');
-  };
+  const loadVouchers = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+
+    try {
+      const snapshot = await vendorVoucherService.list({
+        status: activeTab,
+        keyword,
+        page: currentPage,
+        size: PAGE_SIZE,
+      });
+
+      setResult(snapshot);
+      setSelected((current) => {
+        const availableIds = new Set(snapshot.items.map((item) => item.id));
+        return new Set(Array.from(current).filter((id) => availableIds.has(id)));
+      });
+
+      if (currentPage > snapshot.totalPages) {
+        setPage(snapshot.totalPages);
+      }
+    } catch (error: unknown) {
+      const message = getUiErrorMessage(error, 'Không tải được danh sách voucher của shop');
+      setLoadError(message);
+      addToast(message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, addToast, currentPage, keyword, setPage]);
+
+  useEffect(() => {
+    void loadVouchers();
+  }, [loadVouchers]);
+
+  const stats = useMemo(
+    () => ({
+      running: result.counts.running,
+      paused: result.counts.paused,
+      draft: result.counts.draft,
+      total: result.counts.all,
+      totalUsage: result.totalUsage,
+    }),
+    [result],
+  );
+
+  const summaryChips = useMemo(
+    () => [
+      ...(activeTab !== 'all'
+        ? [
+            {
+              key: 'status',
+              label: `Trạng thái: ${TABS.find((tab) => tab.key === activeTab)?.label || 'Tất cả'}`,
+            },
+          ]
+        : []),
+      ...(keyword
+        ? [
+            {
+              key: 'keyword',
+              label: `Từ khóa: ${keyword}`,
+            },
+          ]
+        : []),
+    ],
+    [activeTab, keyword],
+  );
 
   const openCreate = () => {
     setVoucherForm(emptyVoucher());
     setDrawerOpen(true);
   };
 
-  const openEdit = (id: string) => {
-    const current = vouchers.find((voucher) => voucher.id === id);
-    if (!current) return;
-    setVoucherForm(current);
+  const openEdit = (voucher: VendorVoucherRecord) => {
+    setVoucherForm({
+      id: voucher.id,
+      name: voucher.name,
+      code: voucher.code,
+      description: voucher.description,
+      discountType: voucher.discountType,
+      discountValue: voucher.discountValue,
+      minOrderValue: voucher.minOrderValue,
+      totalIssued: voucher.totalIssued,
+      status: voucher.status,
+      startDate: voucher.startDate,
+      endDate: voucher.endDate,
+    });
     setDrawerOpen(true);
   };
 
-  const saveVoucher = () => {
-    if (!voucherForm.name.trim() || !voucherForm.code.trim()) {
-      pushToast('Tên voucher và mã giảm giá là bắt buộc');
+  const saveVoucher = async () => {
+    const validationError = validateVoucherForm(voucherForm);
+    if (validationError) {
+      addToast(validationError, 'error');
       return;
     }
-    if (voucherForm.id) {
-      setVouchers((current) => current.map((voucher) => (voucher.id === voucherForm.id ? voucherForm : voucher)));
-      pushToast('Đã cập nhật voucher shop');
-    } else {
-      setVouchers((current) => [{ ...voucherForm, id: `sv-${Date.now()}` }, ...current]);
-      pushToast('Đã tạo voucher shop mới');
+
+    setWorking(true);
+    try {
+      if (voucherForm.id) {
+        await vendorVoucherService.update(voucherForm.id, toPayload(voucherForm));
+        addToast('Đã cập nhật voucher shop', 'success');
+      } else {
+        await vendorVoucherService.create(toPayload(voucherForm));
+        addToast('Đã tạo voucher mới', 'success');
+      }
+
+      setDrawerOpen(false);
+      setSelected(new Set());
+
+      if (!voucherForm.id && currentPage !== 1) {
+        setPage(1);
+      } else {
+        await loadVouchers();
+      }
+    } catch (error: unknown) {
+      addToast(getUiErrorMessage(error, 'Không thể lưu voucher'), 'error');
+    } finally {
+      setWorking(false);
     }
-    setDrawerOpen(false);
   };
 
   const requestDelete = (ids: string[]) => {
-    const items = vouchers.filter((voucher) => ids.includes(voucher.id));
+    const selectedRows = result.items.filter((voucher) => ids.includes(voucher.id));
     setDeleteState({
       ids,
-      selectedItems: items.map((item) => item.name),
+      selectedItems: selectedRows.map((item) => item.name),
       title: ids.length > 1 ? 'Xóa các voucher đã chọn' : 'Xóa voucher shop',
-      description: 'Voucher sẽ bị gỡ khỏi seller panel và không còn được áp dụng cho sản phẩm của shop.',
+      description: 'Voucher sẽ bị gỡ khỏi seller panel và không còn áp dụng cho shop.',
       confirmLabel: 'Xóa voucher',
     });
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteState) return;
-    const ids = new Set(deleteState.ids);
-    setVouchers((current) => current.filter((voucher) => !ids.has(voucher.id)));
-    setSelected(new Set());
-    setDeleteState(null);
-    pushToast('Đã xóa voucher shop');
+
+    setWorking(true);
+    try {
+      await Promise.all(deleteState.ids.map((id) => vendorVoucherService.delete(id)));
+      addToast('Đã xóa voucher', 'success');
+      setDeleteState(null);
+      setSelected(new Set());
+      await loadVouchers();
+    } catch (error: unknown) {
+      addToast(getUiErrorMessage(error, 'Không thể xóa voucher'), 'error');
+    } finally {
+      setWorking(false);
+    }
   };
+
+  const updateVoucherStatus = async (ids: string[], explicitStatus?: VendorVoucherStatus) => {
+    if (ids.length === 0) return;
+
+    const vouchersById = new Map(result.items.map((voucher) => [voucher.id, voucher]));
+    const updates = ids
+      .map((id) => {
+        const voucher = vouchersById.get(id);
+        if (!voucher) return null;
+        const nextStatus = explicitStatus || (voucher.status === 'running' ? 'paused' : 'running');
+        return { id, status: nextStatus };
+      })
+      .filter((item): item is { id: string; status: VendorVoucherStatus } => Boolean(item));
+
+    if (updates.length === 0) {
+      return;
+    }
+
+    setWorking(true);
+    try {
+      await Promise.all(
+        updates.map((item) => vendorVoucherService.updateStatus(item.id, item.status)),
+      );
+      setSelected(new Set());
+      addToast('Đã cập nhật trạng thái voucher', 'success');
+      await loadVouchers();
+    } catch (error: unknown) {
+      addToast(getUiErrorMessage(error, 'Không thể cập nhật trạng thái voucher'), 'error');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const resetCurrentView = () => {
+    setSelected(new Set());
+    setSearchInput('');
+    setSearchParams(new URLSearchParams());
+  };
+
+  const shareCurrentView = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      addToast('Đã sao chép bộ lọc hiện tại của voucher shop', 'success');
+    } catch {
+      addToast('Không thể sao chép bộ lọc', 'error');
+    }
+  };
+
+  const startRow = result.totalElements === 0 ? 0 : (currentPage - 1) * result.pageSize + 1;
+  const endRow = result.totalElements === 0 ? 0 : Math.min(currentPage * result.pageSize, result.totalElements);
 
   const statItems = [
     {
       key: 'all',
       label: 'Tổng voucher',
-      value: vouchers.length,
+      value: stats.total,
       sub: `Lượt sử dụng: ${stats.totalUsage}`,
-      onClick: () => setActiveTab('all'),
+      onClick: () => setTab('all'),
     },
     {
       key: 'running',
       label: 'Đang chạy',
       value: stats.running,
       sub: 'Voucher đang tác động doanh thu',
-      tone: 'success',
-      onClick: () => setActiveTab('running'),
+      tone: 'success' as const,
+      onClick: () => setTab('running'),
     },
     {
       key: 'paused',
       label: 'Tạm dừng',
       value: stats.paused,
       sub: 'Chờ kích hoạt lại khi cần',
-      tone: 'warning',
-      onClick: () => setActiveTab('paused'),
+      tone: 'warning' as const,
+      onClick: () => setTab('paused'),
     },
     {
       key: 'draft',
       label: 'Bản nháp',
       value: stats.draft,
       sub: 'Chờ chốt lịch chạy',
-      tone: 'info',
-      onClick: () => setActiveTab('draft'),
+      tone: 'info' as const,
+      onClick: () => setTab('draft'),
     },
-  ] as const;
-
-  const tabItems = TABS.map((tab) => ({ key: tab.key, label: tab.label }));
-  const summaryChips = [
-    ...(activeTab !== 'all'
-      ? [{ key: 'status', label: `Trạng thái: ${TABS.find((tab) => tab.key === activeTab)?.label || 'Tất cả'}` }]
-      : []),
-    ...(search.trim() ? [{ key: 'query', label: `Từ khóa: ${search.trim()}` }] : []),
   ];
+
+  const allOnPageSelected = result.items.length > 0 && selected.size === result.items.length;
 
   return (
     <VendorLayout
       title="Voucher shop và doanh thu ưu đãi"
-      breadcrumbs={[{ label: 'Voucher shop' }, { label: 'Khuyến mãi riêng' }]}
+      breadcrumbs={['Kênh Người Bán', 'Ưu đãi cửa hàng']}
       actions={(
         <>
           <PanelSearchField
             placeholder="Tìm tên voucher hoặc mã giảm giá"
-            value={search}
-            onChange={(value) => {
-              setSearch(value);
-              setPage(1);
-            }}
+            value={searchInput}
+            onChange={setSearchInput}
           />
-          <button className="admin-ghost-btn" onClick={() => void shareCurrentView()}>
+          <button className="admin-ghost-btn" onClick={() => void shareCurrentView()} disabled={working}>
             <Link2 size={16} />
             Chia sẻ bộ lọc
           </button>
-          <button className="admin-ghost-btn" onClick={resetCurrentView}>Đặt lại</button>
-          <button className="admin-primary-btn vendor-admin-primary" onClick={openCreate}>
+          <button className="admin-ghost-btn" onClick={resetCurrentView} disabled={working}>Đặt lại</button>
+          <button className="admin-primary-btn vendor-admin-primary" onClick={openCreate} disabled={working}>
             <Plus size={16} />
             Tạo voucher
           </button>
         </>
       )}
     >
-      <PanelStatsGrid items={[...statItems]} accentClassName="vendor-stat-button" />
+      <PanelStatsGrid items={statItems} accentClassName="vendor-stat-button" />
 
       <PanelTabs
-        items={tabItems}
+        items={TABS}
         activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as 'all' | VoucherStatus)}
+        onChange={(key) => setTab(key as VoucherTab)}
         accentClassName="vendor-active-tab"
       />
 
-      {(activeTab !== 'all' || Boolean(search.trim())) && (
+      {(activeTab !== 'all' || Boolean(keyword)) && (
         <PanelViewSummary chips={summaryChips} clearLabel="Xóa bộ lọc" onClear={resetCurrentView} />
       )}
 
       <section className="admin-panels single">
         <div className="admin-panel">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <AdminTableSkeleton columns={9} rows={6} />
+          ) : loadError ? (
             <AdminStateBlock
-              type={search.trim() ? 'search-empty' : 'empty'}
-              title={search.trim() ? 'Không có voucher phù hợp' : 'Chưa có voucher shop'}
-              description={search.trim() ? 'Thử đổi từ khóa hoặc chuyển tab khác để xem danh sách ưu đãi.' : 'Khi shop tạo voucher riêng, danh sách sẽ xuất hiện tại đây.'}
-              actionLabel={search.trim() ? 'Đặt lại bộ lọc' : 'Tạo voucher'}
-              onAction={search.trim() ? resetCurrentView : openCreate}
+              type="error"
+              title="Không tải được danh sách voucher"
+              description={loadError}
+              actionLabel="Thử tải lại"
+              onAction={() => void loadVouchers()}
+            />
+          ) : result.items.length === 0 ? (
+            <AdminStateBlock
+              type={keyword ? 'search-empty' : 'empty'}
+              title={keyword ? 'Không có voucher phù hợp' : 'Chưa có voucher shop'}
+              description={
+                keyword
+                  ? 'Thử đổi từ khóa hoặc chuyển tab khác để xem danh sách ưu đãi.'
+                  : 'Khi shop tạo voucher riêng, danh sách sẽ xuất hiện tại đây.'
+              }
+              actionLabel={keyword ? 'Đặt lại bộ lọc' : 'Tạo voucher'}
+              onAction={keyword ? resetCurrentView : openCreate}
             />
           ) : (
             <>
-              <div className="admin-table" role="table" aria-label="Bảng voucher shop">
+              <div className="admin-table" role="table" aria-label="Bang voucher shop">
                 <div className="admin-table-row vendor-promotions admin-table-head" role="row">
                   <div role="columnheader">
                     <input
                       type="checkbox"
-                      checked={selected.size === filtered.length && filtered.length > 0}
-                      onChange={(e) => setSelected(e.target.checked ? new Set(filtered.map((item) => item.id)) : new Set())}
+                      checked={allOnPageSelected}
+                      onChange={(event) =>
+                        setSelected(
+                          event.target.checked
+                            ? new Set(result.items.map((item) => item.id))
+                            : new Set(),
+                        )
+                      }
                     />
                   </div>
                   <div role="columnheader">Voucher</div>
@@ -298,8 +558,12 @@ const VendorPromotions = () => {
                   <div role="columnheader">Hành động</div>
                 </div>
 
-                {paged.map((voucher, index) => {
-                  const usedPercent = voucher.totalIssued > 0 ? Math.min(100, Math.round((voucher.usedCount / voucher.totalIssued) * 100)) : 0;
+                {result.items.map((voucher, index) => {
+                  const usedPercent =
+                    voucher.totalIssued > 0
+                      ? Math.min(100, Math.round((voucher.usedCount / voucher.totalIssued) * 100))
+                      : 0;
+
                   return (
                     <motion.div
                       key={voucher.id}
@@ -309,17 +573,20 @@ const VendorPromotions = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.16) }}
                       whileHover={{ y: -1 }}
-                      onClick={() => openEdit(voucher.id)}
+                      onClick={() => openEdit(voucher)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <div role="cell" onClick={(e) => e.stopPropagation()}>
+                      <div role="cell" onClick={(event) => event.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selected.has(voucher.id)}
-                          onChange={(e) => {
+                          onChange={(event) => {
                             const next = new Set(selected);
-                            if (e.target.checked) next.add(voucher.id);
-                            else next.delete(voucher.id);
+                            if (event.target.checked) {
+                              next.add(voucher.id);
+                            } else {
+                              next.delete(voucher.id);
+                            }
                             setSelected(next);
                           }}
                         />
@@ -330,27 +597,46 @@ const VendorPromotions = () => {
                       </div>
                       <div role="cell">{voucher.discountType === 'percent' ? 'Phần trăm' : 'Giảm tiền'}</div>
                       <div role="cell" className="admin-bold">
-                        {voucher.discountType === 'percent' ? `${voucher.discountValue}%` : formatCurrency(voucher.discountValue)}
+                        {voucher.discountType === 'percent'
+                          ? `${voucher.discountValue}%`
+                          : formatCurrency(voucher.discountValue)}
                       </div>
                       <div role="cell">Đơn từ {formatCurrency(voucher.minOrderValue)}</div>
                       <div role="cell">
-                        <p className="admin-bold">{voucher.usedCount}/{voucher.totalIssued}</p>
+                        <p className="admin-bold">
+                          {voucher.usedCount}/{voucher.totalIssued}
+                        </p>
                         <div className="promo-progress-track"><span style={{ width: `${usedPercent}%` }} /></div>
                       </div>
                       <div role="cell" className="admin-muted">{voucher.endDate}</div>
                       <div role="cell">
-                        <span className={`admin-pill ${voucher.status === 'running' ? 'success' : voucher.status === 'paused' ? 'pending' : 'neutral'}`}>
-                          {voucher.status === 'running' ? 'Đang chạy' : voucher.status === 'paused' ? 'Tạm dừng' : 'Bản nháp'}
+                        <span className={`admin-pill ${toStatusClass(voucher.status)}`}>
+                          {toStatusLabel(voucher.status)}
                         </span>
                       </div>
-                      <div role="cell" className="admin-actions" onClick={(e) => e.stopPropagation()}>
-                        <button className="admin-icon-btn subtle" onClick={() => openEdit(voucher.id)} title="Chỉnh sửa voucher">
+                      <div role="cell" className="admin-actions" onClick={(event) => event.stopPropagation()}>
+                        <button
+                          className="admin-icon-btn subtle"
+                          onClick={() => openEdit(voucher)}
+                          title="Chỉnh sửa voucher"
+                          disabled={working}
+                        >
                           <Pencil size={16} />
                         </button>
-                        <button className="admin-icon-btn subtle" onClick={() => toggleVoucher([voucher.id])} title="Đổi trạng thái">
+                        <button
+                          className="admin-icon-btn subtle"
+                          onClick={() => void updateVoucherStatus([voucher.id])}
+                          title="Đổi trạng thái"
+                          disabled={working}
+                        >
                           {voucher.status === 'running' ? <Pause size={16} /> : <Play size={16} />}
                         </button>
-                        <button className="admin-icon-btn subtle danger-icon" onClick={() => requestDelete([voucher.id])} title="Xóa voucher">
+                        <button
+                          className="admin-icon-btn subtle danger-icon"
+                          onClick={() => requestDelete([voucher.id])}
+                          title="Xóa voucher"
+                          disabled={working}
+                        >
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -360,9 +646,9 @@ const VendorPromotions = () => {
               </div>
 
               <PanelTableFooter
-                meta={`Hiển thị ${(page - 1) * perPage + 1}-${Math.min(page * perPage, filtered.length)} trên ${filtered.length} voucher`}
-                page={page}
-                totalPages={totalPages}
+                meta={`Hiển thị ${startRow}-${endRow} trên ${result.totalElements} voucher`}
+                page={currentPage}
+                totalPages={Math.max(result.totalPages, 1)}
                 onPageChange={setPage}
                 activePageClassName="vendor-active-page"
                 nextLabel="Sau"
@@ -376,9 +662,27 @@ const VendorPromotions = () => {
         <div className="admin-floating-content">
           <span>Đã chọn {selected.size} voucher</span>
           <div className="admin-actions">
-            <button className="admin-ghost-btn" onClick={() => toggleVoucher(Array.from(selected), 'paused')}>Tạm dừng</button>
-            <button className="admin-ghost-btn" onClick={() => toggleVoucher(Array.from(selected), 'running')}>Kích hoạt</button>
-            <button className="admin-ghost-btn danger" onClick={() => requestDelete(Array.from(selected))}>Xóa đã chọn</button>
+            <button
+              className="admin-ghost-btn"
+              onClick={() => void updateVoucherStatus(Array.from(selected), 'paused')}
+              disabled={working}
+            >
+              Tạm dừng
+            </button>
+            <button
+              className="admin-ghost-btn"
+              onClick={() => void updateVoucherStatus(Array.from(selected), 'running')}
+              disabled={working}
+            >
+              Kích hoạt
+            </button>
+            <button
+              className="admin-ghost-btn danger"
+              onClick={() => requestDelete(Array.from(selected))}
+              disabled={working}
+            >
+              Xóa đã chọn
+            </button>
           </div>
         </div>
       </PanelFloatingBar>
@@ -392,81 +696,164 @@ const VendorPromotions = () => {
         confirmLabel={deleteState?.confirmLabel || 'Xóa'}
         danger
         onCancel={() => setDeleteState(null)}
-        onConfirm={confirmDelete}
+        onConfirm={() => void confirmDelete()}
       />
 
-      {drawerOpen && (
-        <>
-          <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
-          <div className="drawer">
-            <PanelDrawerHeader
-              eyebrow="Voucher shop"
-              title={voucherForm.id ? 'Cập nhật voucher' : 'Tạo voucher mới'}
-              onClose={() => setDrawerOpen(false)}
-              closeLabel="Đóng biểu mẫu voucher"
-            />
-            <div className="drawer-body">
-              <PanelDrawerSection title="Nhận diện ưu đãi">
-                <div className="form-grid">
-                  <label className="form-field">
-                    <span>Tên voucher</span>
-                    <input value={voucherForm.name} onChange={(e) => setVoucherForm((current) => ({ ...current, name: e.target.value }))} />
-                  </label>
-                  <label className="form-field">
-                    <span>Mã giảm giá</span>
-                    <input value={voucherForm.code} onChange={(e) => setVoucherForm((current) => ({ ...current, code: e.target.value.toUpperCase().replace(/\s+/g, '') }))} />
-                  </label>
-                  <label className="form-field full">
-                    <span>Mô tả ngắn</span>
-                    <textarea rows={3} value={voucherForm.description} onChange={(e) => setVoucherForm((current) => ({ ...current, description: e.target.value }))} />
-                  </label>
-                </div>
-              </PanelDrawerSection>
-              <PanelDrawerSection title="Cấu hình khuyến mãi">
-                <div className="form-grid">
-                  <label className="form-field">
-                    <span>Loại giảm</span>
-                    <select value={voucherForm.discountType} onChange={(e) => setVoucherForm((current) => ({ ...current, discountType: e.target.value as DiscountType }))}>
-                      <option value="percent">Giảm theo phần trăm</option>
-                      <option value="fixed">Giảm số tiền cố định</option>
-                    </select>
-                  </label>
-                  <label className="form-field">
-                    <span>Giá trị giảm</span>
-                    <input type="number" value={voucherForm.discountValue} onChange={(e) => setVoucherForm((current) => ({ ...current, discountValue: Number(e.target.value || 0) }))} />
-                  </label>
-                  <label className="form-field">
-                    <span>Đơn tối thiểu</span>
-                    <input type="number" value={voucherForm.minOrderValue} onChange={(e) => setVoucherForm((current) => ({ ...current, minOrderValue: Number(e.target.value || 0) }))} />
-                  </label>
-                  <label className="form-field">
-                    <span>Tổng phát hành</span>
-                    <input type="number" value={voucherForm.totalIssued} onChange={(e) => setVoucherForm((current) => ({ ...current, totalIssued: Number(e.target.value || 0) }))} />
-                  </label>
-                  <label className="form-field">
-                    <span>Hạn dùng</span>
-                    <input type="date" value={voucherForm.endDate} onChange={(e) => setVoucherForm((current) => ({ ...current, endDate: e.target.value }))} />
-                  </label>
-                  <label className="form-field">
-                    <span>Trạng thái</span>
-                    <select value={voucherForm.status} onChange={(e) => setVoucherForm((current) => ({ ...current, status: e.target.value as VoucherStatus }))}>
-                      <option value="running">Đang chạy</option>
-                      <option value="paused">Tạm dừng</option>
-                      <option value="draft">Bản nháp</option>
-                    </select>
-                  </label>
-                </div>
-              </PanelDrawerSection>
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <PanelDrawerHeader
+          eyebrow="Voucher shop"
+          title={voucherForm.id ? 'Cập nhật voucher' : 'Tạo voucher mới'}
+          onClose={() => setDrawerOpen(false)}
+          closeLabel="Đóng biểu mẫu voucher"
+        />
+        <div className="drawer-body">
+          <PanelDrawerSection title="Nhận diện ưu đãi">
+            <div className="form-grid">
+              <label className="form-field">
+                <span>Tên voucher</span>
+                <input
+                  value={voucherForm.name}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="form-field">
+                <span>Mã giảm giá</span>
+                <input
+                  value={voucherForm.code}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({
+                      ...current,
+                      code: event.target.value.toUpperCase().replace(/\s+/g, ''),
+                    }))
+                  }
+                />
+              </label>
+              <label className="form-field full">
+                <span>Mô tả ngắn</span>
+                <textarea
+                  rows={3}
+                  value={voucherForm.description}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                />
+              </label>
             </div>
-            <PanelDrawerFooter>
-              <button className="admin-ghost-btn" onClick={() => setDrawerOpen(false)}>Hủy</button>
-              <button className="admin-primary-btn vendor-admin-primary" onClick={saveVoucher}>Lưu voucher</button>
-            </PanelDrawerFooter>
-          </div>
-        </>
-      )}
+          </PanelDrawerSection>
 
-      <AdminToast toast={toast} />
+          <PanelDrawerSection title="Cấu hình khuyến mãi">
+            <div className="form-grid">
+              <label className="form-field">
+                <span>Loại giảm</span>
+                <select
+                  value={voucherForm.discountType}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({
+                      ...current,
+                      discountType: event.target.value as VendorVoucherDiscountType,
+                    }))
+                  }
+                >
+                  <option value="percent">Giảm theo phần trăm</option>
+                  <option value="fixed">Giảm số tiền cố định</option>
+                </select>
+              </label>
+              <label className="form-field">
+                <span>Giá trị giảm</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={voucherForm.discountValue}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({
+                      ...current,
+                      discountValue: Number(event.target.value || 0),
+                    }))
+                  }
+                />
+              </label>
+              <label className="form-field">
+                <span>Đơn tối thiểu</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={voucherForm.minOrderValue}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({
+                      ...current,
+                      minOrderValue: Number(event.target.value || 0),
+                    }))
+                  }
+                />
+              </label>
+              <label className="form-field">
+                <span>Tổng phát hành</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={voucherForm.totalIssued}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({
+                      ...current,
+                      totalIssued: Number(event.target.value || 0),
+                    }))
+                  }
+                />
+              </label>
+              <label className="form-field">
+                <span>Ngày bắt đầu</span>
+                <input
+                  type="date"
+                  value={voucherForm.startDate}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({ ...current, startDate: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="form-field">
+                <span>Ngày kết thúc</span>
+                <input
+                  type="date"
+                  value={voucherForm.endDate}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({ ...current, endDate: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="form-field">
+                <span>Trạng thái</span>
+                <select
+                  value={voucherForm.status}
+                  onChange={(event) =>
+                    setVoucherForm((current) => ({
+                      ...current,
+                      status: event.target.value as VendorVoucherStatus,
+                    }))
+                  }
+                >
+                  <option value="running">Đang chạy</option>
+                  <option value="paused">Tạm dừng</option>
+                  <option value="draft">Bản nháp</option>
+                </select>
+              </label>
+            </div>
+          </PanelDrawerSection>
+        </div>
+        <PanelDrawerFooter>
+          <button className="admin-ghost-btn" onClick={() => setDrawerOpen(false)} disabled={working}>
+            Hủy
+          </button>
+          <button
+            className="admin-primary-btn vendor-admin-primary"
+            onClick={() => void saveVoucher()}
+            disabled={working}
+          >
+            {working ? 'Đang lưu...' : 'Lưu voucher'}
+          </button>
+        </PanelDrawerFooter>
+      </Drawer>
     </VendorLayout>
   );
 };

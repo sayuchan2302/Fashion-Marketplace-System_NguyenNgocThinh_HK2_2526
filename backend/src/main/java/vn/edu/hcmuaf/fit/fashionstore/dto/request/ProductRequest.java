@@ -21,4 +21,8 @@ public class ProductRequest {
     private String material;
     private String fit;
     private String gender;
+    private String status;
+    private String sku;
+    private Integer stockQuantity;
+    private String imageUrl;
 }

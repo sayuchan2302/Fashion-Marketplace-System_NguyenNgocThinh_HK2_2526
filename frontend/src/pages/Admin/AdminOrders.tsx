@@ -25,6 +25,7 @@ import {
   type PaymentStatus,
 } from './orderWorkflow';
 import { PanelStatsGrid, PanelTabs, PanelViewSummary } from '../../components/Panel/PanelPrimitives';
+import Portal from '../../components/Portal/Portal';
 
 interface AdminOrderRow {
   code: string;
@@ -511,7 +512,7 @@ const AdminOrders = () => {
       </AnimatePresence>
 
       {selected.size > 0 && showBulkConfirmModal && (
-        <>
+        <Portal>
           <div className="drawer-overlay" onClick={() => setShowBulkConfirmModal(false)} />
           <div
             className="confirm-modal"
@@ -544,7 +545,7 @@ const AdminOrders = () => {
               </button>
             </div>
           </div>
-        </>
+        </Portal>
       )}
 
       {toast ? <div className="toast success">{toast}</div> : null}

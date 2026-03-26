@@ -22,6 +22,20 @@ const buildUrl = (path: string) => {
 };
 
 const parseErrorMessage = async (response: Response) => {
+  const fallbackByStatus: Record<number, string> = {
+    400: 'Dữ liệu gửi lên chưa hợp lệ.',
+    401: 'Hết phiên đăng nhập. Vui lòng đăng nhập lại.',
+    403: 'Bạn không có quyền thực hiện thao tác này.',
+    404: 'Không tìm thấy dữ liệu yêu cầu.',
+    409: 'Dữ liệu đang xung đột. Vui lòng tải lại và thử lại.',
+    422: 'Thông tin nhập vào chưa hợp lệ.',
+    500: 'Hệ thống đang bận. Vui lòng thử lại sau.',
+    502: 'Máy chủ tạm thời không khả dụng. Vui lòng thử lại sau.',
+    503: 'Dịch vụ đang bảo trì hoặc quá tải. Vui lòng thử lại sau.',
+    504: 'Máy chủ phản hồi quá chậm. Vui lòng thử lại sau.',
+  };
+  const fallbackMessage = fallbackByStatus[response.status] || response.statusText || 'Request failed';
+
   try {
     const payload = await response.clone().json();
     if (typeof payload?.message === 'string' && payload.message.trim()) {
@@ -30,10 +44,10 @@ const parseErrorMessage = async (response: Response) => {
     if (typeof payload?.error === 'string' && payload.error.trim()) {
       return { message: payload.error, payload };
     }
-    return { message: response.statusText || 'Request failed', payload };
+    return { message: fallbackMessage, payload };
   } catch {
     const text = await response.text();
-    return { message: text || response.statusText || 'Request failed', payload: text };
+    return { message: text || fallbackMessage, payload: text };
   }
 };
 

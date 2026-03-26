@@ -4,8 +4,7 @@ import { Loader2, Sparkles } from 'lucide-react';
 import './Auth.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-
-const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+import { getUiErrorMessage } from '../../utils/errorMessage';
 
 const Register = () => {
   const { register } = useAuth();
@@ -21,11 +20,11 @@ const Register = () => {
 
   const validate = () => {
     const next: typeof errors = {};
-    if (!name.trim()) next.name = 'Vui lòng nhập họ tên';
-    if (!email.trim()) next.email = 'Vui lòng nhập email';
-    if (!password.trim()) next.password = 'Vui lòng nhập mật khẩu';
-    else if (password.trim().length < 6) next.password = 'Tối thiểu 6 ký tự';
-    if (confirm.trim() !== password.trim()) next.confirm = 'Mật khẩu không khớp';
+    if (!name.trim()) next.name = 'Vui lÃ²ng nháº­p há» tÃªn';
+    if (!email.trim()) next.email = 'Vui lÃ²ng nháº­p email';
+    if (!password.trim()) next.password = 'Vui lÃ²ng nháº­p máº­t kháº©u';
+    else if (password.trim().length < 6) next.password = 'Tá»‘i thiá»ƒu 6 kÃ½ tá»±';
+    if (confirm.trim() !== password.trim()) next.confirm = 'Máº­t kháº©u khÃ´ng khá»›p';
     return next;
   };
 
@@ -38,10 +37,10 @@ const Register = () => {
     try {
       setLoading(true);
       await register(name.trim(), email.trim(), password.trim());
-      addToast('Tạo tài khoản thành công', 'success');
+      addToast('Táº¡o tÃ i khoáº£n thÃ nh cÃ´ng', 'success');
       navigate('/', { replace: true });
     } catch (error: unknown) {
-      addToast(getErrorMessage(error, 'Đăng ký thất bại'), 'error');
+      addToast(getUiErrorMessage(error, 'ÄÄƒng kÃ½ tháº¥t báº¡i'), 'error');
     } finally {
       setLoading(false);
     }
@@ -50,17 +49,17 @@ const Register = () => {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">Đăng ký</h1>
-        <p className="auth-subtitle">Trở thành thành viên để nhận ưu đãi và theo dõi đơn hàng dễ dàng.</p>
+        <h1 className="auth-title">ÄÄƒng kÃ½</h1>
+        <p className="auth-subtitle">Trá»Ÿ thÃ nh thÃ nh viÃªn Ä‘á»ƒ nháº­n Æ°u Ä‘Ã£i vÃ  theo dÃµi Ä‘Æ¡n hÃ ng dá»… dÃ ng.</p>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-field">
-            <label>Họ và tên</label>
+            <label>Há» vÃ  tÃªn</label>
             <input
               className="auth-input"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Nguyễn Văn A"
+              placeholder="Nguyá»…n VÄƒn A"
             />
             {errors.name && <div className="auth-error">{errors.name}</div>}
           </div>
@@ -78,35 +77,35 @@ const Register = () => {
           </div>
 
           <div className="auth-field">
-            <label>Mật khẩu</label>
+            <label>Máº­t kháº©u</label>
             <input
               className="auth-input"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
             />
             {errors.password && <div className="auth-error">{errors.password}</div>}
           </div>
 
           <div className="auth-field">
-            <label>Nhập lại mật khẩu</label>
+            <label>Nháº­p láº¡i máº­t kháº©u</label>
             <input
               className="auth-input"
               type="password"
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
             />
             {errors.confirm && <div className="auth-error">{errors.confirm}</div>}
           </div>
 
           <div className="auth-actions">
             <button type="submit" className="auth-btn" disabled={loading}>
-              {loading ? <><Loader2 size={18} className="auth-spinner" /> Đang tạo tài khoản...</> : <><Sparkles size={18} /> Đăng ký</>}
+              {loading ? <><Loader2 size={18} className="auth-spinner" /> Äang táº¡o tÃ i khoáº£n...</> : <><Sparkles size={18} /> ÄÄƒng kÃ½</>}
             </button>
             <div className="auth-secondary">
-              Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+              ÄÃ£ cÃ³ tÃ i khoáº£n? <Link to="/login">ÄÄƒng nháº­p</Link>
             </div>
           </div>
         </form>

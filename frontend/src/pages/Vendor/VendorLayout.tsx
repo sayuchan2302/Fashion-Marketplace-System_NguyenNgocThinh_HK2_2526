@@ -9,7 +9,7 @@ interface VendorLayoutProps {
   actions?: ReactNode;
   children: ReactNode;
   hideTopbarTitle?: boolean;
-  breadcrumbs?: Array<{ label: string; to?: string }>;
+  breadcrumbs?: string[];
 }
 
 const t = VENDOR_DICTIONARY.layout;
@@ -17,14 +17,12 @@ const t = VENDOR_DICTIONARY.layout;
 const vendorNavItems: PanelNavItem[] = vendorPanelNav;
 
 const VendorLayout = ({ title, actions, children, hideTopbarTitle = false, breadcrumbs }: VendorLayoutProps) => {
-  const crumbLabels = breadcrumbs?.length ? breadcrumbs.map((crumb) => crumb.label) : undefined;
-
   return (
     <AdminLayout
       title={title}
       actions={actions}
       hideTopbarTitle={hideTopbarTitle}
-      breadcrumbs={crumbLabels}
+      breadcrumbs={breadcrumbs}
       navItems={vendorNavItems}
       logoIcon={<Store size={22} />}
       logoText={t.logo}

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Order;
 
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +38,32 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
      * Find orders by store with status filter
      */
     Page<Order> findByStoreIdAndStatusOrderByCreatedAtDesc(UUID storeId, Order.OrderStatus status, Pageable pageable);
+
+    @Query("""
+            SELECT o FROM Order o
+            LEFT JOIN o.user u
+            LEFT JOIN o.shippingAddress a
+            WHERE o.storeId = :storeId
+              AND (:status IS NULL OR o.status = :status)
+              AND (
+                    COALESCE(:keyword, '') = ''
+                    OR LOWER(STR(o.id)) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+                    OR LOWER(COALESCE(u.name, '')) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+                    OR LOWER(COALESCE(u.email, '')) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+                    OR LOWER(COALESCE(a.fullName, '')) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+                  )
+              AND o.createdAt >= :fromDate
+              AND o.createdAt < :toDate
+            ORDER BY o.createdAt DESC
+            """)
+    Page<Order> searchByStore(
+            @Param("storeId") UUID storeId,
+            @Param("status") Order.OrderStatus status,
+            @Param("keyword") String keyword,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
+            Pageable pageable
+    );
 
     /**
      * Find order by ID only if it belongs to the specified store (ownership check)

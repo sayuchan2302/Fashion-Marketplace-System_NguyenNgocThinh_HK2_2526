@@ -11,7 +11,14 @@ import java.util.UUID;
 @Repository
 public interface CartRepository extends JpaRepository<Cart, UUID> {
 
-    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.user.id = :userId")
+    @Query("""
+            SELECT DISTINCT c
+            FROM Cart c
+            LEFT JOIN FETCH c.items i
+            LEFT JOIN FETCH i.product
+            LEFT JOIN FETCH i.variant
+            WHERE c.user.id = :userId
+            """)
     Optional<Cart> findByUserIdWithItems(UUID userId);
 
     Optional<Cart> findByUserId(UUID userId);

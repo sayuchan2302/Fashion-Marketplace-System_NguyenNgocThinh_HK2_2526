@@ -22,10 +22,10 @@ const marketTrend = [1.9, 2.1, 2.4, 2.3, 2.8, 3.1, 3.4];
 const trendLabels = ['13/03', '14/03', '15/03', '16/03', '17/03', '18/03', '19/03'];
 
 const parentOrders = [
-  { code: 'PARENT-10234', customer: 'Nguyễn Văn A', total: '3.250.000 đ', issue: 'Xem xét tranh chấp', priority: 'high', waitTime: '58 phút', thumb: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=120&h=140&q=80' },
-  { code: 'PARENT-10233', customer: 'Trần Thị B', total: '1.780.000 đ', issue: 'Chờ xác nhận vendor', priority: 'medium', waitTime: '24 phút', thumb: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=120&h=140&q=80' },
-  { code: 'PARENT-10232', customer: 'Lê Hữu C', total: '5.150.000 đ', issue: 'Chờ giải ngân', priority: 'high', waitTime: '1 giờ 12 phút', thumb: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&h=140&q=80' },
-  { code: 'PARENT-10231', customer: 'Phạm Minh D', total: '950.000 đ', issue: 'Chờ xác minh thanh toán', priority: 'low', waitTime: '12 phút', thumb: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=120&h=140&q=80' },
+  { code: 'PARENT-10234', customer: 'Nguyễn Văn A', total: '3.250.000 ₫', issue: 'Xem xét tranh chấp', priority: 'high', waitTime: '58 phút', thumb: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=120&h=140&q=80' },
+  { code: 'PARENT-10233', customer: 'Trần Thị B', total: '1.780.000 ₫', issue: 'Chờ xác nhận vendor', priority: 'medium', waitTime: '24 phút', thumb: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=120&h=140&q=80' },
+  { code: 'PARENT-10232', customer: 'Lê Hữu C', total: '5.150.000 ₫', issue: 'Chờ giải ngân', priority: 'high', waitTime: '1 giờ 12 phút', thumb: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&h=140&q=80' },
+  { code: 'PARENT-10231', customer: 'Phạm Minh D', total: '950.000 ₫', issue: 'Chờ xác minh thanh toán', priority: 'low', waitTime: '12 phút', thumb: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=120&h=140&q=80' },
 ];
 
 const governanceFeed = [
@@ -52,7 +52,7 @@ const priorityLabel = (priority: string) => {
   return 'Theo dõi';
 };
 
-const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')} đ`;
+const formatCurrency = (value: number) => `${value.toLocaleString('vi-VN')} ₫`;
 
 const Admin = () => {
   const stats = useMemo(() => [

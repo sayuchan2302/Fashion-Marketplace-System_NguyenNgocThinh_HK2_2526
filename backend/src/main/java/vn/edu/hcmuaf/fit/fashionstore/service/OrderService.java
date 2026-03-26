@@ -2,19 +2,26 @@ package vn.edu.hcmuaf.fit.fashionstore.service;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.OrderRequest;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderDetailResponse;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderPageResponse;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderSummaryResponse;
 import vn.edu.hcmuaf.fit.fashionstore.entity.*;
 import vn.edu.hcmuaf.fit.fashionstore.exception.ForbiddenException;
 import vn.edu.hcmuaf.fit.fashionstore.exception.ResourceNotFoundException;
 import vn.edu.hcmuaf.fit.fashionstore.repository.*;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -40,6 +47,10 @@ public class OrderService {
     private static final double DEFAULT_COMMISSION_RATE = 0.05;
     private static final double DEFAULT_SHIPPING_FEE = 30000.0;
     private static final double FREE_SHIPPING_THRESHOLD = 500000.0;
+    private static final LocalDateTime DEFAULT_FILTER_FROM = LocalDateTime.of(1970, 1, 1, 0, 0);
+    private static final LocalDateTime DEFAULT_FILTER_TO = LocalDateTime.of(2999, 12, 31, 23, 59, 59);
+    private static final EnumSet<Order.OrderStatus> TRACKING_UPDATABLE_STATUSES =
+            EnumSet.of(Order.OrderStatus.PROCESSING, Order.OrderStatus.SHIPPED);
 
     private record PreparedOrderItem(
             Product product,
@@ -97,12 +108,56 @@ public class OrderService {
         return orderRepository.findByStoreIdAndStatusOrderByCreatedAtDesc(storeId, status, pageable);
     }
 
+    public Page<Order> findByStoreIdFiltered(
+            UUID storeId,
+            Order.OrderStatus status,
+            String keyword,
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            Pageable pageable
+    ) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        LocalDateTime effectiveFrom = fromDate != null ? fromDate : DEFAULT_FILTER_FROM;
+        LocalDateTime effectiveTo = toDate != null ? toDate : DEFAULT_FILTER_TO;
+
+        if (!effectiveTo.isAfter(effectiveFrom)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date_to must be greater than date_from");
+        }
+
+        return orderRepository.searchByStore(storeId, status, normalizedKeyword, effectiveFrom, effectiveTo, pageable);
+    }
+
     /**
      * Find order by ID with store ownership validation (for vendors)
      */
     public Order findByIdForStore(UUID orderId, UUID storeId) {
         return orderRepository.findByIdAndStoreId(orderId, storeId)
                 .orElseThrow(() -> new ForbiddenException("Order not found or you don't have access to it"));
+    }
+
+    @Transactional(readOnly = true)
+    public VendorOrderPageResponse getVendorOrderPage(
+            UUID storeId,
+            Order.OrderStatus status,
+            String keyword,
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            Pageable pageable
+    ) {
+        Page<Order> page = findByStoreIdFiltered(storeId, status, keyword, fromDate, toDate, pageable);
+        return VendorOrderPageResponse.builder()
+                .content(page.getContent().stream().map(this::toVendorOrderSummaryResponse).toList())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .number(page.getNumber())
+                .size(page.getSize())
+                .statusCounts(buildVendorStatusCounts(storeId))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public VendorOrderDetailResponse getVendorOrderDetail(UUID orderId, UUID storeId) {
+        return toVendorOrderDetailResponse(findByIdForStore(orderId, storeId));
     }
 
     /**
@@ -117,6 +172,18 @@ public class OrderService {
      */
     public long countByStoreIdAndStatus(UUID storeId, Order.OrderStatus status) {
         return orderRepository.countByStoreIdAndStatus(storeId, status);
+    }
+
+    private VendorOrderPageResponse.StatusCounts buildVendorStatusCounts(UUID storeId) {
+        return VendorOrderPageResponse.StatusCounts.builder()
+                .all(countByStoreId(storeId))
+                .pending(countByStoreIdAndStatus(storeId, Order.OrderStatus.PENDING))
+                .confirmed(countByStoreIdAndStatus(storeId, Order.OrderStatus.CONFIRMED))
+                .processing(countByStoreIdAndStatus(storeId, Order.OrderStatus.PROCESSING))
+                .shipped(countByStoreIdAndStatus(storeId, Order.OrderStatus.SHIPPED))
+                .delivered(countByStoreIdAndStatus(storeId, Order.OrderStatus.DELIVERED))
+                .cancelled(countByStoreIdAndStatus(storeId, Order.OrderStatus.CANCELLED))
+                .build();
     }
 
     /**
@@ -143,6 +210,19 @@ public class OrderService {
 
     @Transactional
     public Order create(UUID userId, OrderRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order request is required");
+        }
+        if (request.getAddressId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Address is required");
+        }
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order must contain at least one item");
+        }
+        if (request.getPaymentMethod() == null || request.getPaymentMethod().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is required");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -153,11 +233,12 @@ public class OrderService {
             throw new ForbiddenException("You don't have access to this address");
         }
 
-        if (request.getItems() == null || request.getItems().isEmpty()) {
-            throw new ResourceNotFoundException("Order must contain at least one item");
+        Order.PaymentMethod paymentMethod;
+        try {
+            paymentMethod = Order.PaymentMethod.valueOf(request.getPaymentMethod().trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported payment method: " + request.getPaymentMethod());
         }
-
-        Order.PaymentMethod paymentMethod = Order.PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase());
         List<PreparedOrderItem> preparedItems = prepareOrderItems(request.getItems());
         Map<UUID, StoreOrderGroup> groupedByStore = groupItemsByStore(preparedItems);
 
@@ -177,7 +258,7 @@ public class OrderService {
         Order order = findByIdForUser(orderId, userId);
 
         if (order.getStatus() != Order.OrderStatus.PENDING) {
-            throw new IllegalStateException("Can only cancel pending orders");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Can only cancel pending orders");
         }
 
         order.setStatus(Order.OrderStatus.CANCELLED);
@@ -210,22 +291,79 @@ public class OrderService {
     @Transactional
     public Order updateStatus(UUID orderId, Order.OrderStatus status) {
         Order order = findById(orderId);
-        return applyStatusUpdate(order, status);
+        return applyStatusUpdate(order, status, null, null, null, false);
     }
 
     /**
      * Update order status with store ownership validation (vendor operation)
      */
     @Transactional
-    public Order updateStatusForStore(UUID orderId, UUID storeId, Order.OrderStatus status) {
+    public Order updateStatusForStore(
+            UUID orderId,
+            UUID storeId,
+            Order.OrderStatus status,
+            String trackingNumber,
+            String carrier,
+            String reason
+    ) {
         Order order = findByIdForStore(orderId, storeId);
-        return applyStatusUpdate(order, status);
+        return applyStatusUpdate(order, status, trackingNumber, carrier, reason, true);
     }
 
-    private Order applyStatusUpdate(Order order, Order.OrderStatus status) {
+    @Transactional
+    public VendorOrderDetailResponse updateVendorOrderStatus(
+            UUID orderId,
+            UUID storeId,
+            Order.OrderStatus status,
+            String trackingNumber,
+            String carrier,
+            String reason
+    ) {
+        Order updated = updateStatusForStore(orderId, storeId, status, trackingNumber, carrier, reason);
+        return toVendorOrderDetailResponse(updated);
+    }
+
+    private Order applyStatusUpdate(
+            Order order,
+            Order.OrderStatus status,
+            String trackingNumber,
+            String carrier,
+            String reason,
+            boolean enforceVendorRules
+    ) {
+        validateStatusTransition(order.getStatus(), status);
+
+        if (status == Order.OrderStatus.SHIPPED) {
+            String normalizedTracking = resolveRequiredField(
+                    trackingNumber,
+                    order.getTrackingNumber(),
+                    "Tracking number is required before shipping"
+            );
+            String normalizedCarrier = resolveRequiredField(
+                    carrier,
+                    order.getShippingCarrier(),
+                    "Carrier is required before shipping"
+            );
+            order.setTrackingNumber(normalizedTracking);
+            order.setShippingCarrier(normalizedCarrier);
+        }
+
+        if (status == Order.OrderStatus.CANCELLED) {
+            String normalizedReason = normalizeOptionalText(reason);
+            if (enforceVendorRules && normalizedReason.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cancellation reason is required");
+            }
+            if (!normalizedReason.isEmpty()) {
+                String currentNote = order.getNote() == null ? "" : order.getNote().trim();
+                String cancelNote = "Cancellation reason: " + normalizedReason;
+                order.setNote(currentNote.isEmpty() ? cancelNote : currentNote + "\n" + cancelNote);
+            }
+        }
+
         order.setStatus(status);
 
         if (status == Order.OrderStatus.DELIVERED) {
+            ensureTrackingDataReady(order);
             order.setPaidAt(LocalDateTime.now());
             order.setPaymentStatus(Order.PaymentStatus.PAID);
         }
@@ -239,6 +377,61 @@ public class OrderService {
         return savedOrder;
     }
 
+    private void validateStatusTransition(Order.OrderStatus current, Order.OrderStatus next) {
+        if (current == next) {
+            return;
+        }
+
+        boolean allowed = switch (current) {
+            case PENDING -> next == Order.OrderStatus.CONFIRMED || next == Order.OrderStatus.CANCELLED;
+            case CONFIRMED -> next == Order.OrderStatus.PROCESSING || next == Order.OrderStatus.CANCELLED;
+            case PROCESSING -> next == Order.OrderStatus.SHIPPED || next == Order.OrderStatus.CANCELLED;
+            case SHIPPED -> next == Order.OrderStatus.DELIVERED;
+            case DELIVERED, CANCELLED -> false;
+        };
+
+        if (!allowed) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    String.format("Invalid status transition: %s -> %s", current, next)
+            );
+        }
+    }
+
+    private String normalizeRequiredText(String value, String message) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+        }
+        return normalized;
+    }
+
+    private String normalizeOptionalText(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String resolveRequiredField(String providedValue, String fallbackValue, String message) {
+        String normalizedProvided = normalizeOptionalText(providedValue);
+        if (!normalizedProvided.isEmpty()) {
+            return normalizedProvided;
+        }
+        return normalizeRequiredText(fallbackValue, message);
+    }
+
+    private void ensureTrackingDataReady(Order order) {
+        normalizeRequiredText(order.getTrackingNumber(), "Tracking number is required before marking as delivered");
+        normalizeRequiredText(order.getShippingCarrier(), "Carrier is required before marking as delivered");
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+
+        String normalized = keyword.trim().toLowerCase(Locale.ROOT);
+        return normalized.isEmpty() ? null : normalized;
+    }
+
     // ─── Update Tracking ───────────────────────────────────────────────────────
 
     /**
@@ -247,14 +440,98 @@ public class OrderService {
     @Transactional
     public Order updateTrackingForStore(UUID orderId, UUID storeId, String trackingNumber) {
         Order order = findByIdForStore(orderId, storeId);
-        order.setTrackingNumber(trackingNumber);
+        if (!TRACKING_UPDATABLE_STATUSES.contains(order.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tracking can only be updated when order is PROCESSING or SHIPPED"
+            );
+        }
+        order.setTrackingNumber(normalizeRequiredText(trackingNumber, "Tracking number is required"));
         return orderRepository.save(order);
+    }
+
+    @Transactional
+    public VendorOrderDetailResponse updateVendorOrderTracking(UUID orderId, UUID storeId, String trackingNumber) {
+        return toVendorOrderDetailResponse(updateTrackingForStore(orderId, storeId, trackingNumber));
+    }
+
+    private VendorOrderSummaryResponse toVendorOrderSummaryResponse(Order order) {
+        return VendorOrderSummaryResponse.builder()
+                .id(order.getId())
+                .status(safeEnumName(order.getStatus()))
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .total(order.getTotal())
+                .commissionFee(order.getCommissionFee())
+                .vendorPayout(order.getVendorPayout())
+                .itemCount(order.getItems() == null ? 0 : order.getItems().size())
+                .customer(VendorOrderSummaryResponse.Customer.builder()
+                        .name(order.getUser() != null ? order.getUser().getName() : null)
+                        .email(order.getUser() != null ? order.getUser().getEmail() : null)
+                        .phone(order.getUser() != null ? order.getUser().getPhone() : null)
+                        .build())
+                .trackingNumber(order.getTrackingNumber())
+                .shippingCarrier(order.getShippingCarrier())
+                .build();
+    }
+
+    private VendorOrderDetailResponse toVendorOrderDetailResponse(Order order) {
+        return VendorOrderDetailResponse.builder()
+                .id(order.getId())
+                .status(safeEnumName(order.getStatus()))
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .subtotal(order.getSubtotal())
+                .shippingFee(order.getShippingFee())
+                .discount(order.getDiscount())
+                .total(order.getTotal())
+                .paymentMethod(safeEnumName(order.getPaymentMethod()))
+                .paymentStatus(safeEnumName(order.getPaymentStatus()))
+                .note(order.getNote())
+                .trackingNumber(order.getTrackingNumber())
+                .shippingCarrier(order.getShippingCarrier())
+                .commissionFee(order.getCommissionFee())
+                .vendorPayout(order.getVendorPayout())
+                .customer(VendorOrderSummaryResponse.Customer.builder()
+                        .name(order.getUser() != null ? order.getUser().getName() : null)
+                        .email(order.getUser() != null ? order.getUser().getEmail() : null)
+                        .phone(order.getUser() != null ? order.getUser().getPhone() : null)
+                        .build())
+                .shippingAddress(VendorOrderDetailResponse.ShippingAddress.builder()
+                        .fullName(order.getShippingAddress() != null ? order.getShippingAddress().getFullName() : null)
+                        .phone(order.getShippingAddress() != null ? order.getShippingAddress().getPhone() : null)
+                        .address(order.getShippingAddress() != null ? order.getShippingAddress().getDetail() : null)
+                        .ward(order.getShippingAddress() != null ? order.getShippingAddress().getWard() : null)
+                        .district(order.getShippingAddress() != null ? order.getShippingAddress().getDistrict() : null)
+                        .city(order.getShippingAddress() != null ? order.getShippingAddress().getProvince() : null)
+                        .build())
+                .items((order.getItems() == null ? List.<OrderItem>of() : order.getItems()).stream()
+                        .map(item -> VendorOrderDetailResponse.Item.builder()
+                                .id(item.getId())
+                                .name(item.getProductName())
+                                .sku(item.getVariant() != null && item.getVariant().getSku() != null
+                                        ? item.getVariant().getSku()
+                                        : (item.getId() != null ? item.getId().toString() : ""))
+                                .variant(item.getVariantName())
+                                .quantity(item.getQuantity())
+                                .unitPrice(item.getUnitPrice())
+                                .totalPrice(item.getTotalPrice())
+                                .image(item.getProductImage())
+                                .build())
+                        .toList())
+                .build();
     }
 
     private List<PreparedOrderItem> prepareOrderItems(List<OrderRequest.OrderItemRequest> items) {
         List<PreparedOrderItem> preparedItems = new ArrayList<>();
 
         for (OrderRequest.OrderItemRequest itemReq : items) {
+            if (itemReq == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order item is required");
+            }
+            if (itemReq.getProductId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product ID is required");
+            }
             Product product = productRepository.findPublicById(itemReq.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
@@ -271,7 +548,7 @@ public class OrderService {
             }
 
             if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
-                throw new ForbiddenException("Quantity must be greater than 0");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quantity must be greater than 0");
             }
 
             Double unitPrice = itemReq.getUnitPrice() != null ? itemReq.getUnitPrice() : resolveUnitPrice(product, variant);
@@ -514,5 +791,9 @@ public class OrderService {
         }
 
         return Order.OrderStatus.PENDING;
+    }
+
+    private String safeEnumName(Enum<?> value) {
+        return value == null ? null : value.name();
     }
 }

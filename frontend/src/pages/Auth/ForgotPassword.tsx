@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom';
 import { Loader2, Mail } from 'lucide-react';
 import './Auth.css';
 import { useToast } from '../../contexts/ToastContext';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 import { authService } from '../../services/authService';
-
-const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
 const ForgotPassword = () => {
   const { addToast } = useToast();
@@ -16,7 +15,7 @@ const ForgotPassword = () => {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!email.trim()) {
-      setError('Vui lòng nhập email');
+      setError('Vui lÃ²ng nháº­p email');
       return;
     }
 
@@ -25,9 +24,9 @@ const ForgotPassword = () => {
     try {
       setLoading(true);
       await authService.forgot(email.trim());
-      addToast('Đã gửi hướng dẫn đặt lại mật khẩu (mock)', 'success');
+      addToast('ÄÃ£ gá»­i hÆ°á»›ng dáº«n Ä‘áº·t láº¡i máº­t kháº©u (mock)', 'success');
     } catch (errorValue: unknown) {
-      addToast(getErrorMessage(errorValue, 'Gửi yêu cầu thất bại'), 'error');
+      addToast(getUiErrorMessage(errorValue, 'Gá»­i yÃªu cáº§u tháº¥t báº¡i'), 'error');
     } finally {
       setLoading(false);
     }
@@ -36,8 +35,8 @@ const ForgotPassword = () => {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">Quên mật khẩu</h1>
-        <p className="auth-subtitle">Nhập email để nhận hướng dẫn đặt lại mật khẩu.</p>
+        <h1 className="auth-title">QuÃªn máº­t kháº©u</h1>
+        <p className="auth-subtitle">Nháº­p email Ä‘á»ƒ nháº­n hÆ°á»›ng dáº«n Ä‘áº·t láº¡i máº­t kháº©u.</p>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-field">
@@ -54,10 +53,10 @@ const ForgotPassword = () => {
 
           <div className="auth-actions">
             <button type="submit" className="auth-btn" disabled={loading}>
-              {loading ? <><Loader2 size={18} className="auth-spinner" /> Đang gửi...</> : <><Mail size={18} /> Gửi hướng dẫn</>}
+              {loading ? <><Loader2 size={18} className="auth-spinner" /> Äang gá»­i...</> : <><Mail size={18} /> Gá»­i hÆ°á»›ng dáº«n</>}
             </button>
             <div className="auth-secondary">
-              Đã nhớ mật khẩu? <Link to="/login">Đăng nhập</Link>
+              ÄÃ£ nhá»› máº­t kháº©u? <Link to="/login">ÄÄƒng nháº­p</Link>
             </div>
           </div>
         </form>

@@ -1,4 +1,4 @@
-import './Admin.css';
+﻿import './Admin.css';
 import { useCallback, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, EyeOff, FolderPlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -418,14 +418,14 @@ const AdminCategories = () => {
   return (
     <AdminLayout
       title="Danh mục"
-      breadcrumbs={['Danh mục toàn sàn', 'Quản lý taxonomy']}
+      breadcrumbs={['Danh mục toàn sàn', 'Quản lý hệ danh mục']}
       actions={<button className="admin-primary-btn" onClick={openCreateRoot}><Plus size={14} /> Thêm danh mục gốc</button>}
     >
       <PanelStatsGrid
         items={[
-          { key: 'all', label: 'Tổng danh mục', value: stats.all, sub: 'Toàn bộ taxonomy đang quản lý' },
+          { key: 'all', label: 'Tổng danh mục', value: stats.all, sub: 'Toàn bộ danh mục đang quản lý' },
           { key: 'root', label: 'Danh mục gốc', value: stats.root, sub: 'Cấp 1 điều hướng toàn sàn', tone: 'info' },
-          { key: 'leaf', label: 'Danh mục lá', value: stats.leaf, sub: 'Vendor chỉ được chọn nhóm này', tone: 'success', onClick: () => setActiveFilter('leaf') },
+          { key: 'leaf', label: 'Danh mục lá', value: stats.leaf, sub: 'Nhà bán hàng chỉ được chọn nhóm này', tone: 'success', onClick: () => setActiveFilter('leaf') },
           { key: 'hidden', label: 'Đã ẩn', value: stats.hidden, sub: 'Nhóm đang tạm ngưng phân phối', tone: stats.hidden > 0 ? 'warning' : '' },
         ]}
       />
@@ -455,7 +455,7 @@ const AdminCategories = () => {
           <div className="admin-panel-head">
             <div>
               <h2>Cây danh mục</h2>
-              <span className="admin-muted">Admin quản lý taxonomy theo cây; vendor chỉ chọn danh mục lá.</span>
+              <span className="admin-muted">Quản trị viên quản lý danh mục theo cây; nhà bán hàng chỉ chọn danh mục lá.</span>
             </div>
           </div>
           <div className="admin-search category-search">
@@ -470,7 +470,7 @@ const AdminCategories = () => {
             <AdminStateBlock
               type={query ? 'search-empty' : 'empty'}
               title={query ? 'Không tìm thấy danh mục phù hợp' : 'Chưa có danh mục nào'}
-              description={query ? 'Thử đổi từ khóa tìm kiếm hoặc xóa bộ lọc hiện tại.' : 'Taxonomy toàn sàn sẽ hiển thị tại đây dưới dạng cây.'}
+              description={query ? 'Thử đổi từ khóa tìm kiếm hoặc xóa bộ lọc hiện tại.' : 'Hệ danh mục toàn sàn sẽ hiển thị tại đây dưới dạng cây.'}
               actionLabel="Xóa bộ lọc"
               onAction={resetView}
             />
@@ -484,7 +484,7 @@ const AdminCategories = () => {
             <div>
               <h2>{draftMode === 'view' ? 'Chi tiết danh mục' : draftMode === 'edit' ? 'Chỉnh sửa danh mục' : 'Tạo danh mục mới'}</h2>
               <span className="admin-muted">
-                {draftMode === 'view' ? 'Theo dõi cấu trúc, sản phẩm đang gắn và hành động quản trị nhanh.' : 'Cập nhật thông tin taxonomy, parent-path và trạng thái hiển thị.'}
+                {draftMode === 'view' ? 'Theo dõi cấu trúc, sản phẩm đang gắn và hành động quản trị nhanh.' : 'Cập nhật thông tin danh mục, đường dẫn cha và trạng thái hiển thị.'}
               </span>
             </div>
           </div>
@@ -494,7 +494,7 @@ const AdminCategories = () => {
               <div className="category-detail-hero">
                 <img src={selectedCategory.image} alt={selectedCategory.name} />
                 <div className="category-detail-headings">
-                  <p className="drawer-eyebrow">Taxonomy node</p>
+                  <p className="drawer-eyebrow">Nút danh mục</p>
                   <h3>{selectedCategory.name}</h3>
                   <div className="category-path">{selectedPath.join(' > ')}</div>
                 </div>
@@ -505,7 +505,7 @@ const AdminCategories = () => {
                 <div className="category-signal-card"><span className="admin-muted small">Cấp</span><strong>Cấp {getLevel(selectedCategory.id, byId)}</strong></div>
                 <div className="category-signal-card"><span className="admin-muted small">Sản phẩm</span><strong>{selectedCategory.count}</strong></div>
                 <div className="category-signal-card"><span className="admin-muted small">Điều hướng</span><strong>{selectedCategory.showOnMenu ? 'Hiện menu' : 'Ẩn menu'}</strong></div>
-                <div className="category-signal-card"><span className="admin-muted small">Loại node</span><strong>{isLeaf.has(selectedCategory.id) ? 'Danh mục lá' : 'Nhóm cha'}</strong></div>
+                <div className="category-signal-card"><span className="admin-muted small">Loại danh mục</span><strong>{isLeaf.has(selectedCategory.id) ? 'Danh mục lá' : 'Nhóm cha'}</strong></div>
               </div>
 
               <div className="admin-card-list">
@@ -538,7 +538,7 @@ const AdminCategories = () => {
               <div className="switch-row category-switch-row">
                 <div>
                   <p className="admin-bold">Hiện trên menu chính</p>
-                  <p className="admin-muted small">Dùng cho các node cấp điều hướng, không nên bật tràn lan với danh mục lá.</p>
+                  <p className="admin-muted small">Dùng cho các danh mục cấp điều hướng, không nên bật tràn lan với danh mục lá.</p>
                 </div>
                 <label className="switch">
                   <input type="checkbox" checked={draft.showOnMenu} onChange={(event) => setDraft((prev) => ({ ...prev, showOnMenu: event.target.checked }))} disabled={draft.status === 'hidden'} />
@@ -548,7 +548,7 @@ const AdminCategories = () => {
 
               <div className="admin-card-list">
                 <div className="admin-card-row"><span className="admin-bold">Đường dẫn dự kiến</span><span className="admin-muted">{buildDraftPath(draft, byId).join(' > ') || 'Danh mục mới'}</span></div>
-                <div className="admin-card-row"><span className="admin-bold">Node cha</span><span className="admin-muted">{draftParentLabel}</span></div>
+                <div className="admin-card-row"><span className="admin-bold">Danh mục cha</span><span className="admin-muted">{draftParentLabel}</span></div>
               </div>
 
               <div className="drawer-footer category-editor-footer">
@@ -564,20 +564,20 @@ const AdminCategories = () => {
         <div className="admin-panel">
           <div className="admin-panel-head">
             <div>
-              <h2>Danh sách rà soát taxonomy</h2>
-              <span className="admin-muted">Bảng phẳng để admin scan nhanh level, path, số sản phẩm và thao tác CRUD.</span>
+              <h2>Danh sách rà soát danh mục</h2>
+              <span className="admin-muted">Bảng phẳng để quản trị viên rà nhanh cấp, đường dẫn, số sản phẩm và thao tác quản lý.</span>
             </div>
           </div>
           {flatFilteredCategories.length === 0 ? (
             <AdminStateBlock
               type={query ? 'search-empty' : 'empty'}
-              title={query ? 'Không tìm thấy danh mục phù hợp' : 'Chưa có dữ liệu taxonomy'}
-              description={query ? 'Thử đổi từ khóa hoặc xóa bộ lọc để xem toàn bộ taxonomy.' : 'Các node taxonomy sẽ hiển thị tại đây để rà soát nhanh.'}
+              title={query ? 'Không tìm thấy danh mục phù hợp' : 'Chưa có dữ liệu danh mục'}
+              description={query ? 'Thử đổi từ khóa hoặc xóa bộ lọc để xem toàn bộ danh mục.' : 'Các nút danh mục sẽ hiển thị tại đây để rà soát nhanh.'}
               actionLabel="Xóa bộ lọc"
               onAction={resetView}
             />
           ) : (
-            <div className="admin-table" role="table" aria-label="Bảng danh sách taxonomy">
+            <div className="admin-table" role="table" aria-label="Bảng danh sách danh mục">
               <div className="admin-table-row taxonomy-audit admin-table-head" role="row">
                 <div role="columnheader">Danh mục</div>
                 <div role="columnheader">Đường dẫn</div>
@@ -650,3 +650,4 @@ function buildDraftPath(draft: CategoryDraft, byId: Map<string, Category>) {
 }
 
 export default AdminCategories;
+

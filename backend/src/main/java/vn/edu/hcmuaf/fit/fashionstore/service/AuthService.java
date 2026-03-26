@@ -94,20 +94,33 @@ public class AuthService {
     }
 
     public AuthResponse refreshToken(String refreshToken) {
-        String email = jwtService.extractUsername(refreshToken);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-
-        if (!jwtService.isTokenValid(refreshToken, userDetails)) {
-            logger.warn("Refresh token invalid for email={}", email);
+        if (refreshToken == null || refreshToken.isBlank()) {
+            logger.warn("Refresh token request rejected: token is blank");
             throw new BadCredentialsException("Invalid refresh token");
         }
 
-        User user = userRepository.findByEmail(email).orElseThrow();
+        try {
+            String email = jwtService.extractUsername(refreshToken);
+            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-        String newToken = jwtService.generateTokenWithUserId(user.getId().toString(), userDetails);
-        String newRefreshToken = jwtService.generateRefreshToken(userDetails);
+            if (!jwtService.isTokenValid(refreshToken, userDetails)) {
+                logger.warn("Refresh token invalid for email={}", email);
+                throw new BadCredentialsException("Invalid refresh token");
+            }
 
-        return buildAuthResponse(user, newToken, newRefreshToken);
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+
+            String newToken = jwtService.generateTokenWithUserId(user.getId().toString(), userDetails);
+            String newRefreshToken = jwtService.generateRefreshToken(userDetails);
+
+            return buildAuthResponse(user, newToken, newRefreshToken);
+        } catch (BadCredentialsException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            logger.warn("Refresh token validation failed: {}", ex.getMessage());
+            throw new BadCredentialsException("Invalid refresh token");
+        }
     }
 
     private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {

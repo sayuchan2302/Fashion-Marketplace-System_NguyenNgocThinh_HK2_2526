@@ -3,9 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, LockKeyhole } from 'lucide-react';
 import './Auth.css';
 import { useToast } from '../../contexts/ToastContext';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 import { authService } from '../../services/authService';
-
-const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
 const ResetPassword = () => {
   const { addToast } = useToast();
@@ -17,9 +16,9 @@ const ResetPassword = () => {
 
   const validate = () => {
     const next: typeof errors = {};
-    if (!password.trim()) next.password = 'Vui lòng nhập mật khẩu mới';
-    else if (password.trim().length < 6) next.password = 'Tối thiểu 6 ký tự';
-    if (confirm.trim() !== password.trim()) next.confirm = 'Mật khẩu không khớp';
+    if (!password.trim()) next.password = 'Vui lÃ²ng nháº­p máº­t kháº©u má»›i';
+    else if (password.trim().length < 6) next.password = 'Tá»‘i thiá»ƒu 6 kÃ½ tá»±';
+    if (confirm.trim() !== password.trim()) next.confirm = 'Máº­t kháº©u khÃ´ng khá»›p';
     return next;
   };
 
@@ -32,10 +31,10 @@ const ResetPassword = () => {
     try {
       setLoading(true);
       await authService.reset(password.trim());
-      addToast('Đặt lại mật khẩu thành công (mock)', 'success');
+      addToast('Äáº·t láº¡i máº­t kháº©u thÃ nh cÃ´ng (mock)', 'success');
       navigate('/login', { replace: true });
     } catch (error: unknown) {
-      addToast(getErrorMessage(error, 'Đặt lại mật khẩu thất bại'), 'error');
+      addToast(getUiErrorMessage(error, 'Äáº·t láº¡i máº­t kháº©u tháº¥t báº¡i'), 'error');
     } finally {
       setLoading(false);
     }
@@ -44,40 +43,40 @@ const ResetPassword = () => {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">Đặt lại mật khẩu</h1>
-        <p className="auth-subtitle">Nhập mật khẩu mới cho tài khoản của bạn.</p>
+        <h1 className="auth-title">Äáº·t láº¡i máº­t kháº©u</h1>
+        <p className="auth-subtitle">Nháº­p máº­t kháº©u má»›i cho tÃ i khoáº£n cá»§a báº¡n.</p>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-field">
-            <label>Mật khẩu mới</label>
+            <label>Máº­t kháº©u má»›i</label>
             <input
               className="auth-input"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
             />
             {errors.password && <div className="auth-error">{errors.password}</div>}
           </div>
 
           <div className="auth-field">
-            <label>Nhập lại mật khẩu</label>
+            <label>Nháº­p láº¡i máº­t kháº©u</label>
             <input
               className="auth-input"
               type="password"
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
             />
             {errors.confirm && <div className="auth-error">{errors.confirm}</div>}
           </div>
 
           <div className="auth-actions">
             <button type="submit" className="auth-btn" disabled={loading}>
-              {loading ? <><Loader2 size={18} className="auth-spinner" /> Đang đặt lại...</> : <><LockKeyhole size={18} /> Đặt lại mật khẩu</>}
+              {loading ? <><Loader2 size={18} className="auth-spinner" /> Äang Ä‘áº·t láº¡i...</> : <><LockKeyhole size={18} /> Äáº·t láº¡i máº­t kháº©u</>}
             </button>
             <div className="auth-secondary">
-              Nhớ mật khẩu rồi? <Link to="/login">Đăng nhập</Link>
+              Nhá»› máº­t kháº©u rá»“i? <Link to="/login">ÄÄƒng nháº­p</Link>
             </div>
           </div>
         </form>

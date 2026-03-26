@@ -1,22 +1,21 @@
 package vn.edu.hcmuaf.fit.fashionstore.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Getter
 @Setter
-@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 @Entity
 @Table(name = "categories")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Category extends BaseEntity {
 
     @Column(nullable = false, unique = true)
@@ -29,13 +28,16 @@ public class Category extends BaseEntity {
 
     private String image;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private Category parent;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
     private List<Category> children = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "category")
     private List<Product> products = new ArrayList<>();
 

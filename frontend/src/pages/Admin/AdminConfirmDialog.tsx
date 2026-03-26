@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import type { ReactNode } from 'react';
 
 interface AdminConfirmDialogProps {
   open: boolean;
@@ -11,6 +13,7 @@ interface AdminConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -25,6 +28,7 @@ const AdminConfirmDialog = ({
   confirmLabel = 'Xác nhận',
   cancelLabel = 'Hủy',
   danger = false,
+  children,
   onConfirm,
   onCancel,
 }: AdminConfirmDialogProps) => {
@@ -67,12 +71,25 @@ const AdminConfirmDialog = ({
     return () => dialog.removeEventListener('keydown', handleKeyDown);
   }, [open, onCancel]);
 
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
   const selectedList = selectedItems || [];
   const hasSelectedItems = selectedList.length > 0;
   const visibleItems = selectedList.slice(0, maxVisibleItems);
   const hiddenCount = Math.max(0, selectedList.length - visibleItems.length);
 
-  return (
+  if (!open) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -97,6 +114,7 @@ const AdminConfirmDialog = ({
           >
             <h3>{title}</h3>
             <p>{description}</p>
+            {children}
 
             {hasSelectedItems && (
               <div className="confirm-selection-block">
@@ -117,7 +135,8 @@ const AdminConfirmDialog = ({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };
 

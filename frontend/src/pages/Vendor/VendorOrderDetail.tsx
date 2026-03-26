@@ -1,12 +1,14 @@
 import './Vendor.css';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, Copy, CreditCard, FileText, Link2, MapPin, Package, Printer, Truck, User } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Link2, MapPin, Package, Percent, Printer, Store, Truck, User, XCircle } from 'lucide-react';
 import { startTransition, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import VendorLayout from './VendorLayout';
-import { formatVendorOrderDate, getVendorOrderStatusLabel } from './vendorOrderPresentation';
+import { formatVendorOrderDate, getVendorOrderStatusLabel, getVendorOrderStatusTone } from './vendorOrderPresentation';
 import { formatCurrency } from '../../services/commissionService';
 import { vendorPortalService, type VendorOrderDetailData } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 
 const emptyOrder: VendorOrderDetailData = {
@@ -24,6 +26,7 @@ const emptyOrder: VendorOrderDetailData = {
   paymentStatus: 'pending',
   note: '',
   trackingNumber: '',
+  carrier: '',
   commissionFee: 0,
   vendorPayout: 0,
   timeline: [],
@@ -47,26 +50,36 @@ const VendorOrderDetail = () => {
         startTransition(() => setOrder(next));
       } catch (err: unknown) {
         if (!active) return;
-        addToast((err as Error)?.message || 'Không tải được chi tiết đơn hàng con', 'error');
+        addToast(getUiErrorMessage(err, 'Không tải được chi tiết đơn hàng'), 'error');
       } finally {
         if (active) setLoading(false);
       }
     };
 
-    load();
+    void load();
     return () => {
       active = false;
     };
   }, [addToast, id]);
 
-  const updateStatus = async (status: 'CONFIRMED' | 'SHIPPED', nextUiStatus: 'packing' | 'shipping', message: string) => {
+  const updateStatus = async (
+    status: 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED',
+    nextUiStatus: VendorOrderDetailData['status'],
+    message: string,
+    payload?: { trackingNumber?: string; carrier?: string; reason?: string },
+  ) => {
     setIsProcessing(true);
     try {
-      await vendorPortalService.updateOrderStatus(id, status);
-      setOrder((current) => ({ ...current, status: nextUiStatus }));
+      await vendorPortalService.updateOrderStatus(id, status, payload);
+      setOrder((current) => ({
+        ...current,
+        status: nextUiStatus,
+        trackingNumber: payload?.trackingNumber || current.trackingNumber,
+        carrier: payload?.carrier || current.carrier,
+      }));
       addToast(message, 'success');
     } catch (err: unknown) {
-      addToast((err as Error)?.message || 'Không thể cập nhật trạng thái đơn hàng con', 'error');
+      addToast(getUiErrorMessage(err, 'Không thể cập nhật trạng thái đơn hàng'), 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -74,7 +87,12 @@ const VendorOrderDetail = () => {
 
   const handleCopyOrderId = async () => {
     await navigator.clipboard.writeText(order.id);
-    addToast('Đã sao chép mã đơn hàng con', 'success');
+    addToast('Đã sao chép mã đơn hàng', 'success');
+  };
+
+  const handleCopyTracking = async () => {
+    await navigator.clipboard.writeText(order.trackingNumber);
+    addToast('Đã sao chép mã vận đơn', 'success');
   };
 
   const shareCurrentView = async () => {
@@ -82,12 +100,43 @@ const VendorOrderDetail = () => {
     addToast('Đã sao chép liên kết đơn hàng', 'success');
   };
 
+  const shipOrder = async () => {
+    const tracking = window.prompt('Nhập mã vận đơn');
+    if (!tracking || !tracking.trim()) {
+      addToast('Cần nhập mã vận đơn trước khi bàn giao', 'error');
+      return;
+    }
+
+    const carrier = window.prompt('Nhập đơn vị vận chuyển');
+    if (!carrier || !carrier.trim()) {
+      addToast('Cần nhập đơn vị vận chuyển trước khi bàn giao', 'error');
+      return;
+    }
+
+    await updateStatus(
+      'SHIPPED',
+      'shipped',
+      'Đơn hàng đã bàn giao cho đơn vị vận chuyển',
+      { trackingNumber: tracking.trim(), carrier: carrier.trim() },
+    );
+  };
+
+  const shippingAddress = [order.shippingAddress.address, order.shippingAddress.ward, order.shippingAddress.district, order.shippingAddress.city].filter(Boolean).join(', ');
+  const statusLabel = getVendorOrderStatusLabel(order.status);
+  const statusTone = getVendorOrderStatusTone(order.status);
+
+  const canConfirm = order.status === 'pending';
+  const canProcess = order.status === 'confirmed';
+  const canShip = order.status === 'processing';
+  const canDeliver = order.status === 'shipped';
+  const canCancel = order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing';
+
   return (
     <VendorLayout
-      title={`Đơn hàng ${id}`}
-      breadcrumbs={[{ label: 'Bảng điều khiển', to: '/vendor/dashboard' }, { label: 'Đơn hàng shop', to: '/vendor/orders' }, { label: 'Chi tiết vận hành' }]}
+      title={`Đơn hàng #${id}`}
+      breadcrumbs={['Kênh Người Bán', 'Đơn hàng', 'Chi tiết']}
       actions={(
-        <>
+        <div className="admin-actions">
           <button className="admin-ghost-btn" onClick={() => navigate('/vendor/orders')}>
             <ArrowLeft size={16} />
             Quay lại
@@ -100,188 +149,205 @@ const VendorOrderDetail = () => {
             <Printer size={16} />
             In phiếu giao
           </button>
-          {order.status === 'pending' && (
-            <button className="admin-primary-btn vendor-admin-primary" onClick={() => void updateStatus('CONFIRMED', 'packing', 'Đã xác nhận đơn hàng con của shop')} disabled={isProcessing}>
+          {canConfirm && (
+            <button className="admin-primary-btn vendor-admin-primary" onClick={() => void updateStatus('CONFIRMED', 'confirmed', 'Đã xác nhận đơn hàng')} disabled={isProcessing}>
               <Check size={16} />
               {isProcessing ? 'Đang xử lý...' : 'Xác nhận đơn'}
             </button>
           )}
-          {order.status === 'packing' && (
-            <button className="admin-primary-btn vendor-admin-primary" onClick={() => void updateStatus('SHIPPED', 'shipping', 'Đơn hàng đã bàn giao cho đơn vị vận chuyển')} disabled={isProcessing}>
+          {canProcess && (
+            <button className="admin-primary-btn vendor-admin-primary" onClick={() => void updateStatus('PROCESSING', 'processing', 'Đơn hàng đã chuyển sang đang xử lý')} disabled={isProcessing}>
+              <Package size={16} />
+              {isProcessing ? 'Đang xử lý...' : 'Bắt đầu xử lý'}
+            </button>
+          )}
+          {canShip && (
+            <button className="admin-primary-btn vendor-admin-primary" onClick={() => void shipOrder()} disabled={isProcessing}>
               <Truck size={16} />
               {isProcessing ? 'Đang xử lý...' : 'Bàn giao vận chuyển'}
             </button>
           )}
-        </>
+          {canDeliver && (
+            <button className="admin-primary-btn vendor-admin-primary" onClick={() => void updateStatus('DELIVERED', 'delivered', 'Đơn hàng đã được xác nhận giao thành công')} disabled={isProcessing}>
+              <Check size={16} />
+              {isProcessing ? 'Đang xử lý...' : 'Xác nhận đã giao'}
+            </button>
+          )}
+          {canCancel && (
+            <button className="admin-ghost-btn danger" onClick={() => void updateStatus('CANCELLED', 'cancelled', 'Đã hủy đơn hàng')} disabled={isProcessing}>
+              <XCircle size={16} />
+              Hủy đơn
+            </button>
+          )}
+        </div>
       )}
     >
       {loading ? (
         <AdminStateBlock
           type="empty"
-          title="Đang tải chi tiết vận hành"
+          title="Đang tải chi tiết đơn hàng"
           description="Đơn hàng của shop đang được đồng bộ."
         />
       ) : (
-        <>
-          <div className="admin-stats grid-4">
-            <div className="admin-stat-card">
-              <div className="admin-stat-label">Mã đơn hàng con</div>
-              <div className="admin-stat-value vendor-stat-inline">{order.id} <button className="admin-icon-btn subtle" onClick={() => void handleCopyOrderId()}><Copy size={14} /></button></div>
-              <div className="admin-stat-sub">{formatVendorOrderDate(order.createdAt, true)}</div>
-            </div>
-            <div className="admin-stat-card info">
-              <div className="admin-stat-label">Trạng thái</div>
-              <div className="admin-stat-value">{getVendorOrderStatusLabel(order.status)}</div>
-              <div className="admin-stat-sub">Chỉ phản ánh phần vận hành của shop</div>
-            </div>
-            <div className="admin-stat-card warning">
-              <div className="admin-stat-label">Phí sàn</div>
-              <div className="admin-stat-value">{formatCurrency(order.commissionFee)}</div>
-              <div className="admin-stat-sub">Commission áp dụng cho đơn hàng con</div>
-            </div>
-            <div className="admin-stat-card success">
-              <div className="admin-stat-label">Thực nhận</div>
-              <div className="admin-stat-value">{formatCurrency(order.vendorPayout)}</div>
-              <div className="admin-stat-sub">Payout dự kiến cho shop</div>
-            </div>
+        <motion.div className="order-detail-grid">
+          <div className="od-left">
+            <section className="od-section">
+              <div className="od-section-head">
+                <h2><Package size={16} /> Hàng hóa ({order.items.length} SKU)</h2>
+              </div>
+              <div className="od-items">
+                {order.items.map((item) => (
+                  <div key={item.id} className="od-item">
+                    <img src={item.image} alt={item.name} />
+                    <div className="od-item-info">
+                      <p className="od-item-name">{item.name}</p>
+                      <p className="od-item-variant">SKU: <strong>{item.sku}</strong> · {item.variant}</p>
+                      <p className="od-item-price">{item.quantity} x {formatCurrency(item.price)}</p>
+                    </div>
+                    <div className="od-item-total">{formatCurrency(item.price * item.quantity)}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="od-summary">
+                <div className="od-summary-row"><span>Tạm tính</span><strong>{formatCurrency(order.subtotal)}</strong></div>
+                <div className="od-summary-row"><span>Phí vận chuyển</span><strong>{order.shippingFee === 0 ? 'Miễn phí' : formatCurrency(order.shippingFee)}</strong></div>
+                <div className="od-summary-row"><span>Voucher / giảm trừ</span><strong>-{formatCurrency(order.discount)}</strong></div>
+                <div className="od-summary-row od-total"><span>Tổng đơn hàng</span><strong>{formatCurrency(order.total)}</strong></div>
+              </div>
+
+              <div className="od-commission-card" style={{
+                marginTop: 12,
+                padding: 14,
+                background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+                border: '1px solid #bbf7d0',
+                borderRadius: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <Store size={16} style={{ color: '#16a34a' }} />
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#16a34a' }}>
+                    Đối soát shop
+                  </h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: '#475569' }}>Doanh thu gộp</span>
+                    <strong style={{ color: '#334155' }}>{formatCurrency(order.total)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Percent size={12} />
+                      Phí sàn
+                    </span>
+                    <strong style={{ color: '#d97706' }}>-{formatCurrency(order.commissionFee)}</strong>
+                  </div>
+                  <div style={{ height: 1, background: '#bbf7d0', margin: '4px 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                    <span style={{ color: '#475569', fontWeight: 600 }}>Thực nhận</span>
+                    <strong style={{ color: '#16a34a', fontSize: 16 }}>{formatCurrency(order.vendorPayout)}</strong>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
 
-          <section className="admin-panels">
-            <div className="admin-left">
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><Package size={16} /> Hàng hóa của shop</h2>
-                  <span className="admin-muted">{order.items.length} SKU trong đơn hàng</span>
+          <div className="od-right">
+            <section className="od-section">
+              <div className="od-section-head">
+                <h2><User size={16} /> Thông tin đơn hàng</h2>
+              </div>
+              <div className="od-card">
+                <div className="od-card-row">
+                  <span className="od-label">Trạng thái</span>
+                  <span className={`admin-pill ${statusTone}`}>{statusLabel}</span>
                 </div>
-                {order.items.length === 0 ? (
-                  <AdminStateBlock type="empty" title="Không có SKU" description="Đơn hàng này chưa có dòng hàng hóa hợp lệ." />
-                ) : (
-                  <div className="admin-table" role="table" aria-label="Bảng hàng hóa của shop">
-                    <div className="admin-table-row vendor-order-items admin-table-head" role="row">
-                      <div role="columnheader">Sản phẩm</div>
-                      <div role="columnheader">Biến thể</div>
-                      <div role="columnheader">Số lượng</div>
-                      <div role="columnheader">Đơn giá</div>
-                      <div role="columnheader">Thành tiền</div>
-                    </div>
-                    {order.items.map((item) => (
-                      <div key={item.id} className="admin-table-row vendor-order-items" role="row">
-                        <div role="cell" className="vendor-admin-product-cell">
-                          <img src={item.image} alt={item.name} className="vendor-admin-thumb" />
-                          <div className="vendor-admin-product-copy">
-                            <div className="admin-bold">{item.name}</div>
-                            <div className="admin-muted small">SKU: {item.sku}</div>
-                          </div>
-                        </div>
-                        <div role="cell">{item.variant}</div>
-                        <div role="cell">{item.quantity}</div>
-                        <div role="cell">{formatCurrency(item.price)}</div>
-                        <div role="cell" className="admin-bold">{formatCurrency(item.price * item.quantity)}</div>
-                      </div>
-                    ))}
+                <div className="od-card-row">
+                  <span className="od-label">Mã đơn hàng</span>
+                  <div className="tracking-value">
+                    <strong>{order.id}</strong>
+                    <button className="admin-icon-btn subtle" aria-label="Sao chép mã đơn" onClick={() => void handleCopyOrderId()}>
+                      <Copy size={14} />
+                    </button>
                   </div>
+                </div>
+                <div className="od-card-row">
+                  <span className="od-label">Ngày tạo</span>
+                  <span>{formatVendorOrderDate(order.createdAt, true)}</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="od-section">
+              <div className="od-section-head">
+                <h2><User size={16} /> Khách hàng</h2>
+              </div>
+              <div className="od-card">
+                <div className="od-card-row"><span className="od-label">Tên khách</span><strong>{order.customer.name}</strong></div>
+                <div className="od-card-row"><span className="od-label">Điện thoại</span><strong>{order.customer.phone}</strong></div>
+                <div className="od-card-row"><span className="od-label">Email</span><span>{order.customer.email}</span></div>
+              </div>
+            </section>
+
+            <section className="od-section">
+              <div className="od-section-head">
+                <h2><MapPin size={16} /> Giao nhận & vận chuyển</h2>
+              </div>
+              <div className="od-card">
+                <div className="od-card-row"><span className="od-label">Người nhận</span><strong>{order.shippingAddress.fullName}</strong></div>
+                <div className="od-card-row"><span className="od-label">Điện thoại</span><span>{order.shippingAddress.phone}</span></div>
+                <div className="od-card-row"><span className="od-label">Địa chỉ</span><span>{shippingAddress || 'Chưa cập nhật'}</span></div>
+                <div className="od-card-row">
+                  <span className="od-label">Phương thức TT</span>
+                  <span>{order.paymentMethod}</span>
+                </div>
+                <div className="od-card-row">
+                  <span className="od-label">Thanh toán</span>
+                  <span className={`admin-pill ${order.paymentStatus === 'paid' ? 'success' : 'pending'}`}>
+                    {order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                  </span>
+                </div>
+                <div className="od-card-row tracking-row">
+                  <span className="od-label">Mã vận đơn</span>
+                  <div className="tracking-value">
+                    <strong>{order.trackingNumber || '-'}</strong>
+                    {order.trackingNumber && (
+                      <button className="admin-icon-btn subtle" aria-label="Sao chép mã vận đơn" onClick={() => void handleCopyTracking()}>
+                        <Copy size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="od-card-row">
+                  <span className="od-label">Đơn vị vận chuyển</span>
+                  <span>{order.carrier || 'Chưa xác định'}</span>
+                </div>
+                {order.note && (
+                  <div className="od-note">Ghi chú: {order.note}</div>
                 )}
-              </section>
+              </div>
+            </section>
 
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><CreditCard size={16} /> Đối soát đơn hàng con</h2>
-                </div>
-                <div className="admin-card-list">
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Tạm tính hàng hóa</span>
-                    <span className="admin-muted">{formatCurrency(order.subtotal)}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Phí vận chuyển</span>
-                    <span className="admin-muted">{order.shippingFee === 0 ? 'Miễn phí' : formatCurrency(order.shippingFee)}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Voucher / giảm trừ</span>
-                    <span className="admin-muted">{order.discount > 0 ? `-${formatCurrency(order.discount)}` : 'Không có'}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Tổng đơn hàng con</span>
-                    <span className="admin-muted">{formatCurrency(order.total)}</span>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <div className="admin-right">
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><User size={16} /> Người mua</h2>
-                </div>
-                <div className="admin-card-list">
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Tên khách</span>
-                    <span className="admin-muted">{order.customer.name}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Email</span>
-                    <span className="admin-muted">{order.customer.email}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Điện thoại</span>
-                    <span className="admin-muted">{order.customer.phone}</span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><MapPin size={16} /> Địa chỉ giao nhận</h2>
-                </div>
-                <div className="admin-card-list">
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Người nhận</span>
-                    <span className="admin-muted">{order.shippingAddress.fullName}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Điện thoại</span>
-                    <span className="admin-muted">{order.shippingAddress.phone}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Địa chỉ</span>
-                    <span className="admin-muted">
-                      {[order.shippingAddress.address, order.shippingAddress.ward, order.shippingAddress.district, order.shippingAddress.city].filter(Boolean).join(', ')}
-                    </span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><Truck size={16} /> Thanh toán và vận chuyển</h2>
-                </div>
-                <div className="admin-card-list">
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Phương thức</span>
-                    <span className="admin-muted">{order.paymentMethod}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Trạng thái thanh toán</span>
-                    <span className="admin-muted">{order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Mã vận đơn</span>
-                    <span className="admin-muted">{order.trackingNumber || 'Đang cập nhật'}</span>
-                  </div>
-                </div>
-              </section>
-
-              {order.note && (
-                <section className="admin-panel">
-                  <div className="admin-panel-head">
-                    <h2><FileText size={16} /> Ghi chú vận hành</h2>
-                  </div>
-                  <p className="admin-muted vendor-note-block">{order.note}</p>
-                </section>
-              )}
-            </div>
-          </section>
-        </>
+            <section className="od-section">
+              <div className="od-section-head">
+                <h2><Truck size={16} /> Timeline vận hành</h2>
+              </div>
+              <div className="od-timeline">
+                {order.timeline.length === 0 ? (
+                  <p className="admin-muted" style={{ padding: '8px 0' }}>Chưa có cập nhật vận hành.</p>
+                ) : (
+                  order.timeline.map((log, idx) => (
+                    <div key={idx} className="od-timeline-item">
+                      <div className={`od-timeline-dot ${log.status === 'cancelled' ? 'error' : log.status === 'delivered' || log.status === 'done' ? 'success' : 'neutral'}`} />
+                      <div>
+                        <p className="od-timeline-time">{new Date(log.date).toLocaleString('vi-VN')}</p>
+                        <p className="od-timeline-text">{getVendorOrderStatusLabel(log.status)}{log.note ? ` - ${log.note}` : ''}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+        </motion.div>
       )}
     </VendorLayout>
   );

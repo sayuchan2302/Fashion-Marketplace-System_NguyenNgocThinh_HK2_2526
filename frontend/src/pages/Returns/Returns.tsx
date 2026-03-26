@@ -174,11 +174,11 @@ const Returns = () => {
               </div>
 
               <div>
-                <label>{t.info.resolution}</label>
+                <label>{t.resolution.title}</label>
                 <div className="reason-grid">
                   {[
-                    { id: 'EXCHANGE' as ReturnResolution, label: t.info.resolutionOptions.exchange },
-                    { id: 'REFUND' as ReturnResolution, label: t.info.resolutionOptions.refund },
+                    { id: 'EXCHANGE' as ReturnResolution, label: t.resolution.changeSize },
+                    { id: 'REFUND' as ReturnResolution, label: t.resolution.refund },
                   ].map(opt => (
                     <button
                       type="button"
@@ -195,7 +195,7 @@ const Returns = () => {
 
             <div className="returns-actions">
               <button type="submit" className="returns-submit" disabled={submitting}>
-                {submitting ? t.submitting : t.submit}
+                {submitting ? t.summary.submitting : t.summary.submit}
               </button>
               {submittedId && <p className="returns-success">Da gui yeu cau #{submittedId}</p>}
             </div>

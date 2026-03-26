@@ -1,0 +1,338 @@
+import { apiRequest } from './apiClient';
+
+interface BackendCategoryOption {
+  id?: string;
+  name?: string;
+  label?: string;
+  leaf?: boolean;
+}
+
+interface BackendVendorProduct {
+  id: string;
+  name?: string;
+  slug?: string;
+  description?: string;
+  status?: string;
+  visible?: boolean;
+  categoryId?: string;
+  categoryName?: string;
+  basePrice?: number;
+  salePrice?: number;
+  effectivePrice?: number;
+  totalStock?: number;
+  primarySku?: string;
+  primaryImage?: string;
+}
+
+interface BackendVendorProductPage {
+  content?: BackendVendorProduct[];
+  totalElements?: number;
+  totalPages?: number;
+  number?: number;
+  size?: number;
+  statusCounts?: {
+    all?: number;
+    active?: number;
+    draft?: number;
+    outOfStock?: number;
+    lowStock?: number;
+  };
+}
+
+interface BackendProductRequest {
+  name?: string;
+  slug?: string;
+  description?: string;
+  categoryId?: string;
+  basePrice?: number;
+  salePrice?: number;
+  status?: 'ACTIVE' | 'INACTIVE' | 'DRAFT' | 'ARCHIVED';
+  sku?: string;
+  stockQuantity?: number;
+  imageUrl?: string;
+}
+
+export type VendorProductStatus = 'active' | 'low' | 'out' | 'draft';
+
+export interface VendorProductRecord {
+  id: string;
+  slug: string;
+  name: string;
+  sku: string;
+  category: string;
+  categoryId?: string;
+  price: number;
+  stock: number;
+  sold: number;
+  status: VendorProductStatus;
+  visible: boolean;
+  image: string;
+  description: string;
+}
+
+export interface VendorProductCategory {
+  id: string;
+  name: string;
+  label: string;
+}
+
+export interface VendorProductUpsertInput {
+  name: string;
+  sku: string;
+  categoryId?: string;
+  price: number;
+  stock: number;
+  description?: string;
+  image?: string;
+  visible: boolean;
+  slug?: string;
+}
+
+export interface VendorProductPageResult {
+  items: VendorProductRecord[];
+  totalElements: number;
+  totalPages: number;
+  page: number;
+  pageSize: number;
+  statusCounts: {
+    all: number;
+    active: number;
+    draft: number;
+    outOfStock: number;
+    lowStock: number;
+  };
+}
+
+export interface VendorProductQuery {
+  status?: 'all' | 'active' | 'draft' | 'outOfStock';
+  page?: number;
+  size?: number;
+  keyword?: string;
+  categoryId?: string;
+}
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=180&h=180&fit=crop';
+const PRODUCT_PAGE_SIZE = 100;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value?: string) => Boolean(value && UUID_PATTERN.test(value));
+
+const normalizeText = (value?: string) => (value || '').trim();
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+const toVendorStatus = (backendStatus: string | undefined, stock: number): VendorProductStatus => {
+  const normalized = (backendStatus || '').toUpperCase();
+  if (normalized === 'DRAFT' || normalized === 'INACTIVE' || normalized === 'ARCHIVED') {
+    return 'draft';
+  }
+  if (stock <= 0) {
+    return 'out';
+  }
+  if (stock < 10) {
+    return 'low';
+  }
+  return 'active';
+};
+
+const mapBackendProduct = (product: BackendVendorProduct): VendorProductRecord => {
+  const stock = Math.max(0, Number(product.totalStock || 0));
+  const status = toVendorStatus(product.status, stock);
+  const fallbackSku = normalizeText(product.slug) || product.id;
+
+  return {
+    id: product.id,
+    slug: normalizeText(product.slug) || fallbackSku,
+    name: normalizeText(product.name) || 'San pham moi',
+    sku: normalizeText(product.primarySku) || fallbackSku,
+    category: normalizeText(product.categoryName) || 'Chua phan loai',
+    categoryId: product.categoryId,
+    price: Number(product.effectivePrice || product.salePrice || product.basePrice || 0),
+    stock,
+    sold: 0,
+    status,
+    visible: Boolean(product.visible),
+    image: normalizeText(product.primaryImage) || FALLBACK_IMAGE,
+    description: normalizeText(product.description),
+  };
+};
+
+const mapCategories = (rows: BackendCategoryOption[]): VendorProductCategory[] => {
+  return rows
+    .filter((row) => row.id && normalizeText(row.name) && (row.leaf ?? true))
+    .map((row) => ({
+      id: String(row.id),
+      name: normalizeText(row.name),
+      label: normalizeText(row.label) || normalizeText(row.name),
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'vi'));
+};
+
+const toRequestPayload = (
+  input: VendorProductUpsertInput,
+  options?: { forceStatus?: 'ACTIVE' | 'INACTIVE' | 'DRAFT' | 'ARCHIVED' },
+): BackendProductRequest => {
+  const normalizedName = normalizeText(input.name);
+  const normalizedSku = normalizeText(input.sku).toUpperCase();
+  const normalizedSlug =
+    normalizeText(input.slug) || slugify(`${normalizedName}-${normalizedSku}`) || `sp-${Date.now()}`;
+  const normalizedImage = normalizeText(input.image);
+
+  return {
+    name: normalizedName,
+    slug: normalizedSlug,
+    description: normalizeText(input.description),
+    categoryId: isUuid(input.categoryId) ? input.categoryId : undefined,
+    basePrice: Math.max(0, Number(input.price || 0)),
+    salePrice: Math.max(0, Number(input.price || 0)),
+    status: options?.forceStatus || (input.visible ? 'ACTIVE' : 'DRAFT'),
+    sku: normalizedSku || undefined,
+    stockQuantity: Math.max(0, Number(input.stock || 0)),
+    imageUrl: normalizedImage || undefined,
+  };
+};
+
+const statusToBackend = (status?: VendorProductQuery['status']) => {
+  if (!status || status === 'all') return undefined;
+  if (status === 'active') return 'ACTIVE';
+  if (status === 'draft') return 'DRAFT';
+  return 'ACTIVE';
+};
+
+const inventoryToBackend = (status?: VendorProductQuery['status']) => {
+  if (status === 'outOfStock') return 'OUT';
+  return undefined;
+};
+
+export const vendorProductService = {
+  async getCategories(): Promise<VendorProductCategory[]> {
+    const categories = await apiRequest<BackendCategoryOption[]>(
+      '/api/categories/options?leafOnly=true',
+      {},
+      { auth: true },
+    ).catch(() => []);
+    return mapCategories(categories);
+  },
+
+  async getProducts(params: VendorProductQuery = {}): Promise<VendorProductPageResult> {
+    const page = Math.max(0, (params.page ?? 1) - 1);
+    const size = params.size ?? 10;
+
+    const searchParams = new URLSearchParams();
+    searchParams.set('page', String(page));
+    searchParams.set('size', String(size));
+
+    const backendStatus = statusToBackend(params.status);
+    if (backendStatus) searchParams.set('status', backendStatus);
+
+    const inventory = inventoryToBackend(params.status);
+    if (inventory) searchParams.set('inventory', inventory);
+
+    if (params.keyword?.trim()) searchParams.set('q', params.keyword.trim());
+    if (params.categoryId && isUuid(params.categoryId)) searchParams.set('category_id', params.categoryId);
+
+    const response = await apiRequest<BackendVendorProductPage>(
+      `/api/products/my-store?${searchParams.toString()}`,
+      {},
+      { auth: true },
+    );
+
+    const content = response.content || [];
+    const statusCounts = response.statusCounts || {};
+    return {
+      items: content.map(mapBackendProduct),
+      totalElements: Number(response.totalElements ?? content.length),
+      totalPages: Number(response.totalPages ?? 1),
+      page: Number(response.number ?? page) + 1,
+      pageSize: Number(response.size ?? size),
+      statusCounts: {
+        all: Number(statusCounts.all || 0),
+        active: Number(statusCounts.active || 0),
+        draft: Number(statusCounts.draft || 0),
+        outOfStock: Number(statusCounts.outOfStock || 0),
+        lowStock: Number(statusCounts.lowStock || 0),
+      },
+    };
+  },
+
+  async getSnapshot(): Promise<{ products: VendorProductRecord[]; categories: VendorProductCategory[] }> {
+    const [firstPage, categories] = await Promise.all([
+      this.getProducts({ page: 1, size: PRODUCT_PAGE_SIZE }),
+      this.getCategories(),
+    ]);
+
+    let items = [...firstPage.items];
+    const totalPages = Math.max(firstPage.totalPages, 1);
+    if (totalPages > 1) {
+      const requests: Array<Promise<VendorProductPageResult>> = [];
+      for (let nextPage = 2; nextPage <= totalPages; nextPage += 1) {
+        requests.push(this.getProducts({ page: nextPage, size: PRODUCT_PAGE_SIZE }));
+      }
+      const pages = await Promise.all(requests);
+      items = items.concat(pages.flatMap((page) => page.items));
+    }
+
+    return {
+      products: items,
+      categories,
+    };
+  },
+
+  async createProduct(input: VendorProductUpsertInput): Promise<VendorProductRecord> {
+    const payload = toRequestPayload(input);
+    const created = await apiRequest<BackendVendorProduct>(
+      '/api/products',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { auth: true },
+    );
+
+    return mapBackendProduct(created);
+  },
+
+  async updateProduct(id: string, input: VendorProductUpsertInput): Promise<VendorProductRecord> {
+    const payload = toRequestPayload(input);
+    const updated = await apiRequest<BackendVendorProduct>(
+      `/api/products/${id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      { auth: true },
+    );
+
+    return mapBackendProduct(updated);
+  },
+
+  async setVisibility(id: string, visible: boolean): Promise<VendorProductRecord> {
+    const updated = await apiRequest<BackendVendorProduct>(
+      `/api/products/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ status: visible ? 'ACTIVE' : 'DRAFT' }),
+      },
+      { auth: true },
+    );
+
+    return mapBackendProduct(updated);
+  },
+
+  async deleteProduct(id: string): Promise<void> {
+    await apiRequest<void>(
+      `/api/products/${id}`,
+      {
+        method: 'DELETE',
+      },
+      { auth: true },
+    );
+  },
+};

@@ -4,6 +4,7 @@ import { ExternalLink, ImagePlus, Save, ShieldCheck, Tag } from 'lucide-react';
 import VendorLayout from './VendorLayout';
 import { vendorPortalService, type VendorSettingsData } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 
 const defaultSettings: VendorSettingsData = {
@@ -30,7 +31,7 @@ const VendorStorefront = () => {
         setSettings(next);
       } catch (err: unknown) {
         if (!active) return;
-        addToast((err as Error)?.message || 'Không tải được gian hàng công khai', 'error');
+        addToast(getUiErrorMessage(err, 'Không tải được gian hàng công khai'), 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -59,10 +60,10 @@ const VendorStorefront = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await vendorPortalService.updateSettings(settings.storeInfo);
+      await vendorPortalService.updateSettings(settings);
       addToast('Đã lưu bộ mặt gian hàng', 'success');
     } catch (err: unknown) {
-      addToast((err as Error)?.message || 'Lưu gian hàng thất bại', 'error');
+      addToast(getUiErrorMessage(err, 'Lưu gian hàng thất bại'), 'error');
     } finally {
       setSaving(false);
     }
@@ -71,10 +72,10 @@ const VendorStorefront = () => {
   return (
     <VendorLayout
       title="Gian hàng công khai và bộ mặt thương hiệu"
-      breadcrumbs={[{ label: 'Gian hàng công khai' }, { label: 'Hồ sơ gian hàng' }]}
+      breadcrumbs={['Kênh Người Bán', 'Gian hàng']}
       actions={(
         <>
-          <a className="admin-ghost-btn" href="/store/test-vendor-store">
+          <a className="admin-ghost-btn" href={`/store/${settings.storeInfo.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'my-store'}`}>
             <ExternalLink size={16} />
             Xem trang công khai
           </a>
@@ -121,7 +122,7 @@ const VendorStorefront = () => {
               <section className="admin-panel">
                 <div className="admin-panel-head">
                   <h2>Thiết lập thương hiệu</h2>
-                  <span className="admin-muted">Các thông tin này xuất hiện trên storefront và điểm “Bán bởi”.</span>
+                  <span className="admin-muted">Các thông tin này xuất hiện trên storefront và điểm "Bán bởi".</span>
                 </div>
                 <div className="form-grid">
                   <label className="form-field full">

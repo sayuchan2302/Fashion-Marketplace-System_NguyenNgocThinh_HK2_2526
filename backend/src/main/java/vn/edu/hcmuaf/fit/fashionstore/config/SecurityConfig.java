@@ -1,8 +1,10 @@
 package vn.edu.hcmuaf.fit.fashionstore.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -18,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.ApiErrorResponse;
 import vn.edu.hcmuaf.fit.fashionstore.security.JwtAuthenticationFilter;
 
 import java.util.Arrays;
@@ -29,9 +32,11 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -42,14 +47,20 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json;charset=UTF-8");
-                            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"" + authException.getMessage() + "\"}");
+                            writeErrorResponse(
+                                    response,
+                                    HttpStatus.UNAUTHORIZED,
+                                    request.getRequestURI(),
+                                    "Authentication required or token is invalid"
+                            );
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            response.setContentType("application/json;charset=UTF-8");
-                            response.getWriter().write("{\"error\":\"Forbidden\",\"message\":\"" + accessDeniedException.getMessage() + "\"}");
+                            writeErrorResponse(
+                                    response,
+                                    HttpStatus.FORBIDDEN,
+                                    request.getRequestURI(),
+                                    "You do not have permission to access this resource"
+                            );
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
@@ -62,6 +73,11 @@ public class SecurityConfig {
                         
                         // ─── Content pages ────────────────────────────────────────────────
                         .requestMatchers("/api/admin/content/**").hasRole("SUPER_ADMIN")
+
+                        // Vendor/admin private workspace endpoints
+                        .requestMatchers("/api/orders/my-store", "/api/orders/my-store/**").hasAnyRole("VENDOR", "SUPER_ADMIN")
+                        .requestMatchers("/api/products/my-store", "/api/products/my-store/**").hasAnyRole("VENDOR", "SUPER_ADMIN")
+                        .requestMatchers("/api/vouchers/my-store", "/api/vouchers/my-store/**").hasAnyRole("VENDOR", "SUPER_ADMIN")
                         
                         // ─── Products: public read, vendor/admin write ─────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
@@ -148,5 +164,17 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    private void writeErrorResponse(
+            HttpServletResponse response,
+            HttpStatus status,
+            String path,
+            String message
+    ) throws java.io.IOException {
+        response.setStatus(status.value());
+        response.setContentType("application/json;charset=UTF-8");
+        ApiErrorResponse body = ApiErrorResponse.of(status, message, path);
+        objectMapper.writeValue(response.getWriter(), body);
     }
 }
