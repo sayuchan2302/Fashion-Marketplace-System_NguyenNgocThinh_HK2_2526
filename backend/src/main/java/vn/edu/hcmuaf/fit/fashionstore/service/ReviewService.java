@@ -11,6 +11,8 @@ import vn.edu.hcmuaf.fit.fashionstore.exception.ResourceNotFoundException;
 import vn.edu.hcmuaf.fit.fashionstore.repository.ReviewRepository;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -24,6 +26,15 @@ public class ReviewService {
         this.reviewRepository = reviewRepository;
     }
 
+    private List<String> toPlainImages(Review review) {
+        List<String> images = review.getImages();
+        if (images == null || images.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // Break Hibernate lazy collection reference before leaving transaction boundary.
+        return new ArrayList<>(images);
+    }
+
     private ReviewResponse toReviewResponse(Review review) {
         return ReviewResponse.builder()
                 .id(review.getId())
@@ -35,7 +46,7 @@ public class ReviewService {
                 .customerEmail(review.getUser() != null ? review.getUser().getEmail() : "Unknown Email")
                 .rating(review.getRating())
                 .content(review.getContent())
-                .images(review.getImages())
+                .images(toPlainImages(review))
                 .date(review.getCreatedAt())
                 .status(review.getStatus() != null ? review.getStatus().name() : null)
                 .reply(review.getShopReply())

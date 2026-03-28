@@ -13,13 +13,20 @@ import { ADMIN_VIEW_KEYS } from './adminListView';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import Drawer from '../../components/Drawer/Drawer';
 
-const ReviewStatusBadge = ({ status }: { status: ReviewStatus }) => {
+const normalizeStatus = (status?: string | null): ReviewStatus => {
+  const normalized = status?.toLowerCase();
+  if (normalized === 'approved') return 'approved';
+  if (normalized === 'hidden') return 'hidden';
+  return 'pending';
+};
+
+const ReviewStatusBadge = ({ status }: { status?: ReviewStatus | string | null }) => {
   const config: Record<ReviewStatus, { label: string; pillClass: string }> = {
     pending: { label: 'Chờ duyệt', pillClass: 'admin-pill pending' },
     approved: { label: 'Đã duyệt', pillClass: 'admin-pill success' },
     hidden: { label: 'Đã ẩn', pillClass: 'admin-pill neutral' },
   };
-  const { label, pillClass } = config[status];
+  const { label, pillClass } = config[normalizeStatus(status)];
   return <span className={pillClass}>{label}</span>;
 };
 
@@ -230,16 +237,18 @@ const AdminReviews = () => {
             {selected.size > 0 && (
               <div className="admin-actions">
                 <span className="admin-muted">{selected.size} đã chọn</span>
-                <button className="admin-ghost-btn" onClick={() => {
-                  deleteTarget?.ids?.forEach(async (id) => await applyStatusUpdate(id, 'approved'));
+                <button className="admin-ghost-btn" onClick={async () => {
+                  const selectedIds = filteredItems.filter((review) => selected.has(review.id)).map((review) => review.id);
+                  await Promise.all(selectedIds.map((id) => applyStatusUpdate(id, 'approved')));
                   setSelected(new Set());
                   pushToast('Đã duyệt đánh giá đã chọn.');
                 }}>
                   <CheckCircle size={15} />
                   Duyệt
                 </button>
-                <button className="admin-ghost-btn" onClick={() => {
-                  deleteTarget?.ids?.forEach(async (id) => await applyStatusUpdate(id, 'hidden'));
+                <button className="admin-ghost-btn" onClick={async () => {
+                  const selectedIds = filteredItems.filter((review) => selected.has(review.id)).map((review) => review.id);
+                  await Promise.all(selectedIds.map((id) => applyStatusUpdate(id, 'hidden')));
                   setSelected(new Set());
                   pushToast('Đã ẩn đánh giá đã chọn.');
                 }}>
