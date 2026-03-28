@@ -1,4 +1,5 @@
 import { apiRequest, hasBackendJwt } from './apiClient';
+import { authService } from './authService';
 
 export type ReviewStatus = 'pending' | 'approved' | 'hidden';
 
@@ -119,7 +120,7 @@ const buildSubmissionRecord = (submission: ReviewSubmission): Review => ({
   id: `rev_${Date.now()}_${Math.round(Math.random() * 1000)}`,
   storeId: submission.storeId || 'store_001',
   productId: submission.productId,
-  productName: submission.productName || 'San pham',
+  productName: submission.productName || 'Sản phẩm',
   productImage: submission.productImage || '',
   orderId: submission.orderId,
   rating: submission.rating,
@@ -207,6 +208,10 @@ export const reviewService = {
   },
 
   canVendorReply(): boolean {
-    return hasBackendJwt();
+    if (!hasBackendJwt()) {
+      return false;
+    }
+    const session = authService.getSession() || authService.getAdminSession();
+    return session?.user.role === 'VENDOR';
   },
 };

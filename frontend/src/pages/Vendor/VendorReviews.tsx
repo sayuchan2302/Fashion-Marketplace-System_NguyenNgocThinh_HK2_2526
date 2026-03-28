@@ -255,7 +255,7 @@ const VendorReviews = () => {
             <div>
               <h2>Danh sách đánh giá</h2>
               {!canVendorReply ? (
-                <p className="admin-muted small">Tạm thời chế độ read-only: backend chưa cung cấp API seller reply.</p>
+                <p className="admin-muted small">Bạn cần đăng nhập bằng tài khoản người bán để phản hồi đánh giá.</p>
               ) : null}
             </div>
           </div>
@@ -447,7 +447,7 @@ const VendorReviews = () => {
                   </div>
                 ) : (
                   <div className="vendor-review-reply-box">
-                    API phản hồi cho seller chưa sẵn sàng. Bạn có thể theo dõi đánh giá ở chế độ xem.
+                    Bạn cần đăng nhập tài khoản người bán hợp lệ để gửi phản hồi đánh giá này.
                   </div>
                 )}
               </PanelDrawerSection>

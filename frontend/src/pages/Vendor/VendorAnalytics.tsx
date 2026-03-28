@@ -48,6 +48,12 @@ const periodLabels: Record<Period, string> = {
   month: '30 ngày',
 };
 
+const PERIOD_TO_DAYS: Record<Period, 1 | 7 | 30> = {
+  today: 1,
+  week: 7,
+  month: 30,
+};
+
 const VendorAnalytics = () => {
   const { addToast } = useToast();
   const [activePeriod, setActivePeriod] = useState<Period>('week');
@@ -63,7 +69,7 @@ const VendorAnalytics = () => {
       setLoading(true);
       try {
         setLoadError('');
-        const next = await vendorPortalService.getAnalytics();
+        const next = await vendorPortalService.getAnalytics({ topProductsDays: PERIOD_TO_DAYS[activePeriod] });
         if (!active) return;
         setAnalytics(next);
       } catch (err: unknown) {
@@ -81,7 +87,7 @@ const VendorAnalytics = () => {
     return () => {
       active = false;
     };
-  }, [addToast, reloadKey]);
+  }, [activePeriod, addToast, reloadKey]);
 
   const periodData = analytics.periods[activePeriod];
   const commission = { commission: periodData.commission, payout: periodData.payout };
@@ -192,8 +198,8 @@ const VendorAnalytics = () => {
                 </div>
                 <div className="admin-card-list">
                   <div className="admin-card-row">
-                    <span className="admin-bold"><TrendingUp size={15} style={{ verticalAlign: -2, marginRight: 6 }} /> Tỷ lệ chuyển đổi</span>
-                    <span className="admin-muted">{periodData.conversionRate}% dựa trên lượng truy cập và đơn thành công trong kỳ.</span>
+                    <span className="admin-bold"><TrendingUp size={15} style={{ verticalAlign: -2, marginRight: 6 }} /> Tỷ lệ giao thành công</span>
+                    <span className="admin-muted">{periodData.conversionRate}% trên tổng đơn đã phát sinh trong kỳ.</span>
                   </div>
                   <div className="admin-card-row">
                     <span className="admin-bold"><ShoppingCart size={15} style={{ verticalAlign: -2, marginRight: 6 }} /> Giá trị đơn trung bình</span>

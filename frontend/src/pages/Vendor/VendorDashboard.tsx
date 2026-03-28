@@ -90,7 +90,7 @@ const VendorDashboard = () => {
 
   const statCards = [
     {
-      label: 'Đơn hàng chờ xử lý',
+      label: 'Đơn mới hôm nay',
       value: stats.todayOrders,
       change: `${stats.todayOrders > 0 ? '+' : ''}${stats.todayOrders}`,
       tone: stats.todayOrders > 0 ? 'up' : 'down',
@@ -230,7 +230,7 @@ const VendorDashboard = () => {
       >
         <h3>Tổng quan thực nhận: hoa hồng {stats.commissionRate}%</h3>
         <div className="commission-row">
-          <span className="label">GMV hôm nay</span>
+          <span className="label">GMV lũy kế (đơn giao thành công)</span>
           <span className="value">{formatCurrency(stats.totalRevenue)}</span>
         </div>
         <div className="commission-row">
@@ -373,7 +373,7 @@ const VendorDashboard = () => {
                     <span className="name">{product.name}</span>
                     <span className="stats">
                       <Flame size={13} /> {product.sales} đã bán
-                      <span style={{ marginLeft: 8 }}>Còn {product.stock}</span>
+                      <span style={{ marginLeft: 8 }}>{formatCurrency(product.revenue)}</span>
                     </span>
                     <div className="vendor-top-product-bar">
                       <span style={{ width: `${Math.round((product.sales / topSaleBase) * 100)}%` }} />

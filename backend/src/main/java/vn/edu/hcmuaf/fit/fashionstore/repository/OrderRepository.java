@@ -17,6 +17,14 @@ import java.util.UUID;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, UUID> {
 
+    interface ProductSalesProjection {
+        UUID getProductId();
+        String getProductName();
+        String getProductImage();
+        Long getSoldCount();
+        BigDecimal getGrossRevenue();
+    }
+
     List<Order> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
     List<Order> findByUserIdAndParentOrderIsNullOrderByCreatedAtDesc(UUID userId);
@@ -151,5 +159,45 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findRootOrdersCreatedBetween(
             @Param("fromDate") LocalDateTime fromDate,
             @Param("toDate") LocalDateTime toDate
+    );
+
+    @Query("""
+            SELECT oi.product.id AS productId,
+                   COALESCE(MAX(oi.productName), MAX(oi.product.name)) AS productName,
+                   COALESCE(MAX(oi.productImage), '') AS productImage,
+                   COALESCE(SUM(oi.quantity), 0) AS soldCount,
+                   COALESCE(SUM(oi.totalPrice), 0) AS grossRevenue
+            FROM OrderItem oi
+            JOIN oi.order o
+            WHERE o.storeId = :storeId
+              AND o.status = 'DELIVERED'
+              AND o.createdAt >= :fromDate
+              AND o.createdAt < :toDate
+            GROUP BY oi.product.id
+            ORDER BY SUM(oi.quantity) DESC, SUM(oi.totalPrice) DESC
+            """)
+    List<ProductSalesProjection> findTopDeliveredProductsByStoreBetween(
+            @Param("storeId") UUID storeId,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT oi.product.id AS productId,
+                   COALESCE(MAX(oi.productName), MAX(oi.product.name)) AS productName,
+                   COALESCE(MAX(oi.productImage), '') AS productImage,
+                   COALESCE(SUM(oi.quantity), 0) AS soldCount,
+                   COALESCE(SUM(oi.totalPrice), 0) AS grossRevenue
+            FROM OrderItem oi
+            JOIN oi.order o
+            WHERE o.storeId = :storeId
+              AND o.status = 'DELIVERED'
+              AND oi.product.id IN :productIds
+            GROUP BY oi.product.id
+            """)
+    List<ProductSalesProjection> findDeliveredProductSalesByStoreAndProductIds(
+            @Param("storeId") UUID storeId,
+            @Param("productIds") List<UUID> productIds
     );
 }

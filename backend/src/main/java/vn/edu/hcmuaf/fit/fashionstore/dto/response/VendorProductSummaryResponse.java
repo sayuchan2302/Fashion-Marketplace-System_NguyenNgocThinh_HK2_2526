@@ -26,6 +26,8 @@ public class VendorProductSummaryResponse {
     private BigDecimal salePrice;
     private BigDecimal effectivePrice;
     private Integer totalStock;
+    private Long soldCount;
+    private BigDecimal grossRevenue;
     private String primarySku;
     private String primaryImage;
     private LocalDateTime createdAt;

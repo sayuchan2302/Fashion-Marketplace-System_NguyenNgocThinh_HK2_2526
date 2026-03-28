@@ -20,6 +20,8 @@ interface BackendVendorProduct {
   salePrice?: number;
   effectivePrice?: number;
   totalStock?: number;
+  soldCount?: number;
+  grossRevenue?: number;
   primarySku?: string;
   primaryImage?: string;
 }
@@ -64,6 +66,7 @@ export interface VendorProductRecord {
   price: number;
   stock: number;
   sold: number;
+  grossRevenue: number;
   status: VendorProductStatus;
   visible: boolean;
   image: string;
@@ -150,13 +153,14 @@ const mapBackendProduct = (product: BackendVendorProduct): VendorProductRecord =
   return {
     id: product.id,
     slug: normalizeText(product.slug) || fallbackSku,
-    name: normalizeText(product.name) || 'San pham moi',
+    name: normalizeText(product.name) || 'Sản phẩm mới',
     sku: normalizeText(product.primarySku) || fallbackSku,
-    category: normalizeText(product.categoryName) || 'Chua phan loai',
+    category: normalizeText(product.categoryName) || 'Chưa phân loại',
     categoryId: product.categoryId,
     price: Number(product.effectivePrice || product.salePrice || product.basePrice || 0),
     stock,
-    sold: 0,
+    sold: Number(product.soldCount || 0),
+    grossRevenue: Number(product.grossRevenue || 0),
     status,
     visible: Boolean(product.visible),
     image: normalizeText(product.primaryImage) || FALLBACK_IMAGE,

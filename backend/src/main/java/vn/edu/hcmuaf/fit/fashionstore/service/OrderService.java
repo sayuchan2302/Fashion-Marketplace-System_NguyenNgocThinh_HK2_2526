@@ -1,6 +1,7 @@
 package vn.edu.hcmuaf.fit.fashionstore.service;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext.UserContext;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.OrderRequest;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorTopProductResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderDetailResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderPageResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderSummaryResponse;
@@ -247,6 +249,35 @@ public class OrderService {
      */
     public BigDecimal calculatePayoutByStoreId(UUID storeId) {
         return orderRepository.calculatePayoutByStoreId(storeId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VendorTopProductResponse> getTopProductsByStore(UUID storeId, int days, int limit) {
+        if (days != 1 && days != 7 && days != 30) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "days must be one of: 1, 7, 30");
+        }
+
+        if (limit < 1 || limit > 20) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 20");
+        }
+
+        LocalDateTime fromDate = LocalDate.now().minusDays(days - 1L).atStartOfDay();
+        LocalDateTime toDate = LocalDate.now().plusDays(1).atStartOfDay();
+
+        return orderRepository.findTopDeliveredProductsByStoreBetween(
+                        storeId,
+                        fromDate,
+                        toDate,
+                        PageRequest.of(0, limit)
+                ).stream()
+                .map(row -> VendorTopProductResponse.builder()
+                        .productId(row.getProductId())
+                        .productName((row.getProductName() == null || row.getProductName().isBlank()) ? "Sản phẩm" : row.getProductName())
+                        .productImage(row.getProductImage() == null ? "" : row.getProductImage())
+                        .soldCount(row.getSoldCount() == null ? 0L : row.getSoldCount())
+                        .grossRevenue(row.getGrossRevenue() == null ? BigDecimal.ZERO : row.getGrossRevenue())
+                        .build())
+                .toList();
     }
 
     // ─── Admin Methods ─────────────────────────────────────────────────────────

@@ -83,7 +83,17 @@ interface BackendProduct {
   basePrice?: number;
   salePrice?: number;
   totalStock?: number;
+  soldCount?: number;
+  grossRevenue?: number;
   primaryImage?: string;
+}
+
+interface BackendTopProduct {
+  productId?: string;
+  productName?: string;
+  productImage?: string;
+  soldCount?: number;
+  grossRevenue?: number;
 }
 
 interface VendorStatsResponse {
@@ -187,7 +197,7 @@ export interface VendorTopProduct {
   id: string;
   name: string;
   sales: number;
-  stock: number;
+  stock?: number;
   revenue: number;
   img: string;
 }
@@ -231,7 +241,7 @@ const DEFAULT_SETTINGS: VendorSettingsData = {
   storeInfo: {
     name: 'Fashion House',
     slug: 'fashion-house',
-    description: 'Tinh chinh trai nghiem cua hang, logistics va thong tin lien he tai day.',
+    description: 'Tinh chỉnh trải nghiệm cửa hàng, logistics và thông tin liên hệ tại đây.',
     logo: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop',
     contactEmail: 'contact@fashionhouse.vn',
     phone: '0901234567',
@@ -282,7 +292,7 @@ const mapOrderSummary = (order: BackendVendorOrderSummary): VendorOrderSummary =
 
   return {
     id: order.id,
-    customer: order.customer?.name || 'Khach hang',
+    customer: order.customer?.name || 'Khách hàng',
     email: order.customer?.email || '',
     total,
     status: mapBackendStatus(order.status),
@@ -300,12 +310,12 @@ const mapOrderDetail = (order: BackendVendorOrderDetail): VendorOrderDetailData 
   createdAt: order.createdAt || new Date().toISOString(),
   updatedAt: order.updatedAt || order.createdAt || new Date().toISOString(),
   customer: {
-    name: order.customer?.name || order.shippingAddress?.fullName || 'Khach hang',
+    name: order.customer?.name || order.shippingAddress?.fullName || 'Khách hàng',
     email: order.customer?.email || '',
     phone: order.customer?.phone || order.shippingAddress?.phone || '',
   },
   shippingAddress: {
-    fullName: order.shippingAddress?.fullName || order.customer?.name || 'Khach hang',
+    fullName: order.shippingAddress?.fullName || order.customer?.name || 'Khách hàng',
     phone: order.shippingAddress?.phone || order.customer?.phone || '',
     address: order.shippingAddress?.address || '',
     ward: order.shippingAddress?.ward || '',
@@ -314,9 +324,9 @@ const mapOrderDetail = (order: BackendVendorOrderDetail): VendorOrderDetailData 
   },
   items: (order.items || []).map((item, index) => ({
     id: item.id || `${order.id}-${index}`,
-    name: item.name || 'San pham',
+    name: item.name || 'Sản phẩm',
     sku: item.sku || item.id || `ITEM-${index + 1}`,
-    variant: item.variant || 'Mac dinh',
+    variant: item.variant || 'Mặc định',
     price: Number(item.unitPrice || item.totalPrice || 0),
     quantity: Number(item.quantity || 0),
     image: item.image || FALLBACK_IMAGE,
@@ -336,18 +346,20 @@ const mapOrderDetail = (order: BackendVendorOrderDetail): VendorOrderDetailData 
     {
       status: mapBackendStatus(order.status),
       date: order.updatedAt || order.createdAt || new Date().toISOString(),
-      note: order.note || 'Don hang da duoc dong bo tu he thong.',
+      note: order.note || 'Đơn hàng đã được đồng bộ từ hệ thống.',
     },
   ],
 });
 
-const mapTopProduct = (product: BackendProduct): VendorTopProduct => ({
-  id: product.id,
-  name: product.name || 'San pham',
-  sales: 0,
-  stock: Number(product.totalStock || 0),
-  revenue: Number(product.effectivePrice || product.salePrice || product.basePrice || 0),
-  img: product.primaryImage || FALLBACK_IMAGE,
+const mapBackendTopProduct = (
+  product: BackendTopProduct,
+  index: number,
+): VendorTopProduct => ({
+  id: product.productId ? String(product.productId) : `top-${index}`,
+  name: product.productName || 'Sản phẩm',
+  sales: Number(product.soldCount || 0),
+  revenue: Number(product.grossRevenue || 0),
+  img: product.productImage || FALLBACK_IMAGE,
 });
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -475,27 +487,32 @@ const validateSettingsBeforeSave = (payload: VendorSettingsData) => {
   if (!hasCarrier) return;
 
   if (!payload.shipping.warehouseAddress.trim()) {
-    throw new Error('Can dia chi kho khi bat don vi van chuyen.');
+    throw new Error('Cần địa chỉ kho khi bật đơn vị vận chuyển.');
   }
 
   if (!payload.shipping.warehouseContact.trim()) {
-    throw new Error('Can nguoi phu trach kho khi bat don vi van chuyen.');
+    throw new Error('Cần người phụ trách kho khi bật đơn vị vận chuyển.');
   }
 
   if (!payload.shipping.warehousePhone.trim()) {
-    throw new Error('Can so dien thoai kho khi bat don vi van chuyen.');
+    throw new Error('Cần số điện thoại kho khi bật đơn vị vận chuyển.');
   }
 };
 
 export const vendorPortalService = {
   async getDashboardData(): Promise<VendorDashboardData> {
     const today = isoDate(new Date());
-    const [stats, store, orders, products, todayOrdersPage] = await Promise.all([
+    const [stats, store, orders, products, todayOrdersPage, topProducts] = await Promise.all([
       apiRequest<VendorStatsResponse>('/api/orders/my-store/stats', {}, { auth: true }),
       storeService.getMyStore(),
       apiRequest<BackendVendorOrderPage>('/api/orders/my-store?page=0&size=5', {}, { auth: true }),
-      apiRequest<BackendPage<BackendProduct>>('/api/products/my-store?page=0&size=5', {}, { auth: true }),
+      apiRequest<BackendPage<BackendProduct>>('/api/products/my-store?page=0&size=1', {}, { auth: true }),
       apiRequest<BackendVendorOrderPage>(`/api/orders/my-store?page=0&size=1&date_from=${today}&date_to=${today}`, {}, { auth: true }),
+      apiRequest<BackendTopProduct[]>(
+        '/api/orders/my-store/top-products?days=30&limit=3',
+        {},
+        { auth: true },
+      ),
     ]);
     const todayOrders = Number(todayOrdersPage.totalElements || 0);
 
@@ -510,7 +527,7 @@ export const vendorPortalService = {
         commissionRate: store.commissionRate ?? 5,
       },
       recentOrders: (orders.content || []).map(mapOrderSummary),
-      topProducts: (products.content || []).slice(0, 3).map(mapTopProduct),
+      topProducts: (topProducts || []).map((item, index) => mapBackendTopProduct(item, index)),
     };
   },
 
@@ -612,11 +629,21 @@ export const vendorPortalService = {
     return toVendorSettings(updatedStore);
   },
 
-  async getAnalytics() {
+  async getAnalytics(params: { topProductsDays?: 1 | 7 | 30; topProductsLimit?: number } = {}) {
     const pageSize = 200;
-    const [dashboard, firstOrdersPage] = await Promise.all([
-      this.getDashboardData(),
+    const topProductsDays = params.topProductsDays === 1 || params.topProductsDays === 7 || params.topProductsDays === 30
+      ? params.topProductsDays
+      : 30;
+    const topProductsLimit = Math.min(Math.max(params.topProductsLimit ?? 5, 1), 20);
+
+    const [store, firstOrdersPage, topProducts] = await Promise.all([
+      storeService.getMyStore(),
       this.getOrders({ page: 1, size: pageSize }),
+      apiRequest<BackendTopProduct[]>(
+        `/api/orders/my-store/top-products?days=${topProductsDays}&limit=${topProductsLimit}`,
+        {},
+        { auth: true },
+      ),
     ]);
 
     let recentOrders = [...firstOrdersPage.items];
@@ -676,14 +703,8 @@ export const vendorPortalService = {
         },
       },
       dailyData: buildDailySeries(recentOrders, 7),
-      topProducts: dashboard.topProducts.map((product) => ({
-        ...product,
-        sales: product.sales || Math.max(Math.round(product.stock * 0.7), 1),
-        revenue:
-          product.revenue ||
-          weekCurrent.revenue / Math.max(dashboard.topProducts.length, 1),
-      })),
-      commissionRate: dashboard.stats.commissionRate,
+      topProducts: (topProducts || []).map((product, index) => mapBackendTopProduct(product, index)),
+      commissionRate: store.commissionRate ?? 5,
     };
   },
 };

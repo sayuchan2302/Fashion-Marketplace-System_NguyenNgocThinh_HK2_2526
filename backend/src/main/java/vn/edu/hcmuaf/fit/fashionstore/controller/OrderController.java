@@ -11,6 +11,7 @@ import vn.edu.hcmuaf.fit.fashionstore.dto.request.OrderRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.AdminOrderResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderDetailResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorOrderPageResponse;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorTopProductResponse;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Order;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext.UserContext;
@@ -207,6 +208,16 @@ public class OrderController {
                 "totalRevenue", orderService.calculateRevenueByStoreId(storeId),
                 "totalPayout", orderService.calculatePayoutByStoreId(storeId)
         ));
+    }
+
+    @GetMapping("/my-store/top-products")
+    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
+    public ResponseEntity<List<VendorTopProductResponse>> getMyStoreTopProducts(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(defaultValue = "5") int limit) {
+        UserContext ctx = authContext.requireVendor(authHeader);
+        return ResponseEntity.ok(orderService.getTopProductsByStore(ctx.getStoreId(), days, limit));
     }
 
     // ─── Admin Endpoints ───────────────────────────────────────────────────────

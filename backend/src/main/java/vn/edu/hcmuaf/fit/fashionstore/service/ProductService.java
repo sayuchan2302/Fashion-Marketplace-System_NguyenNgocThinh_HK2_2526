@@ -19,6 +19,7 @@ import vn.edu.hcmuaf.fit.fashionstore.entity.Store;
 import vn.edu.hcmuaf.fit.fashionstore.exception.ForbiddenException;
 import vn.edu.hcmuaf.fit.fashionstore.exception.ResourceNotFoundException;
 import vn.edu.hcmuaf.fit.fashionstore.repository.CategoryRepository;
+import vn.edu.hcmuaf.fit.fashionstore.repository.OrderRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.ProductRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.ProductVariantRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.StoreRepository;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,6 +40,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final ProductVariantRepository productVariantRepository;
     private final StoreRepository storeRepository;
+    private final OrderRepository orderRepository;
 
     private static final int LOW_STOCK_THRESHOLD = 10;
 
@@ -46,16 +49,20 @@ public class ProductService {
         OUT
     }
 
+    private record ProductSalesSnapshot(long soldCount, BigDecimal grossRevenue) {}
+
     public ProductService(
             ProductRepository productRepository,
             CategoryRepository categoryRepository,
             ProductVariantRepository productVariantRepository,
-            StoreRepository storeRepository
+            StoreRepository storeRepository,
+            OrderRepository orderRepository
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.productVariantRepository = productVariantRepository;
         this.storeRepository = storeRepository;
+        this.orderRepository = orderRepository;
     }
 
     // ─── Public Methods (No tenant filtering) ──────────────────────────────────
@@ -186,9 +193,12 @@ public class ProductService {
                 LOW_STOCK_THRESHOLD,
                 pageable
         );
+        Map<UUID, ProductSalesSnapshot> salesByProductId = loadDeliveredSalesByProduct(page.getContent(), storeId);
 
         return VendorProductPageResponse.builder()
-                .content(page.getContent().stream().map(this::toVendorProductSummaryResponse).toList())
+                .content(page.getContent().stream()
+                        .map(product -> toVendorProductSummaryResponse(product, salesByProductId.get(product.getId())))
+                        .toList())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
                 .number(page.getNumber())
@@ -473,6 +483,10 @@ public class ProductService {
     }
 
     public VendorProductSummaryResponse toVendorProductSummaryResponse(Product product) {
+        return toVendorProductSummaryResponse(product, null);
+    }
+
+    private VendorProductSummaryResponse toVendorProductSummaryResponse(Product product, ProductSalesSnapshot salesSnapshot) {
         List<ProductVariant> variants = ensureVariantList(product);
         List<ProductImage> images = ensureImageList(product);
 
@@ -495,6 +509,8 @@ public class ProductService {
                 .filter(url -> url != null && !url.isBlank())
                 .findFirst()
                 .orElse(null);
+        long soldCount = salesSnapshot != null ? salesSnapshot.soldCount() : 0L;
+        BigDecimal grossRevenue = salesSnapshot != null ? salesSnapshot.grossRevenue() : BigDecimal.ZERO;
 
         return VendorProductSummaryResponse.builder()
                 .id(product.getId())
@@ -509,11 +525,36 @@ public class ProductService {
                 .salePrice(product.getSalePrice())
                 .effectivePrice(product.getEffectivePrice())
                 .totalStock(totalStock)
+                .soldCount(soldCount)
+                .grossRevenue(grossRevenue)
                 .primarySku(primarySku)
                 .primaryImage(primaryImage)
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();
+    }
+
+    private Map<UUID, ProductSalesSnapshot> loadDeliveredSalesByProduct(List<Product> products, UUID storeId) {
+        if (products == null || products.isEmpty()) {
+            return Map.of();
+        }
+
+        List<UUID> productIds = products.stream()
+                .map(Product::getId)
+                .filter(id -> id != null)
+                .toList();
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return orderRepository.findDeliveredProductSalesByStoreAndProductIds(storeId, productIds).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        OrderRepository.ProductSalesProjection::getProductId,
+                        row -> new ProductSalesSnapshot(
+                                row.getSoldCount() == null ? 0L : row.getSoldCount(),
+                                row.getGrossRevenue() == null ? BigDecimal.ZERO : row.getGrossRevenue()
+                        )
+                ));
     }
 
     private void validateBasicRequest(ProductRequest request) {
