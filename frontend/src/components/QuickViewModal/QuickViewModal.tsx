@@ -17,6 +17,9 @@ interface QuickViewProduct {
   image: string;
   colors?: string[];
   sizes?: string[];
+  storeId?: string;
+  storeName?: string;
+  isOfficialStore?: boolean;
 }
 
 interface QuickViewModalProps {
@@ -60,6 +63,9 @@ const QuickViewModal = ({ product, isOpen, onClose }: QuickViewModalProps) => {
       image: product.image,
       color: selectedColorValue,
       size: selectedSize,
+      storeId: product.storeId,
+      storeName: product.storeName,
+      isOfficialStore: product.isOfficialStore,
       quantity,
     });
     setAdded(true);
@@ -83,6 +89,9 @@ const QuickViewModal = ({ product, isOpen, onClose }: QuickViewModalProps) => {
         price: product.price,
         originalPrice: product.originalPrice,
         image: product.image,
+        storeId: product.storeId,
+        storeName: product.storeName,
+        isOfficialStore: product.isOfficialStore,
       });
     }
   };

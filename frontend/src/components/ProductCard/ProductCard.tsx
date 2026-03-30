@@ -104,6 +104,9 @@ const ProductCard = ({ id, sku, name, price, originalPrice, image, badge, colors
         price,
         originalPrice,
         image,
+        storeId,
+        storeName,
+        isOfficialStore,
       });
     }
   };
@@ -233,7 +236,20 @@ const ProductCard = ({ id, sku, name, price, originalPrice, image, badge, colors
 
       {/* Quick View Modal */}
       <QuickViewModal
-        product={{ id: productRouteKey, backendId, sku, name, price, originalPrice, image, colors, sizes }}
+        product={{
+          id: productRouteKey,
+          backendId,
+          sku,
+          name,
+          price,
+          originalPrice,
+          image,
+          colors,
+          sizes,
+          storeId,
+          storeName,
+          isOfficialStore,
+        }}
         isOpen={isQuickViewOpen}
         onClose={() => setIsQuickViewOpen(false)}
 />

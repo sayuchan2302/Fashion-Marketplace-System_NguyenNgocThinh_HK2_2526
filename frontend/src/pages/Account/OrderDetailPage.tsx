@@ -74,6 +74,8 @@ const OrderDetailPage = () => {
         image: item.image,
         color: item.color || 'Mặc định',
         size: item.size || 'F',
+        storeId: order.storeId,
+        storeName: order.storeName,
       });
     });
     addToast('Đã thêm sản phẩm vào giỏ', 'success');

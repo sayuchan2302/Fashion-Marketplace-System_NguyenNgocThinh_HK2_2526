@@ -87,7 +87,7 @@ const Checkout = () => {
     return () => el.removeEventListener('wheel', handleWheel);
   }, []);
 
-  const storeGroups = groupedByStore();
+  const storeGroups = useMemo(() => groupedByStore(), [items]);
   const checkoutStoreIds = useMemo(
     () => Array.from(new Set(
       storeGroups
@@ -96,6 +96,7 @@ const Checkout = () => {
     )).sort(),
     [storeGroups],
   );
+  const checkoutStoreKey = useMemo(() => checkoutStoreIds.join(','), [checkoutStoreIds]);
   const storeSubtotals = useMemo(
     () => storeGroups.reduce<Record<string, number>>((acc, group) => {
       acc[group.storeId] = group.subtotal;
@@ -128,7 +129,7 @@ const Checkout = () => {
     return () => {
       cancelled = true;
     };
-  }, [checkoutStoreIds]);
+  }, [checkoutStoreKey]);
 
   useEffect(() => {
     if (!appliedCoupon) {
@@ -230,7 +231,7 @@ const Checkout = () => {
       district: addr.district,
       province: addr.province,
     }));
-    addressLocation.clearSelection();
+    void addressLocation.setLocationByNames(addr.province, addr.district, addr.ward);
     setFormErrors({});
   };
 
@@ -442,9 +443,18 @@ const Checkout = () => {
                         autoComplete="address-level1"
                         onChange={e => {
                           addressLocation.setSelectedProvinceCode(e.target.value);
-                          handleFieldChange('city', addressLocation.getProvinceName(e.target.value));
-                          handleFieldChange('district', '');
-                          handleFieldChange('ward', '');
+                          setFormValues((prev) => ({
+                            ...prev,
+                            province: addressLocation.getProvinceName(e.target.value),
+                            district: '',
+                            ward: '',
+                          }));
+                          setFormErrors((prev) => ({
+                            ...prev,
+                            city: undefined,
+                            district: undefined,
+                            ward: undefined,
+                          }));
                         }}
                       >
                         <option value="">{addressLocation.loadingProvinces ? t.form.loading : t.form.province}</option>

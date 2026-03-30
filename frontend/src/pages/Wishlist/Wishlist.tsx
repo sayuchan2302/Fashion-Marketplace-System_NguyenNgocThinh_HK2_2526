@@ -16,6 +16,9 @@ interface PendingItem {
   price: number;
   originalPrice?: number;
   image: string;
+  storeId?: string;
+  storeName?: string;
+  isOfficialStore?: boolean;
 }
 
 const Wishlist = () => {
@@ -46,6 +49,9 @@ const Wishlist = () => {
       image: pendingItem.image,
       color: selectedColor,
       size: selectedSize,
+      storeId: pendingItem.storeId,
+      storeName: pendingItem.storeName,
+      isOfficialStore: pendingItem.isOfficialStore,
     });
     
     triggerAnimation({

@@ -14,6 +14,9 @@ interface ProductActionsProps {
     price: number;
     originalPrice?: number;
     image: string;
+    storeId?: string;
+    storeName?: string;
+    isOfficialStore?: boolean;
     status?: string;
     stock?: number;
   };
@@ -44,6 +47,9 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
       image: product.image,
       color: selectedColor,
       size: selectedSize,
+      storeId: product.storeId,
+      storeName: product.storeName,
+      isOfficialStore: product.isOfficialStore,
       quantity,
     });
     const mainImg = document.querySelector('.gallery-main-image .main-image') as HTMLImageElement | null;
@@ -74,6 +80,9 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
         price: product.price,
         originalPrice: product.originalPrice,
         image: product.image,
+        storeId: product.storeId,
+        storeName: product.storeName,
+        isOfficialStore: product.isOfficialStore,
       });
     }
   };

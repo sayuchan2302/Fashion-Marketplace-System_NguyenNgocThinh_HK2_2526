@@ -9,6 +9,9 @@ interface WishlistItem {
   price: number;
   originalPrice?: number;
   image: string;
+  storeId?: string;
+  storeName?: string;
+  isOfficialStore?: boolean;
 }
 
 interface WishlistContextType {

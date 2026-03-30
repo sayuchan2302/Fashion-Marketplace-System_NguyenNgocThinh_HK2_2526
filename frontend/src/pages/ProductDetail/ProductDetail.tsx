@@ -242,6 +242,9 @@ const ProductDetail = () => {
                 price: product.price,
                 originalPrice: product.originalPrice,
                 image: product.image,
+                storeId: product.storeId,
+                storeName: product.storeName,
+                isOfficialStore: product.isOfficialStore,
               }}
               selectedColor={selectedColor}
               selectedSize={selectedSize}

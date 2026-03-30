@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useToast } from './ToastContext';
 import { authService } from '../services/authService';
+import { productService } from '../services/productService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type CartItem = {
@@ -117,6 +118,81 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   // Persist to localStorage whenever cart changes
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }, [items]);
+
+  // Backfill missing vendor info for legacy cart items added before store metadata existed.
+  useEffect(() => {
+    let cancelled = false;
+
+    const needsHydration = items.filter((item) => (
+      (!item.storeName || item.storeName.trim() === '' || item.storeName === 'Cửa hàng')
+      && Boolean(item.backendProductId || item.id)
+    ));
+    if (needsHydration.length === 0) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const hydrate = async () => {
+      const resolvedByKey = new Map<string, { storeId?: string; storeName?: string; isOfficialStore?: boolean }>();
+
+      await Promise.all(needsHydration.map(async (item) => {
+        const key = String(item.backendProductId || item.id);
+        if (resolvedByKey.has(key)) return;
+        try {
+          const product = await productService.getByIdentifier(key);
+          if (!product) return;
+          resolvedByKey.set(key, {
+            storeId: product.storeId,
+            storeName: product.storeName,
+            isOfficialStore: product.isOfficialStore,
+          });
+        } catch {
+          // Ignore hydration error and keep current cart row untouched.
+        }
+      }));
+
+      if (cancelled || resolvedByKey.size === 0) return;
+
+      setItems((prev) => {
+        let changed = false;
+        const next = prev.map((item) => {
+          const key = String(item.backendProductId || item.id);
+          const resolved = resolvedByKey.get(key);
+          if (!resolved) return item;
+
+          const nextStoreId = item.storeId || resolved.storeId;
+          const nextStoreName = (item.storeName && item.storeName !== 'Cửa hàng')
+            ? item.storeName
+            : (resolved.storeName || item.storeName);
+          const nextOfficial = item.isOfficialStore ?? resolved.isOfficialStore;
+
+          if (
+            nextStoreId === item.storeId
+            && nextStoreName === item.storeName
+            && nextOfficial === item.isOfficialStore
+          ) {
+            return item;
+          }
+
+          changed = true;
+          return {
+            ...item,
+            storeId: nextStoreId,
+            storeName: nextStoreName,
+            isOfficialStore: nextOfficial,
+          };
+        });
+
+        return changed ? next : prev;
+      });
+    };
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
   }, [items]);
 
   const addToCart = (
