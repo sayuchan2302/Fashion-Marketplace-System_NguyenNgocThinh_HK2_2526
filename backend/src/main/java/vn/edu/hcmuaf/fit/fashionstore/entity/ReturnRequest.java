@@ -83,6 +83,9 @@ public class ReturnRequest extends BaseEntity {
     @Column(name = "admin_note", columnDefinition = "text")
     private String adminNote;
 
+    @Column(name = "admin_finalized")
+    private Boolean adminFinalized = false;
+
     @Column(name = "updated_by")
     private String updatedBy;
 

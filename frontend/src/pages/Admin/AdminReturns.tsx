@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, Eye, ShieldAlert, XCircle } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { AdminStateBlock } from './AdminStateBlocks';
-import { useAdminListState } from './useAdminListState';
 import { useAdminToast } from './useAdminToast';
 import { returnService, type AdminVerdictAction, type ReturnRequest, type ReturnStatus } from '../../services/returnService';
 import {
@@ -55,7 +54,15 @@ const resolutionLabel: Record<string, string> = {
 };
 
 const PAGE_SIZE = 8;
-const FETCH_SIZE = 100;
+
+const TAB_STATUS_MAP: Record<TabKey, ReturnStatus[] | undefined> = {
+  all: undefined,
+  disputed: ['DISPUTED'],
+  pendingVendor: ['PENDING_VENDOR'],
+  inProgress: ['ACCEPTED', 'SHIPPING', 'RECEIVED'],
+  completed: ['COMPLETED'],
+  rejected: ['REJECTED'],
+};
 
 const formatVnd = (value: number) =>
   new Intl.NumberFormat('vi-VN', {
@@ -83,23 +90,25 @@ const getReturnAmount = (request: ReturnRequest) => {
   return request.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
 };
 
-const tabPredicate = (tab: TabKey, item: ReturnRequest): boolean => {
-  if (tab === 'all') return true;
-  if (tab === 'disputed') return item.status === 'DISPUTED';
-  if (tab === 'pendingVendor') return item.status === 'PENDING_VENDOR';
-  if (tab === 'completed') return item.status === 'COMPLETED';
-  if (tab === 'rejected') return item.status === 'REJECTED';
-  if (tab === 'inProgress') {
-    return item.status === 'ACCEPTED' || item.status === 'SHIPPING' || item.status === 'RECEIVED';
-  }
-  return true;
+type AdminTabCounts = Record<TabKey, number>;
+
+const EMPTY_ADMIN_COUNTS: AdminTabCounts = {
+  all: 0,
+  disputed: 0,
+  pendingVendor: 0,
+  inProgress: 0,
+  completed: 0,
+  rejected: 0,
 };
 
 const AdminReturns = () => {
   const { pushToast } = useAdminToast();
   const [activeTab, setActiveTab] = useState<TabKey>('disputed');
   const [searchQuery, setSearchQuery] = useState('');
-  const [allReturns, setAllReturns] = useState<ReturnRequest[]>([]);
+  const [rows, setRows] = useState<ReturnRequest[]>([]);
+  const [tabCounts, setTabCounts] = useState<AdminTabCounts>(EMPTY_ADMIN_COUNTS);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -113,78 +122,74 @@ const AdminReturns = () => {
   );
   const drawerRefundTotal = useMemo(() => (drawerItem ? getReturnAmount(drawerItem) : 0), [drawerItem]);
 
-  const fetchAllReturns = useCallback(async () => {
+  const fetchTabCounts = useCallback(async () => {
+    try {
+      const [all, disputed, pendingVendor, inProgress, completed, rejected] = await Promise.all([
+        returnService.listAdmin({ page: 0, size: 1 }),
+        returnService.listAdmin({ status: 'DISPUTED', page: 0, size: 1 }),
+        returnService.listAdmin({ status: 'PENDING_VENDOR', page: 0, size: 1 }),
+        returnService.listAdmin({ statuses: ['ACCEPTED', 'SHIPPING', 'RECEIVED'], page: 0, size: 1 }),
+        returnService.listAdmin({ status: 'COMPLETED', page: 0, size: 1 }),
+        returnService.listAdmin({ status: 'REJECTED', page: 0, size: 1 }),
+      ]);
+
+      setTabCounts({
+        all: Number(all.totalElements || 0),
+        disputed: Number(disputed.totalElements || 0),
+        pendingVendor: Number(pendingVendor.totalElements || 0),
+        inProgress: Number(inProgress.totalElements || 0),
+        completed: Number(completed.totalElements || 0),
+        rejected: Number(rejected.totalElements || 0),
+      });
+    } catch {
+      // Keep previous stats when counting fails.
+    }
+  }, []);
+
+  const fetchPageData = useCallback(async () => {
     try {
       setIsLoading(true);
       setLoadError(null);
-      const firstPage = await returnService.listAdmin({ page: 0, size: FETCH_SIZE });
-      const records = [...(firstPage.content || [])];
-      const totalPages = Math.max(Number(firstPage.totalPages || 1), 1);
-
-      for (let currentPage = 1; currentPage < totalPages; currentPage += 1) {
-        const nextPage = await returnService.listAdmin({ page: currentPage, size: FETCH_SIZE });
-        records.push(...(nextPage.content || []));
-      }
-
-      setAllReturns(records);
+      const response = await returnService.listAdmin({
+        statuses: TAB_STATUS_MAP[activeTab],
+        q: searchQuery,
+        page: Math.max(page - 1, 0),
+        size: PAGE_SIZE,
+      });
+      setRows(response.content || []);
+      setTotalElements(Number(response.totalElements || 0));
+      setTotalPages(Math.max(Number(response.totalPages || 1), 1));
     } catch (error: unknown) {
-      setAllReturns([]);
+      setRows([]);
+      setTotalElements(0);
+      setTotalPages(1);
       setLoadError(getUiErrorMessage(error, 'Không tải được danh sách yêu cầu hoàn trả từ backend.'));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeTab, page, searchQuery]);
 
   useEffect(() => {
-    void fetchAllReturns();
-  }, [fetchAllReturns]);
+    void fetchTabCounts();
+  }, [fetchTabCounts]);
 
-  const tabCounts = useMemo(
-    () => ({
-      all: allReturns.length,
-      disputed: allReturns.filter((item) => item.status === 'DISPUTED').length,
-      pendingVendor: allReturns.filter((item) => item.status === 'PENDING_VENDOR').length,
-      inProgress: allReturns.filter((item) => item.status === 'ACCEPTED' || item.status === 'SHIPPING' || item.status === 'RECEIVED').length,
-      completed: allReturns.filter((item) => item.status === 'COMPLETED').length,
-      rejected: allReturns.filter((item) => item.status === 'REJECTED').length,
-    }),
-    [allReturns],
-  );
+  useEffect(() => {
+    void fetchPageData();
+  }, [fetchPageData]);
 
-  const stats = useMemo(
-    () => ({
-      totalAmount: allReturns.reduce((sum, item) => sum + getReturnAmount(item), 0),
-      disputedAmount: allReturns
-        .filter((item) => item.status === 'DISPUTED')
-        .reduce((sum, item) => sum + getReturnAmount(item), 0),
-    }),
-    [allReturns],
-  );
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, searchQuery]);
 
-  const {
-    search,
-    setSearch,
-    filteredItems,
-    pagedItems,
-    page: safePage,
-    setPage: setSafePage,
-    totalPages,
-    startIndex,
-    endIndex,
-  } = useAdminListState<ReturnRequest>({
-    items: allReturns,
-    pageSize: PAGE_SIZE,
-    searchValue: searchQuery,
-    onSearchChange: setSearchQuery,
-    pageValue: page,
-    onPageChange: setPage,
-    getSearchText: (item) =>
-      `${item.id} ${item.code || ''} ${item.orderCode || ''} ${item.customerName || ''} ${item.customerEmail || ''} ${
-        item.storeName || ''
-      } ${reasonLabel[item.reason] || item.reason} ${resolutionLabel[item.resolution] || item.resolution}`,
-    filterPredicate: (item) => tabPredicate(activeTab, item),
-    loadingDeps: [activeTab],
-  });
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const safePage = Math.min(page, totalPages);
+  const startIndex = totalElements === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(totalElements, safePage * PAGE_SIZE);
 
   const applyFinalVerdict = async (id: string, action: AdminVerdictAction) => {
     try {
@@ -192,9 +197,9 @@ const AdminReturns = () => {
       const adminNote = drawerItem?.id === id ? drawerNote : undefined;
       const updated = await returnService.adminFinalVerdict(id, action, adminNote);
 
-      setAllReturns((prev) => prev.map((item) => (item.id === id ? updated : item)));
       setDrawerItem((current) => (current?.id === id ? updated : current));
       if (drawerItem?.id === id) setDrawerNote('');
+      await Promise.all([fetchPageData(), fetchTabCounts()]);
 
       pushToast(
         action === 'REFUND_TO_CUSTOMER'
@@ -210,8 +215,8 @@ const AdminReturns = () => {
 
   const resetCurrentView = () => {
     setActiveTab('disputed');
-    setSearch('');
-    setSafePage(1);
+    setSearchQuery('');
+    setPage(1);
   };
 
   return (
@@ -222,7 +227,7 @@ const AdminReturns = () => {
             key: 'disputed',
             label: 'Cần trọng tài',
             value: tabCounts.disputed,
-            sub: formatVnd(stats.disputedAmount),
+            sub: 'Case cần phán quyết cuối',
             tone: tabCounts.disputed > 0 ? 'danger' : 'info',
             onClick: () => setActiveTab('disputed'),
           },
@@ -246,7 +251,7 @@ const AdminReturns = () => {
             key: 'completed',
             label: 'Đã hoàn tiền',
             value: tabCounts.completed,
-            sub: formatVnd(stats.totalAmount),
+            sub: 'Yêu cầu đã đóng',
             tone: 'success',
             onClick: () => setActiveTab('completed'),
           },
@@ -262,7 +267,7 @@ const AdminReturns = () => {
         activeKey={activeTab}
         onChange={(key) => {
           setActiveTab(key as TabKey);
-          setSafePage(1);
+          setPage(1);
         }}
       />
 
@@ -273,8 +278,8 @@ const AdminReturns = () => {
             <div className="admin-actions">
               <PanelSearchField
                 placeholder="Tìm mã yêu cầu, mã đơn, khách hàng, gian hàng..."
-                value={search}
-                onChange={setSearch}
+                value={searchQuery}
+                onChange={setSearchQuery}
               />
               {tabCounts.disputed > 0 && (
                 <span className="admin-pill error">
@@ -297,14 +302,14 @@ const AdminReturns = () => {
               title="Không tải được danh sách yêu cầu hoàn trả"
               description={loadError}
               actionLabel="Thử lại"
-              onAction={() => void fetchAllReturns()}
+              onAction={() => void fetchPageData()}
             />
-          ) : filteredItems.length === 0 ? (
+          ) : rows.length === 0 ? (
             <AdminStateBlock
-              type={search.trim() ? 'search-empty' : 'empty'}
-              title={search.trim() ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu hoàn trả'}
+              type={searchQuery.trim() ? 'search-empty' : 'empty'}
+              title={searchQuery.trim() ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu hoàn trả'}
               description={
-                search.trim()
+                searchQuery.trim()
                   ? 'Thử đổi từ khóa hoặc đặt lại bộ lọc để xem lại dữ liệu.'
                   : 'Khi khách gửi yêu cầu đổi trả, danh sách sẽ xuất hiện tại đây.'
               }
@@ -325,7 +330,7 @@ const AdminReturns = () => {
                   <div role="columnheader">Hành động</div>
                 </div>
 
-                {pagedItems.map((item) => (
+                {rows.map((item) => (
                   <motion.div
                     key={item.id}
                     className={`admin-table-row returns-row ${item.status === 'DISPUTED' ? 'returns-row-disputed' : ''}`}
@@ -400,10 +405,10 @@ const AdminReturns = () => {
               </div>
 
               <PanelTableFooter
-                meta={`Hiển thị ${startIndex}-${endIndex} trên ${filteredItems.length} yêu cầu`}
+                meta={`Hiển thị ${startIndex}-${endIndex} trên ${totalElements} yêu cầu`}
                 page={safePage}
                 totalPages={totalPages}
-                onPageChange={setSafePage}
+                onPageChange={setPage}
                 prevLabel="Trước"
                 nextLabel="Sau"
               />

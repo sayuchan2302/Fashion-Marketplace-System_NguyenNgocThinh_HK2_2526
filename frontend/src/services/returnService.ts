@@ -68,6 +68,14 @@ export interface ReturnListResponse {
   number: number;
 }
 
+interface ReturnListParams {
+  status?: ReturnStatus;
+  statuses?: ReturnStatus[];
+  q?: string;
+  page?: number;
+  size?: number;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const returnService = {
@@ -78,18 +86,26 @@ export const returnService = {
     }, { auth: true });
   },
 
-  async listAdmin(params: { status?: ReturnStatus; page?: number; size?: number } = {}): Promise<ReturnListResponse> {
+  async listAdmin(params: ReturnListParams = {}): Promise<ReturnListResponse> {
     const query = new URLSearchParams();
     if (params.status) query.set('status', params.status);
+    if (params.statuses && params.statuses.length > 0) {
+      params.statuses.forEach((status) => query.append('statuses', status));
+    }
+    if (params.q && params.q.trim()) query.set('q', params.q.trim());
     if (params.page !== undefined) query.set('page', String(params.page));
     if (params.size !== undefined) query.set('size', String(params.size));
     const qs = query.toString();
     return apiRequest<ReturnListResponse>(`/api/returns${qs ? `?${qs}` : ''}`, {}, { auth: true });
   },
 
-  async listVendor(params: { status?: ReturnStatus; page?: number; size?: number } = {}): Promise<ReturnListResponse> {
+  async listVendor(params: ReturnListParams = {}): Promise<ReturnListResponse> {
     const query = new URLSearchParams();
     if (params.status) query.set('status', params.status);
+    if (params.statuses && params.statuses.length > 0) {
+      params.statuses.forEach((status) => query.append('statuses', status));
+    }
+    if (params.q && params.q.trim()) query.set('q', params.q.trim());
     if (params.page !== undefined) query.set('page', String(params.page));
     if (params.size !== undefined) query.set('size', String(params.size));
     const qs = query.toString();

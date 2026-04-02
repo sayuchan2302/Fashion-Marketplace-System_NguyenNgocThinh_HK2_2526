@@ -2,6 +2,7 @@ package vn.edu.hcmuaf.fit.fashionstore.service;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,8 +20,10 @@ import vn.edu.hcmuaf.fit.fashionstore.repository.StoreRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -59,14 +62,24 @@ public class ReturnRequestService {
         if (order.getUser() == null || !order.getUser().getId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Order does not belong to user");
         }
+        if (order.getStatus() != Order.OrderStatus.DELIVERED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Returns are only allowed for delivered orders");
+        }
         if (payload.getItems() == null || payload.getItems().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return request must include at least one item");
         }
 
         Map<UUID, OrderItem> orderItemMap = order.getItems().stream()
                 .collect(Collectors.toMap(OrderItem::getId, oi -> oi));
+        Set<UUID> requestedOrderItemIds = new HashSet<>();
 
         List<ReturnRequest.ReturnItemSnapshot> snapshots = payload.getItems().stream().map(itemPayload -> {
+            if (itemPayload == null || itemPayload.getOrderItemId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order item is required");
+            }
+            if (!requestedOrderItemIds.add(itemPayload.getOrderItemId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate order item in return request");
+            }
             OrderItem matched = orderItemMap.get(itemPayload.getOrderItemId());
             if (matched == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid order item");
@@ -96,6 +109,7 @@ public class ReturnRequestService {
             );
         }).toList();
 
+        assertNoOpenReturnConflict(order.getId(), requestedOrderItemIds);
         UUID storeId = resolveSingleStoreId(snapshots, orderItemMap);
 
         ReturnRequest request = ReturnRequest.builder()
@@ -108,6 +122,7 @@ public class ReturnRequestService {
                 .resolution(payload.getResolution())
                 .status(ReturnRequest.ReturnStatus.PENDING_VENDOR)
                 .items(snapshots)
+                .adminFinalized(false)
                 .updatedBy(userId.toString())
                 .build();
 
@@ -116,20 +131,50 @@ public class ReturnRequestService {
 
     @Transactional(readOnly = true)
     public Page<ReturnRequestResponse> list(ReturnRequest.ReturnStatus status, Pageable pageable) {
-        Page<ReturnRequest> page = status == null
-                ? returnRequestRepository.findAll(pageable)
-                : returnRequestRepository.findByStatus(status, pageable);
+        return list(
+                status == null ? null : List.of(status),
+                null,
+                pageable
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReturnRequestResponse> list(
+            List<ReturnRequest.ReturnStatus> statuses,
+            String keyword,
+            Pageable pageable
+    ) {
+        Page<ReturnRequest> page = returnRequestRepository.findAll(
+                buildListSpecification(null, statuses, keyword),
+                pageable
+        );
         return page.map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<ReturnRequestResponse> listForVendor(UUID storeId, ReturnRequest.ReturnStatus status, Pageable pageable) {
+        return listForVendor(
+                storeId,
+                status == null ? null : List.of(status),
+                null,
+                pageable
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReturnRequestResponse> listForVendor(
+            UUID storeId,
+            List<ReturnRequest.ReturnStatus> statuses,
+            String keyword,
+            Pageable pageable
+    ) {
         if (storeId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Store is required");
         }
-        Page<ReturnRequest> page = status == null
-                ? returnRequestRepository.findByStoreIdOrderByCreatedAtDesc(storeId, pageable)
-                : returnRequestRepository.findByStoreIdAndStatusOrderByCreatedAtDesc(storeId, status, pageable);
+        Page<ReturnRequest> page = returnRequestRepository.findAll(
+                buildListSpecification(storeId, statuses, keyword),
+                pageable
+        );
         return page.map(this::toResponse);
     }
 
@@ -172,6 +217,7 @@ public class ReturnRequestService {
 
         request.setStatus(ReturnRequest.ReturnStatus.REJECTED);
         request.setVendorReason(normalizedReason);
+        request.setAdminFinalized(false);
         request.setUpdatedBy(actor);
         return toResponse(returnRequestRepository.save(request));
     }
@@ -232,6 +278,9 @@ public class ReturnRequestService {
         ReturnRequest request = findById(returnId);
         assertCustomerOwnership(request, userId);
         assertStatus(request, ReturnRequest.ReturnStatus.REJECTED);
+        if (Boolean.TRUE.equals(request.getAdminFinalized())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return request has been finalized by admin");
+        }
 
         request.setStatus(ReturnRequest.ReturnStatus.DISPUTED);
         request.setDisputeReason(normalizeRequiredText(reason, "Dispute reason is required"));
@@ -281,6 +330,7 @@ public class ReturnRequestService {
             request.setStatus(ReturnRequest.ReturnStatus.COMPLETED);
             request.setCompletedAt(LocalDateTime.now());
             request.setAdminNote(normalizeOptionalText(adminNote));
+            request.setAdminFinalized(true);
             request.setUpdatedBy(actor);
             ReturnRequest saved = returnRequestRepository.save(request);
             walletService.refundToCustomerFromEscrow(
@@ -293,7 +343,12 @@ public class ReturnRequestService {
         }
 
         request.setStatus(ReturnRequest.ReturnStatus.REJECTED);
-        request.setAdminNote(normalizeOptionalText(adminNote));
+        String normalizedAdminNote = normalizeOptionalText(adminNote);
+        if (normalizedAdminNote.isEmpty()) {
+            normalizedAdminNote = "Final verdict: release to vendor";
+        }
+        request.setAdminNote(normalizedAdminNote);
+        request.setAdminFinalized(true);
         request.setUpdatedBy(actor);
         return toResponse(returnRequestRepository.save(request));
     }
@@ -352,6 +407,86 @@ public class ReturnRequestService {
             return request.getStoreId();
         }
         return request.getOrder() != null ? request.getOrder().getStoreId() : null;
+    }
+
+    private void assertNoOpenReturnConflict(UUID orderId, Set<UUID> requestedOrderItemIds) {
+        if (orderId == null || requestedOrderItemIds == null || requestedOrderItemIds.isEmpty()) {
+            return;
+        }
+
+        List<ReturnRequest> existingRequests = returnRequestRepository.findByOrderId(orderId);
+        for (ReturnRequest existing : existingRequests) {
+            if (!isOpenStatus(existing.getStatus())) {
+                continue;
+            }
+            if (existing.getItems() == null || existing.getItems().isEmpty()) {
+                continue;
+            }
+
+            boolean duplicatedItem = existing.getItems().stream()
+                    .map(ReturnRequest.ReturnItemSnapshot::getOrderItemId)
+                    .anyMatch(requestedOrderItemIds::contains);
+            if (duplicatedItem) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "One or more items already have an active return request"
+                );
+            }
+        }
+    }
+
+    private boolean isOpenStatus(ReturnRequest.ReturnStatus status) {
+        return status == ReturnRequest.ReturnStatus.PENDING_VENDOR
+                || status == ReturnRequest.ReturnStatus.ACCEPTED
+                || status == ReturnRequest.ReturnStatus.SHIPPING
+                || status == ReturnRequest.ReturnStatus.RECEIVED
+                || status == ReturnRequest.ReturnStatus.DISPUTED;
+    }
+
+    private Specification<ReturnRequest> buildListSpecification(
+            UUID storeId,
+            List<ReturnRequest.ReturnStatus> statuses,
+            String keyword
+    ) {
+        return (root, query, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            query.distinct(true);
+
+            if (storeId != null) {
+                predicates.add(cb.equal(root.get("storeId"), storeId));
+            }
+
+            List<ReturnRequest.ReturnStatus> normalizedStatuses = normalizeStatuses(statuses);
+            if (!normalizedStatuses.isEmpty()) {
+                predicates.add(root.get("status").in(normalizedStatuses));
+            }
+
+            String normalizedKeyword = normalizeOptionalText(keyword).toLowerCase();
+            if (!normalizedKeyword.isEmpty()) {
+                String pattern = "%" + normalizedKeyword + "%";
+                var orderJoin = root.join("order", jakarta.persistence.criteria.JoinType.LEFT);
+                var userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
+
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("returnCode")), pattern),
+                        cb.like(cb.lower(orderJoin.get("orderCode")), pattern),
+                        cb.like(cb.lower(userJoin.get("name")), pattern),
+                        cb.like(cb.lower(userJoin.get("email")), pattern)
+                ));
+            }
+
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+    }
+
+    private List<ReturnRequest.ReturnStatus> normalizeStatuses(List<ReturnRequest.ReturnStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return List.of();
+        }
+        return statuses.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
     private BigDecimal calculateRefundAmount(ReturnRequest request) {

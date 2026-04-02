@@ -3,6 +3,7 @@ package vn.edu.hcmuaf.fit.fashionstore.controller;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +27,8 @@ import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext.UserContext;
 import vn.edu.hcmuaf.fit.fashionstore.service.ReturnRequestService;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -94,13 +97,20 @@ public class ReturnRequestController {
     @PreAuthorize("hasRole('VENDOR')")
     public ResponseEntity<Page<ReturnRequestResponse>> listMyStoreReturns(
             @RequestParam(value = "status", required = false) ReturnRequest.ReturnStatus status,
+            @RequestParam(value = "statuses", required = false) List<ReturnRequest.ReturnStatus> statuses,
+            @RequestParam(value = "q", required = false) String keyword,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             @RequestHeader("Authorization") String authHeader
     ) {
         UserContext ctx = authContext.requireVendor(authHeader);
-        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(size, 100));
-        return ResponseEntity.ok(returnRequestService.listForVendor(ctx.getStoreId(), status, pageable));
+        PageRequest pageable = PageRequest.of(
+                Math.max(page, 0),
+                Math.min(size, 100),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+        List<ReturnRequest.ReturnStatus> effectiveStatuses = mergeStatuses(status, statuses);
+        return ResponseEntity.ok(returnRequestService.listForVendor(ctx.getStoreId(), effectiveStatuses, keyword, pageable));
     }
 
     @PatchMapping("/my-store/{id}/accept")
@@ -148,11 +158,18 @@ public class ReturnRequestController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<Page<ReturnRequestResponse>> list(
             @RequestParam(value = "status", required = false) ReturnRequest.ReturnStatus status,
+            @RequestParam(value = "statuses", required = false) List<ReturnRequest.ReturnStatus> statuses,
+            @RequestParam(value = "q", required = false) String keyword,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(size, 100));
-        return ResponseEntity.ok(returnRequestService.list(status, pageable));
+        PageRequest pageable = PageRequest.of(
+                Math.max(page, 0),
+                Math.min(size, 100),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+        List<ReturnRequest.ReturnStatus> effectiveStatuses = mergeStatuses(status, statuses);
+        return ResponseEntity.ok(returnRequestService.list(effectiveStatuses, keyword, pageable));
     }
 
     @GetMapping("/{id}")
@@ -181,5 +198,23 @@ public class ReturnRequestController {
                 request.getAdminNote(),
                 admin.getEmail()
         ));
+    }
+
+    private List<ReturnRequest.ReturnStatus> mergeStatuses(
+            ReturnRequest.ReturnStatus status,
+            List<ReturnRequest.ReturnStatus> statuses
+    ) {
+        List<ReturnRequest.ReturnStatus> merged = new ArrayList<>();
+        if (statuses != null) {
+            for (ReturnRequest.ReturnStatus item : statuses) {
+                if (item != null && !merged.contains(item)) {
+                    merged.add(item);
+                }
+            }
+        }
+        if (status != null && !merged.contains(status)) {
+            merged.add(status);
+        }
+        return merged;
     }
 }

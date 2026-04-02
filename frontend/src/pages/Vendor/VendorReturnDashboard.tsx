@@ -1,5 +1,5 @@
 import './Vendor.css';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Eye, PackageCheck, ShieldCheck, XCircle } from 'lucide-react';
 import VendorLayout from './VendorLayout';
@@ -14,7 +14,7 @@ import {
   PanelTableFooter,
 } from '../../components/Panel/PanelPrimitives';
 import Drawer from '../../components/Drawer/Drawer';
-import { returnService, type ReturnRequest } from '../../services/returnService';
+import { returnService, type ReturnRequest, type ReturnStatus } from '../../services/returnService';
 import { useToast } from '../../contexts/ToastContext';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import { toDisplayOrderCode, toDisplayReturnCode } from '../../utils/displayCode';
@@ -22,7 +22,6 @@ import { toDisplayOrderCode, toDisplayReturnCode } from '../../utils/displayCode
 type VendorReturnTab = 'all' | 'needsAction' | 'inTransit' | 'toInspect' | 'disputed';
 
 const PAGE_SIZE = 10;
-const FETCH_SIZE = 100;
 
 const TABS: Array<{ key: VendorReturnTab; label: string }> = [
   { key: 'all', label: 'Tất cả' },
@@ -55,6 +54,24 @@ const resolutionLabel: Record<string, string> = {
   EXCHANGE: 'Đổi sản phẩm',
 };
 
+const TAB_STATUS_MAP: Record<VendorReturnTab, ReturnStatus[] | undefined> = {
+  all: undefined,
+  needsAction: ['PENDING_VENDOR', 'RECEIVED'],
+  inTransit: ['SHIPPING'],
+  toInspect: ['RECEIVED'],
+  disputed: ['DISPUTED'],
+};
+
+type VendorTabCounts = Record<VendorReturnTab, number>;
+
+const EMPTY_COUNTS: VendorTabCounts = {
+  all: 0,
+  needsAction: 0,
+  inTransit: 0,
+  toInspect: 0,
+  disputed: 0,
+};
+
 const formatVnd = (value: number) =>
   new Intl.NumberFormat('vi-VN', {
     style: 'currency',
@@ -65,15 +82,6 @@ const formatVnd = (value: number) =>
 const getRefundAmount = (request: ReturnRequest) => {
   if (typeof request.refundAmount === 'number') return request.refundAmount;
   return request.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-};
-
-const matchesTab = (tab: VendorReturnTab, request: ReturnRequest) => {
-  if (tab === 'all') return true;
-  if (tab === 'needsAction') return request.status === 'PENDING_VENDOR' || request.status === 'RECEIVED';
-  if (tab === 'inTransit') return request.status === 'SHIPPING';
-  if (tab === 'toInspect') return request.status === 'RECEIVED';
-  if (tab === 'disputed') return request.status === 'DISPUTED';
-  return true;
 };
 
 const formatDate = (value?: string) => {
@@ -91,7 +99,10 @@ const formatDate = (value?: string) => {
 
 const VendorReturnDashboard = () => {
   const { addToast } = useToast();
-  const [allReturns, setAllReturns] = useState<ReturnRequest[]>([]);
+  const [rows, setRows] = useState<ReturnRequest[]>([]);
+  const [tabCounts, setTabCounts] = useState<VendorTabCounts>(EMPTY_COUNTS);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -101,83 +112,80 @@ const VendorReturnDashboard = () => {
   const [detailItem, setDetailItem] = useState<ReturnRequest | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  const fetchAllReturns = useCallback(async () => {
+  const fetchTabCounts = useCallback(async () => {
+    try {
+      const [all, pendingVendor, received, shipping, disputed] = await Promise.all([
+        returnService.listVendor({ page: 0, size: 1 }),
+        returnService.listVendor({ status: 'PENDING_VENDOR', page: 0, size: 1 }),
+        returnService.listVendor({ status: 'RECEIVED', page: 0, size: 1 }),
+        returnService.listVendor({ status: 'SHIPPING', page: 0, size: 1 }),
+        returnService.listVendor({ status: 'DISPUTED', page: 0, size: 1 }),
+      ]);
+
+      setTabCounts({
+        all: Number(all.totalElements || 0),
+        needsAction: Number(pendingVendor.totalElements || 0) + Number(received.totalElements || 0),
+        inTransit: Number(shipping.totalElements || 0),
+        toInspect: Number(received.totalElements || 0),
+        disputed: Number(disputed.totalElements || 0),
+      });
+    } catch {
+      // Keep current counts when stats request fails.
+    }
+  }, []);
+
+  const fetchPageData = useCallback(async () => {
     try {
       setIsLoading(true);
       setLoadError(null);
-      const firstPage = await returnService.listVendor({ page: 0, size: FETCH_SIZE });
-      const records = [...(firstPage.content || [])];
-      const totalPages = Math.max(Number(firstPage.totalPages || 1), 1);
+      const response = await returnService.listVendor({
+        statuses: TAB_STATUS_MAP[activeTab],
+        q: searchQuery,
+        page: Math.max(page - 1, 0),
+        size: PAGE_SIZE,
+      });
 
-      for (let currentPage = 1; currentPage < totalPages; currentPage += 1) {
-        const nextPage = await returnService.listVendor({ page: currentPage, size: FETCH_SIZE });
-        records.push(...(nextPage.content || []));
-      }
-
-      setAllReturns(records);
+      setRows(response.content || []);
+      setTotalElements(Number(response.totalElements || 0));
+      setTotalPages(Math.max(Number(response.totalPages || 1), 1));
     } catch (error: unknown) {
-      setAllReturns([]);
+      setRows([]);
+      setTotalElements(0);
+      setTotalPages(1);
       setLoadError(getUiErrorMessage(error, 'Không tải được danh sách hoàn trả của gian hàng.'));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeTab, page, searchQuery]);
 
   useEffect(() => {
-    void fetchAllReturns();
-  }, [fetchAllReturns]);
+    void fetchTabCounts();
+  }, [fetchTabCounts]);
 
-  const tabCounts = useMemo(
-    () => ({
-      all: allReturns.length,
-      needsAction: allReturns.filter((item) => item.status === 'PENDING_VENDOR' || item.status === 'RECEIVED').length,
-      inTransit: allReturns.filter((item) => item.status === 'SHIPPING').length,
-      toInspect: allReturns.filter((item) => item.status === 'RECEIVED').length,
-      disputed: allReturns.filter((item) => item.status === 'DISPUTED').length,
-    }),
-    [allReturns],
-  );
-
-  const filteredItems = useMemo(() => {
-    const keyword = searchQuery.trim().toLowerCase();
-    return allReturns.filter((item) => {
-      if (!matchesTab(activeTab, item)) return false;
-      if (!keyword) return true;
-
-      const searchable = [
-        item.id,
-        item.code || '',
-        item.orderCode || '',
-        item.customerName || '',
-        item.customerEmail || '',
-        item.storeName || '',
-        reasonLabel[item.reason] || item.reason,
-      ].join(' ').toLowerCase();
-
-      return searchable.includes(keyword);
-    });
-  }, [activeTab, allReturns, searchQuery]);
+  useEffect(() => {
+    void fetchPageData();
+  }, [fetchPageData]);
 
   useEffect(() => {
     setPage(1);
   }, [activeTab, searchQuery]);
 
-  const totalPages = Math.max(Math.ceil(filteredItems.length / PAGE_SIZE), 1);
-  const safePage = Math.min(page, totalPages);
-  const startIndex = filteredItems.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const endIndex = Math.min(filteredItems.length, safePage * PAGE_SIZE);
-  const pagedItems = filteredItems.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
-  const applyRowUpdate = (updated: ReturnRequest) => {
-    setAllReturns((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-    setDetailItem((current) => (current?.id === updated.id ? updated : current));
-  };
+  const safePage = Math.min(page, totalPages);
+  const startIndex = totalElements === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(totalElements, safePage * PAGE_SIZE);
 
   const handleAccept = async (request: ReturnRequest) => {
     try {
       setActionLoading(true);
       const updated = await returnService.acceptByVendor(request.id);
-      applyRowUpdate(updated);
+      setDetailItem((current) => (current?.id === updated.id ? updated : current));
+      await Promise.all([fetchPageData(), fetchTabCounts()]);
       addToast(`Đã chấp nhận yêu cầu ${toDisplayReturnCode(updated.code)}.`, 'success');
     } catch (error: unknown) {
       addToast(getUiErrorMessage(error, 'Không thể chấp nhận yêu cầu hoàn trả.'), 'error');
@@ -196,7 +204,8 @@ const VendorReturnDashboard = () => {
     try {
       setActionLoading(true);
       const updated = await returnService.rejectByVendor(request.id, normalizedReason);
-      applyRowUpdate(updated);
+      setDetailItem((current) => (current?.id === updated.id ? updated : current));
+      await Promise.all([fetchPageData(), fetchTabCounts()]);
       setRejectReason('');
       addToast(`Đã từ chối yêu cầu ${toDisplayReturnCode(updated.code)}.`, 'success');
     } catch (error: unknown) {
@@ -210,7 +219,8 @@ const VendorReturnDashboard = () => {
     try {
       setActionLoading(true);
       const updated = await returnService.markReceivedByVendor(request.id);
-      applyRowUpdate(updated);
+      setDetailItem((current) => (current?.id === updated.id ? updated : current));
+      await Promise.all([fetchPageData(), fetchTabCounts()]);
       addToast(`Đã xác nhận nhận hàng hoàn ${toDisplayReturnCode(updated.code)}.`, 'success');
     } catch (error: unknown) {
       addToast(getUiErrorMessage(error, 'Không thể xác nhận nhận hàng hoàn.'), 'error');
@@ -223,7 +233,8 @@ const VendorReturnDashboard = () => {
     try {
       setActionLoading(true);
       const updated = await returnService.confirmRefundByVendor(request.id);
-      applyRowUpdate(updated);
+      setDetailItem((current) => (current?.id === updated.id ? updated : current));
+      await Promise.all([fetchPageData(), fetchTabCounts()]);
       addToast(`Đã xác nhận hoàn tiền cho ${toDisplayReturnCode(updated.code)}.`, 'success');
     } catch (error: unknown) {
       addToast(getUiErrorMessage(error, 'Không thể hoàn tất hoàn tiền.'), 'error');
@@ -307,9 +318,9 @@ const VendorReturnDashboard = () => {
               title="Không tải được danh sách hoàn trả"
               description={loadError}
               actionLabel="Thử lại"
-              onAction={() => void fetchAllReturns()}
+              onAction={() => void fetchPageData()}
             />
-          ) : filteredItems.length === 0 ? (
+          ) : rows.length === 0 ? (
             <AdminStateBlock
               type={searchQuery.trim() ? 'search-empty' : 'empty'}
               title={searchQuery.trim() ? 'Không có yêu cầu phù hợp' : 'Chưa có yêu cầu hoàn trả'}
@@ -332,7 +343,7 @@ const VendorReturnDashboard = () => {
                   <div role="columnheader">Hành động</div>
                 </div>
 
-                {pagedItems.map((item) => (
+                {rows.map((item) => (
                   <motion.div key={item.id} className="admin-table-row vendor-returns" role="row" whileHover={{ y: -1 }}>
                     <div role="cell" className="returns-code-cell">
                       <strong className="returns-ellipsis">{toDisplayReturnCode(item.code)}</strong>
@@ -411,7 +422,7 @@ const VendorReturnDashboard = () => {
                 page={safePage}
                 totalPages={totalPages}
                 onPageChange={setPage}
-                meta={`Hiển thị ${startIndex}-${endIndex} / ${filteredItems.length} yêu cầu`}
+                meta={`Hiển thị ${startIndex}-${endIndex} / ${totalElements} yêu cầu`}
               />
             </>
           )}

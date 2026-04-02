@@ -3,15 +3,17 @@ package vn.edu.hcmuaf.fit.fashionstore.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ReturnRequest;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, UUID> {
+public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, UUID>, JpaSpecificationExecutor<ReturnRequest> {
     Page<ReturnRequest> findByStatus(ReturnRequest.ReturnStatus status, Pageable pageable);
     Page<ReturnRequest> findByUserId(UUID userId, Pageable pageable);
+    List<ReturnRequest> findByOrderId(UUID orderId);
     Page<ReturnRequest> findByStoreIdOrderByCreatedAtDesc(UUID storeId, Pageable pageable);
     Page<ReturnRequest> findByStoreIdAndStatusOrderByCreatedAtDesc(UUID storeId, ReturnRequest.ReturnStatus status, Pageable pageable);
     Optional<ReturnRequest> findByIdAndStoreId(UUID id, UUID storeId);
