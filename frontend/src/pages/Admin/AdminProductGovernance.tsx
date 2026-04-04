@@ -370,7 +370,6 @@ const AdminProductGovernance = () => {
                       <img src={product.thumbnail || ''} alt={product.name} className="moderation-thumb" />
                       <div className="moderation-product-copy">
                         <p className="admin-bold moderation-truncate">{product.name}</p>
-                        <p className="admin-muted small">{product.productCode}</p>
                       </div>
                     </div>
 

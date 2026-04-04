@@ -101,7 +101,6 @@ function App() {
                           <Route path="/register" element={<Register />} />
                           <Route path="/forgot" element={<ForgotPassword />} />
                           <Route path="/reset-password" element={<ResetPassword />} />
-                          <Route path="/profile" element={<Profile />} />
                           <Route path="/vendor/register" element={<VendorRegister />} />
                           <Route path="/order-success" element={<OrderSuccess />} />
                           <Route path="/search" element={<Search />} />
@@ -115,7 +114,8 @@ function App() {
                           <Route path="/policy/:type" element={<Policy />} />
                           <Route path="/about" element={<About />} />
                           <Route path="/contact" element={<Contact />} />
-                          <Route path="/profile/orders/:id" element={<OrderDetail />} />
+                          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                          <Route path="/profile/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
                           <Route path="/account/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
                           <Route path="/account/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
                           <Route path="/account/addresses" element={<ProtectedRoute><AddressesPage /></ProtectedRoute>} />
