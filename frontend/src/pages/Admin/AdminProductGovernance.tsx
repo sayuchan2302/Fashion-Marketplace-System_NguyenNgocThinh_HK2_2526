@@ -58,7 +58,6 @@ const AdminProductGovernance = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
   const [tabCounts, setTabCounts] = useState<Record<StatusFilter, number>>({
     ALL: 0,
     APPROVED: 0,
@@ -90,7 +89,6 @@ const AdminProductGovernance = () => {
 
       setRows(response.content);
       setTotalPages(Math.max(response.totalPages, 1));
-      setTotalElements(response.totalElements);
       setSelected((prev) => {
         if (prev.size === 0) return prev;
         const idsOnPage = new Set(response.content.map((item) => item.id));
@@ -103,7 +101,6 @@ const AdminProductGovernance = () => {
     } catch (error: unknown) {
       setRows([]);
       setTotalPages(1);
-      setTotalElements(0);
       setLoadError(getUiErrorMessage(error, 'Không tải được danh sách sản phẩm vendor.'));
     } finally {
       setIsLoading(false);
@@ -389,3 +386,4 @@ const AdminProductGovernance = () => {
 };
 
 export default AdminProductGovernance;
+

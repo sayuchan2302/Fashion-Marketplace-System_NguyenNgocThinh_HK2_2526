@@ -369,24 +369,6 @@ const VendorOrders = () => {
     }
   };
 
-  const actionablePendingIds = Array.from(selected).filter(
-    (id) => paginatedOrders.find((order) => order.id === id)?.status === 'pending',
-  );
-  const actionableConfirmedIds = Array.from(selected).filter(
-    (id) => paginatedOrders.find((order) => order.id === id)?.status === 'confirmed',
-  );
-  const actionableProcessingIds = Array.from(selected).filter(
-    (id) => paginatedOrders.find((order) => order.id === id)?.status === 'processing',
-  );
-  const actionableCancelableIds = Array.from(selected).filter((id) => {
-    const status = paginatedOrders.find((order) => order.id === id)?.status;
-    return status === 'pending' || status === 'confirmed' || status === 'processing';
-  });
-  const actionableDelayIds = Array.from(selected).filter((id) => {
-    const status = paginatedOrders.find((order) => order.id === id)?.status;
-    return status === 'pending' || status === 'confirmed' || status === 'processing' || status === 'shipped';
-  });
-
   const handleNotifyDelay = async (ids: string[]) => {
     if (ids.length === 0) return;
     const note = window.prompt('Nhập lý do chậm xử lý / giao hàng');

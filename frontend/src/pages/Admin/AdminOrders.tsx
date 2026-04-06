@@ -194,11 +194,6 @@ const AdminOrders = () => {
     setSelected(nextSelection);
   };
 
-  const handleBulkPrint = () => {
-    if (selected.size === 0) return;
-    pushToast(`Đang chuẩn bị phiếu in cho ${selected.size} đơn hàng.`);
-  };
-
   return (
     <AdminLayout
       title="Đơn hàng"
@@ -388,3 +383,5 @@ const AdminOrders = () => {
 };
 
 export default AdminOrders;
+
+

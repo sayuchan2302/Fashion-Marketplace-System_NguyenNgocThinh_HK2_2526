@@ -11,6 +11,7 @@ import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReviewReplyRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReviewStatusUpdateRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.ReviewEligibleItemResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.ReviewResponse;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorReviewSummaryResponse;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Review;
 import vn.edu.hcmuaf.fit.fashionstore.exception.ForbiddenException;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext;
@@ -106,10 +107,37 @@ public class ReviewController {
             @RequestHeader("Authorization") String authHeader,
             @RequestParam(required = false) UUID storeId,
             @RequestParam(required = false) Review.ReviewStatus status,
+            @RequestParam(required = false, name = "q") String keyword,
+            @RequestParam(required = false) Boolean needReply,
+            @RequestParam(required = false) Integer maxRating,
             Pageable pageable) {
         AuthContext.UserContext ctx = authContext.requireVendor(authHeader);
+        if (ctx.isAdmin() && storeId == null) {
+            throw new IllegalArgumentException("storeId is required for SUPER_ADMIN");
+        }
         UUID resolvedStoreId = authContext.resolveStoreId(ctx, storeId);
-        return ResponseEntity.ok(reviewService.getStoreReviews(resolvedStoreId, status, pageable));
+        return ResponseEntity.ok(reviewService.getStoreReviews(
+                resolvedStoreId,
+                status,
+                keyword,
+                needReply,
+                maxRating,
+                pageable
+        ));
+    }
+
+    @GetMapping("/my-store/summary")
+    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
+    public ResponseEntity<VendorReviewSummaryResponse> getMyStoreReviewSummary(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(required = false) UUID storeId
+    ) {
+        AuthContext.UserContext ctx = authContext.requireVendor(authHeader);
+        if (ctx.isAdmin() && storeId == null) {
+            throw new IllegalArgumentException("storeId is required for SUPER_ADMIN");
+        }
+        UUID resolvedStoreId = authContext.resolveStoreId(ctx, storeId);
+        return ResponseEntity.ok(reviewService.getStoreReviewSummary(resolvedStoreId));
     }
 
     @PostMapping("/my-store/{id}/reply")
@@ -120,6 +148,9 @@ public class ReviewController {
             @RequestParam(required = false) UUID storeId,
             @Valid @RequestBody ReviewReplyRequest request) {
         AuthContext.UserContext ctx = authContext.requireVendor(authHeader);
+        if (ctx.isAdmin() && storeId == null) {
+            throw new IllegalArgumentException("storeId is required for SUPER_ADMIN");
+        }
         UUID resolvedStoreId = authContext.resolveStoreId(ctx, storeId);
         return ResponseEntity.ok(reviewService.addStoreReply(id, resolvedStoreId, request.getReply()));
     }

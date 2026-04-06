@@ -80,6 +80,23 @@ interface BackendEligibleReviewItem {
 
 interface BackendPage<T> {
   content?: T[];
+  totalElements?: number;
+  totalPages?: number;
+  number?: number;
+}
+
+export interface VendorReviewsPage {
+  items: Review[];
+  totalElements: number;
+  totalPages: number;
+  page: number;
+}
+
+export interface VendorReviewSummary {
+  total: number;
+  needReply: number;
+  negative: number;
+  average: number;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -157,13 +174,23 @@ export const reviewService = {
       .filter((item) => Boolean(item.orderId && item.productId));
   },
 
-  async getVendorReviews(params: { status?: ReviewStatus | 'all'; page?: number; size?: number } = {}): Promise<Review[]> {
+  async getVendorReviews(params: {
+    status?: ReviewStatus | 'all';
+    page?: number;
+    size?: number;
+    q?: string;
+    needReply?: boolean;
+    maxRating?: number;
+  } = {}): Promise<VendorReviewsPage> {
     const query = new URLSearchParams();
     query.set('page', String(Math.max(0, (params.page ?? 1) - 1)));
     query.set('size', String(Math.max(1, params.size ?? 1000)));
     if (params.status && params.status !== 'all') {
       query.set('status', params.status.toUpperCase());
     }
+    if (params.q?.trim()) query.set('q', params.q.trim());
+    if (params.needReply !== undefined) query.set('needReply', String(params.needReply));
+    if (params.maxRating !== undefined) query.set('maxRating', String(params.maxRating));
 
     const response = await apiRequest<BackendPage<BackendReviewResponse>>(
       `/api/reviews/my-store?${query.toString()}`,
@@ -171,7 +198,16 @@ export const reviewService = {
       { auth: true },
     );
 
-    return (response.content || []).map(mapBackendReview);
+    return {
+      items: (response.content || []).map(mapBackendReview),
+      totalElements: Number(response.totalElements || 0),
+      totalPages: Math.max(Number(response.totalPages || 1), 1),
+      page: Number(response.number ?? 0) + 1,
+    };
+  },
+
+  async getVendorReviewSummary(): Promise<VendorReviewSummary> {
+    return apiRequest<VendorReviewSummary>('/api/reviews/my-store/summary', {}, { auth: true });
   },
 
   async replyAsVendor(id: string, reply: string): Promise<Review> {

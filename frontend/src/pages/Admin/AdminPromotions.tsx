@@ -301,24 +301,6 @@ const AdminPromotions = () => {
     }
   };
 
-  const pauseSelected = async () => {
-    const selectedRows = rows.filter((row) => selected.has(row.id));
-    const eligible = selectedRows.filter((row) => row.status === 'running');
-    if (eligible.length === 0) {
-      pushToast('Không có chiến dịch nào hợp lệ để tạm dừng.');
-      return;
-    }
-
-    try {
-      await Promise.all(eligible.map((row) => adminPromotionService.updateStatus(row.id, 'paused')));
-      setSelected(new Set());
-      pushToast(`Đã tạm dừng ${eligible.length} chiến dịch.`);
-      await loadData();
-    } catch (error: unknown) {
-      pushToast(getErrorMessage(error, 'Không thể cập nhật hàng loạt.'));
-    }
-  };
-
   const deleteSelected = async () => {
     if (!deleteIds?.length) return;
     try {
@@ -588,3 +570,5 @@ const AdminPromotions = () => {
 };
 
 export default AdminPromotions;
+
+

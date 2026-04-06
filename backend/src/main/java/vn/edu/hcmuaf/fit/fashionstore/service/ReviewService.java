@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReviewRequestDTO;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.ReviewEligibleItemResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.ReviewResponse;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorReviewSummaryResponse;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Order;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Product;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Review;
@@ -95,14 +96,51 @@ public class ReviewService {
 
     @Transactional(readOnly = true)
     public Page<ReviewResponse> getStoreReviews(UUID storeId, Review.ReviewStatus status, Pageable pageable) {
-        Page<Review> page = status == null
-                ? reviewRepository.findByStoreId(storeId, pageable)
-                : reviewRepository.findByStoreIdAndStatus(storeId, status, pageable);
+        return getStoreReviews(storeId, status, null, null, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> getStoreReviews(
+            UUID storeId,
+            Review.ReviewStatus status,
+            String keyword,
+            Boolean needReply,
+            Integer maxRating,
+            Pageable pageable
+    ) {
+        String normalizedKeyword = keyword == null ? null : keyword.trim();
+        if (normalizedKeyword != null && normalizedKeyword.isEmpty()) {
+            normalizedKeyword = null;
+        }
+
+        Page<Review> page = reviewRepository.searchStoreReviews(
+                storeId,
+                status,
+                normalizedKeyword,
+                needReply,
+                maxRating,
+                pageable
+        );
 
         List<ReviewResponse> content = page.getContent().stream()
                 .map(this::toReviewResponse)
                 .collect(Collectors.toList());
         return new PageImpl<>(content, pageable, page.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public VendorReviewSummaryResponse getStoreReviewSummary(UUID storeId) {
+        long total = reviewRepository.countByStoreId(storeId);
+        long needReply = reviewRepository.countByStoreIdNeedReply(storeId);
+        long negative = reviewRepository.countByStoreIdWithMaxRating(storeId, 3);
+        Double average = reviewRepository.calculateRawAverageRatingByStoreId(storeId);
+
+        return VendorReviewSummaryResponse.builder()
+                .total(total)
+                .needReply(needReply)
+                .negative(negative)
+                .average(average == null ? 0.0 : Math.round(average * 10.0) / 10.0)
+                .build();
     }
 
     @Transactional(readOnly = true)

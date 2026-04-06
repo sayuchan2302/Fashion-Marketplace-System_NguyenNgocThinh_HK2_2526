@@ -1,7 +1,7 @@
 import './AdminFinancials.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, CheckCircle2, Eye, WalletCards, X, Clock } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Eye, WalletCards, X } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminStateBlock } from './AdminStateBlocks';
@@ -142,6 +142,7 @@ const AdminFinancials = () => {
     try {
       for (const storeId of confirmState.storeIds) {
         await walletService.getAdminWallets('', 1, 1);
+        void storeId;
       }
       setSelected(new Set());
       setConfirmState(null);

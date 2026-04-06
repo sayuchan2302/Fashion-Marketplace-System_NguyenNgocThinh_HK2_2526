@@ -424,84 +424,10 @@ const mapBackendTopProduct = (
   img: product.productImage || FALLBACK_IMAGE,
 });
 
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const toStartOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
-
-const dateKey = (value: Date) => {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const dateLabel = (value: Date) =>
-  `${String(value.getDate()).padStart(2, '0')}/${String(value.getMonth() + 1).padStart(2, '0')}`;
 
 const isoDate = (value: Date) =>
   `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-
-const toValidDate = (raw?: string) => {
-  if (!raw) return null;
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const getDaysAgo = (raw?: string) => {
-  const parsed = toValidDate(raw);
-  if (!parsed) return null;
-  const nowStart = toStartOfDay(new Date()).getTime();
-  const orderStart = toStartOfDay(parsed).getTime();
-  return Math.floor((nowStart - orderStart) / DAY_IN_MS);
-};
-
-const summarizeWindow = (orders: VendorOrderSummary[], fromDaysAgo: number, toDaysAgo: number) => {
-  const scoped = orders.filter((order) => {
-    const daysAgo = getDaysAgo(order.date);
-    return daysAgo !== null && daysAgo >= fromDaysAgo && daysAgo < toDaysAgo;
-  });
-
-  const revenue = scoped.reduce((sum, order) => sum + Number(order.total || 0), 0);
-  const payout = scoped.reduce((sum, order) => sum + Number(order.vendorPayout || 0), 0);
-  const commission = scoped.reduce((sum, order) => sum + Number(order.commissionFee || 0), 0);
-  const count = scoped.length;
-  const deliveredCount = scoped.filter((order) => order.status === 'delivered').length;
-
-  return {
-    revenue: Math.round(revenue),
-    payout: Math.round(payout),
-    commission: Math.round(commission),
-    orders: count,
-    avgOrderValue: count > 0 ? Math.round(revenue / count) : 0,
-    conversionRate: count > 0 ? Number(((deliveredCount / count) * 100).toFixed(1)) : 0,
-  };
-};
-
-const buildDailySeries = (orders: VendorOrderSummary[], days = 7) => {
-  const now = toStartOfDay(new Date());
-  const buckets = new Map<string, { date: string; revenue: number; payout: number; commission: number; orders: number }>();
-
-  for (let index = days - 1; index >= 0; index -= 1) {
-    const current = new Date(now);
-    current.setDate(now.getDate() - index);
-    buckets.set(dateKey(current), { date: dateLabel(current), revenue: 0, payout: 0, commission: 0, orders: 0 });
-  }
-
-  orders.forEach((order) => {
-    const parsed = toValidDate(order.date);
-    if (!parsed) return;
-    const key = dateKey(toStartOfDay(parsed));
-    const bucket = buckets.get(key);
-    if (!bucket) return;
-    bucket.orders += 1;
-    bucket.revenue += Number(order.total || 0);
-    bucket.payout += Number(order.vendorPayout || 0);
-    bucket.commission += Number(order.commissionFee || 0);
-  });
-
-  return Array.from(buckets.values());
-};
 
 const toVendorSettings = (store: StoreProfile): VendorSettingsData => ({
   storeInfo: {
@@ -706,11 +632,18 @@ export const vendorPortalService = {
 
   async getAnalytics(params: { commissionRate?: number } = {}) {
     const commissionRate = params.commissionRate ?? 5;
-    const analytics = await apiRequest<BackendVendorAnalyticsResponse>(
-      `/api/orders/my-store/analytics?commissionRate=${commissionRate}`,
-      {},
-      { auth: true },
-    );
+    const [analytics, topProducts] = await Promise.all([
+      apiRequest<BackendVendorAnalyticsResponse>(
+        `/api/orders/my-store/analytics?commissionRate=${commissionRate}`,
+        {},
+        { auth: true },
+      ),
+      apiRequest<BackendTopProduct[]>(
+        '/api/orders/my-store/top-products?days=30&limit=5',
+        {},
+        { auth: true },
+      ).catch(() => []),
+    ]);
 
     return {
       periods: {
@@ -758,7 +691,7 @@ export const vendorPortalService = {
         commission: d.commission,
         orders: d.orders,
       })),
-      topProducts: [],
+      topProducts: (topProducts || []).map((item, index) => mapBackendTopProduct(item, index)),
       commissionRate: analytics.commissionRate,
     };
   },

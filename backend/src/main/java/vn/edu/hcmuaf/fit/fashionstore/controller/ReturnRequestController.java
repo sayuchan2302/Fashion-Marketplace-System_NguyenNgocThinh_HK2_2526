@@ -22,6 +22,7 @@ import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReturnRejectRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReturnShippingUpdateRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReturnSubmitRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.ReturnRequestResponse;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorReturnSummaryResponse;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ReturnRequest;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext;
 import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext.UserContext;
@@ -111,6 +112,15 @@ public class ReturnRequestController {
         );
         List<ReturnRequest.ReturnStatus> effectiveStatuses = mergeStatuses(status, statuses);
         return ResponseEntity.ok(returnRequestService.listForVendor(ctx.getStoreId(), effectiveStatuses, keyword, pageable));
+    }
+
+    @GetMapping("/my-store/summary")
+    @PreAuthorize("hasRole('VENDOR')")
+    public ResponseEntity<VendorReturnSummaryResponse> getMyStoreSummary(
+            @RequestHeader("Authorization") String authHeader
+    ) {
+        UserContext ctx = authContext.requireVendor(authHeader);
+        return ResponseEntity.ok(returnRequestService.getVendorSummary(ctx.getStoreId()));
     }
 
     @PatchMapping("/my-store/{id}/accept")

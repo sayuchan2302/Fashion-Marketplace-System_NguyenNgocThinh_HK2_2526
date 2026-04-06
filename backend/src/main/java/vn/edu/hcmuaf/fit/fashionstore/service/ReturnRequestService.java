@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReturnAdminVerdictRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReturnSubmitRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.ReturnRequestResponse;
+import vn.edu.hcmuaf.fit.fashionstore.dto.response.VendorReturnSummaryResponse;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Order;
 import vn.edu.hcmuaf.fit.fashionstore.entity.OrderItem;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ReturnRequest;
@@ -176,6 +177,35 @@ public class ReturnRequestService {
                 pageable
         );
         return page.map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public VendorReturnSummaryResponse getVendorSummary(UUID storeId) {
+        if (storeId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Store is required");
+        }
+
+        Map<ReturnRequest.ReturnStatus, Long> countsByStatus = returnRequestRepository
+                .countGroupedByStatusForStore(storeId)
+                .stream()
+                .collect(Collectors.toMap(
+                        ReturnRequestRepository.ReturnStatusCountProjection::getStatus,
+                        ReturnRequestRepository.ReturnStatusCountProjection::getTotal
+                ));
+
+        long total = countsByStatus.values().stream().mapToLong(Long::longValue).sum();
+        long pendingVendor = countsByStatus.getOrDefault(ReturnRequest.ReturnStatus.PENDING_VENDOR, 0L);
+        long received = countsByStatus.getOrDefault(ReturnRequest.ReturnStatus.RECEIVED, 0L);
+        long shipping = countsByStatus.getOrDefault(ReturnRequest.ReturnStatus.SHIPPING, 0L);
+        long disputed = countsByStatus.getOrDefault(ReturnRequest.ReturnStatus.DISPUTED, 0L);
+
+        return VendorReturnSummaryResponse.builder()
+                .all(total)
+                .needsAction(pendingVendor + received)
+                .inTransit(shipping)
+                .toInspect(received)
+                .disputed(disputed)
+                .build();
     }
 
     @Transactional(readOnly = true)

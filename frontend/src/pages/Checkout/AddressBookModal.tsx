@@ -68,7 +68,7 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
   if (!isOpen) return null;
 
   const addressIcon = (address: Address) => {
-    const label = (address.addressType || '').toLowerCase();
+    const label = (address.detail || '').toLowerCase();
     if (label.includes('nhà') || label.includes('home')) return <Home size={16} />;
     if (label.includes('công ty') || label.includes('office') || label.includes('cơ quan')) return <Building2 size={16} />;
     return <MapPin size={16} />;
@@ -166,3 +166,4 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
 };
 
 export default AddressBookModal;
+

@@ -291,24 +291,6 @@ const AdminUsers = () => {
     });
   };
 
-  const lockableSelectedIds = useMemo(
-    () =>
-      Array.from(selected).filter((id) => {
-        const user = users.find((item) => item.id === id);
-        return Boolean(user && canManageUser(user) && user.status !== 'LOCKED');
-      }),
-    [selected, users],
-  );
-
-  const unlockableSelectedIds = useMemo(
-    () =>
-      Array.from(selected).filter((id) => {
-        const user = users.find((item) => item.id === id);
-        return Boolean(user && canManageUser(user) && user.status === 'LOCKED');
-      }),
-    [selected, users],
-  );
-
   const applyStatusChange = async () => {
     if (!confirmState) return;
 
@@ -763,3 +745,5 @@ const AdminUsers = () => {
 };
 
 export default AdminUsers;
+
+

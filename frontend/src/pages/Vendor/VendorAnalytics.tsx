@@ -1,6 +1,6 @@
 import './Vendor.css';
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Download, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, DollarSign, Percent, ShoppingCart, Package } from 'lucide-react';
+import { Download, TrendingUp, ArrowUpRight, ArrowDownRight, ShoppingCart, Package } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import VendorLayout from './VendorLayout';
 import { formatCurrency } from '../../services/commissionService';
@@ -82,7 +82,7 @@ const VendorAnalytics = () => {
     return () => {
       active = false;
     };
-  }, [activePeriod, addToast, reloadKey]);
+  }, [addToast, analytics.commissionRate, reloadKey]);
 
   const periodData = analytics.periods[activePeriod];
   const commission = { commission: periodData.commission, payout: periodData.payout };
@@ -96,10 +96,6 @@ const VendorAnalytics = () => {
   const payoutChange = prevCommission.payout > 0
     ? ((commission.payout - prevCommission.payout) / prevCommission.payout) * 100
     : 0;
-  const commissionChange = prevCommission.commission > 0
-    ? ((commission.commission - prevCommission.commission) / prevCommission.commission) * 100
-    : 0;
-
   const chartData = useMemo(() =>
     analytics.dailyData.map((d) => ({
       date: d.date,
@@ -124,7 +120,17 @@ const VendorAnalytics = () => {
     );
   };
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }> }) => {
+  type AnalyticsTooltipEntry = {
+    name: string;
+    value: number;
+    color: string;
+    payload: {
+      dateLabel: string;
+      orders: number;
+    };
+  };
+
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: AnalyticsTooltipEntry[] }) => {
     if (!active || !payload?.length) return null;
     return (
       <div className="analytics-tooltip">
@@ -162,9 +168,14 @@ const VendorAnalytics = () => {
               </button>
             ))}
           </div>
-          <button className="admin-ghost-btn">
+          <button
+            className="admin-ghost-btn"
+            type="button"
+            disabled
+            title="Tính năng xuất báo cáo đang được phát triển"
+          >
             <Download size={16} />
-            Xuất báo cáo
+            Xuất báo cáo (sắp có)
           </button>
         </>
       )}

@@ -49,11 +49,6 @@ const reasonLabel: Record<string, string> = {
   OTHER: 'Lý do khác',
 };
 
-const resolutionLabel: Record<string, string> = {
-  REFUND: 'Hoàn tiền',
-  EXCHANGE: 'Đổi sản phẩm',
-};
-
 const TAB_STATUS_MAP: Record<VendorReturnTab, ReturnStatus[] | undefined> = {
   all: undefined,
   needsAction: ['PENDING_VENDOR', 'RECEIVED'],
@@ -115,20 +110,13 @@ const VendorReturnDashboard = () => {
 
   const fetchTabCounts = useCallback(async () => {
     try {
-      const [all, pendingVendor, received, shipping, disputed] = await Promise.all([
-        returnService.listVendor({ page: 0, size: 1 }),
-        returnService.listVendor({ status: 'PENDING_VENDOR', page: 0, size: 1 }),
-        returnService.listVendor({ status: 'RECEIVED', page: 0, size: 1 }),
-        returnService.listVendor({ status: 'SHIPPING', page: 0, size: 1 }),
-        returnService.listVendor({ status: 'DISPUTED', page: 0, size: 1 }),
-      ]);
-
+      const summary = await returnService.getVendorSummary();
       setTabCounts({
-        all: Number(all.totalElements || 0),
-        needsAction: Number(pendingVendor.totalElements || 0) + Number(received.totalElements || 0),
-        inTransit: Number(shipping.totalElements || 0),
-        toInspect: Number(received.totalElements || 0),
-        disputed: Number(disputed.totalElements || 0),
+        all: Number(summary.all || 0),
+        needsAction: Number(summary.needsAction || 0),
+        inTransit: Number(summary.inTransit || 0),
+        toInspect: Number(summary.toInspect || 0),
+        disputed: Number(summary.disputed || 0),
       });
     } catch {
       // Keep current counts when stats request fails.

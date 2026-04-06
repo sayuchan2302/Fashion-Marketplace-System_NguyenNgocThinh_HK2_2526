@@ -1,15 +1,23 @@
 import './Vendor.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, MessageSquare, Star } from 'lucide-react';
 import VendorLayout from './VendorLayout';
-import { PanelStatsGrid, PanelTabs } from '../../components/Panel/PanelPrimitives';
 import {
   PanelDrawerFooter,
   PanelDrawerHeader,
   PanelDrawerSection,
+  PanelSearchField,
+  PanelStatsGrid,
+  PanelTableFooter,
+  PanelTabs,
 } from '../../components/Panel/PanelPrimitives';
-import { reviewService, type Review } from '../../services/reviewService';
+import {
+  reviewService,
+  type Review,
+  type VendorReviewSummary,
+  type VendorReviewsPage,
+} from '../../services/reviewService';
 import { useToast } from '../../contexts/ToastContext';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
@@ -20,8 +28,24 @@ import { toDisplayOrderCode } from '../../utils/displayCode';
 const TABS = [
   { key: 'all', label: 'Tất cả' },
   { key: 'need_reply', label: 'Cần phản hồi' },
-  { key: 'negative', label: 'Đánh giá tiêu cực' },
+  { key: 'negative', label: 'Tiêu cực' },
 ] as const;
+
+const PAGE_SIZE = 12;
+
+const emptyReviewsPage: VendorReviewsPage = {
+  items: [],
+  totalElements: 0,
+  totalPages: 1,
+  page: 1,
+};
+
+const emptyReviewSummary: VendorReviewSummary = {
+  total: 0,
+  needReply: 0,
+  negative: 0,
+  average: 0,
+};
 
 const RatingStars = ({ rating }: { rating: number }) => (
   <div className="vendor-rating-stars">
@@ -66,9 +90,12 @@ const getModerationLabel = (status?: Review['status']) => {
 
 const VendorReviews = () => {
   const { addToast } = useToast();
-  const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'need_reply' | 'negative'>('all');
-  const [allReviews, setAllReviews] = useState<Review[]>([]);
+  const [page, setPage] = useState(1);
+  const [reviewsPage, setReviewsPage] = useState<VendorReviewsPage>(emptyReviewsPage);
+  const [summary, setSummary] = useState<VendorReviewSummary>(emptyReviewSummary);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
@@ -80,58 +107,88 @@ const VendorReviews = () => {
   const canVendorReply = reviewService.canVendorReply();
 
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        setLoading(true);
-        setLoadError(null);
-        const rows = await reviewService.getVendorReviews({ size: 1000 });
-        if (!mounted) return;
-        setAllReviews(rows);
-      } catch (err: unknown) {
-        if (!mounted) return;
-        setAllReviews([]);
-        setLoadError(getUiErrorMessage(err, 'Không tải được đánh giá của cửa hàng.'));
-      } finally {
-        if (mounted) setLoading(false);
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage(1);
+    setSelected(new Set());
+  }, [activeTab, debouncedQuery]);
+
+  const tabFilters = useMemo(() => {
+    if (activeTab === 'need_reply') return { needReply: true as const };
+    if (activeTab === 'negative') return { maxRating: 3 as const };
+    return {};
+  }, [activeTab]);
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      const next = await reviewService.getVendorReviewSummary();
+      setSummary(next);
+    } catch {
+      // Keep current summary on summary request failure.
+    }
+  }, []);
+
+  const fetchReviews = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+
+      const next = await reviewService.getVendorReviews({
+        page,
+        size: PAGE_SIZE,
+        q: debouncedQuery || undefined,
+        ...tabFilters,
+      });
+
+      setReviewsPage(next);
+      setSelected((prev) => {
+        if (prev.size === 0) return prev;
+        const visibleIds = new Set(next.items.map((item) => item.id));
+        return new Set(Array.from(prev).filter((id) => visibleIds.has(id)));
+      });
+
+      if (page > next.totalPages) {
+        setPage(next.totalPages);
       }
-    };
+    } catch (err: unknown) {
+      setReviewsPage(emptyReviewsPage);
+      setLoadError(getUiErrorMessage(err, 'Không tải được đánh giá của cửa hàng.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedQuery, page, tabFilters]);
 
-    void load();
-    return () => {
-      mounted = false;
-    };
-  }, [reloadKey]);
+  useEffect(() => {
+    void fetchSummary();
+  }, [fetchSummary, reloadKey]);
 
-  const reviews = useMemo(() => {
-    return allReviews.filter((review) => {
-      const keyword = query.trim().toLowerCase();
-      const matchesSearch =
-        !keyword || `${review.productName} ${review.content} ${review.orderCode || ''}`.toLowerCase().includes(keyword);
-      const matchesTab =
-        activeTab === 'all'
-          ? true
-          : activeTab === 'need_reply'
-            ? !review.shopReply
-            : review.rating <= 3;
-      return matchesSearch && matchesTab;
-    });
-  }, [activeTab, allReviews, query]);
+  useEffect(() => {
+    void fetchReviews();
+  }, [fetchReviews, reloadKey]);
 
-  const stats = useMemo(() => {
-    return {
-      total: allReviews.length,
-      needReply: allReviews.filter((review) => !review.shopReply).length,
-      negative: allReviews.filter((review) => review.rating <= 3).length,
-      average: allReviews.length
-        ? (allReviews.reduce((sum, review) => sum + review.rating, 0) / allReviews.length).toFixed(1)
-        : '0.0',
-    };
-  }, [allReviews]);
+  const reviews = reviewsPage.items;
+
+  useEffect(() => {
+    if (!activeReview) return;
+    const refreshed = reviews.find((review) => review.id === activeReview.id);
+    if (refreshed) {
+      setActiveReview(refreshed);
+    }
+  }, [activeReview, reviews]);
+
+  const safePage = Math.min(page, reviewsPage.totalPages);
+  const startIndex = reviewsPage.totalElements === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(reviewsPage.totalElements, safePage * PAGE_SIZE);
 
   const resetCurrentView = () => {
-    setQuery('');
+    setSearchQuery('');
     setActiveTab('all');
+    setPage(1);
     setSelected(new Set());
   };
 
@@ -143,7 +200,7 @@ const VendorReviews = () => {
 
     const targets = ids.filter((id) => {
       const content = (replyDrafts[id] || '').trim();
-      const review = allReviews.find((item) => item.id === id);
+      const review = reviews.find((item) => item.id === id) || (activeReview?.id === id ? activeReview : null);
       return Boolean(content) && Boolean(review) && !review?.shopReply;
     });
 
@@ -168,7 +225,6 @@ const VendorReviews = () => {
       );
 
       const updatedMap = new Map(updates);
-      setAllReviews((current) => current.map((review) => updatedMap.get(review.id) || review));
       setReplyDrafts((current) => {
         const next = { ...current };
         targets.forEach((id) => {
@@ -188,6 +244,7 @@ const VendorReviews = () => {
           : 'Đã gửi phản hồi cho đánh giá.',
         'success',
       );
+      await Promise.all([fetchReviews(), fetchSummary()]);
     } catch (err: unknown) {
       addToast(getUiErrorMessage(err, 'Không thể gửi phản hồi đánh giá.'), 'error');
     } finally {
@@ -199,39 +256,44 @@ const VendorReviews = () => {
     }
   };
 
-  const selectedNeedReply = Array.from(selected).filter((id) => {
-    if (!canVendorReply) return false;
-    const current = reviews.find((review) => review.id === id);
-    return current && !current.shopReply && (replyDrafts[id] || '').trim();
-  });
-  const selectedReplyLabels = selectedNeedReply
-    .map((id) => {
-      const review = reviews.find((item) => item.id === id);
-      if (!review) return null;
-      return `${review.productName} - #${toDisplayOrderCode(review.orderCode)}`;
-    })
-    .filter((label): label is string => Boolean(label));
+  const selectedNeedReply = useMemo(() => {
+    return Array.from(selected).filter((id) => {
+      if (!canVendorReply) return false;
+      const current = reviews.find((review) => review.id === id);
+      return Boolean(current && !current.shopReply && (replyDrafts[id] || '').trim());
+    });
+  }, [canVendorReply, replyDrafts, reviews, selected]);
+
+  const selectedReplyLabels = useMemo(() => {
+    return selectedNeedReply
+      .map((id) => {
+        const review = reviews.find((item) => item.id === id);
+        if (!review) return null;
+        return `${review.productName} - #${toDisplayOrderCode(review.orderCode)}`;
+      })
+      .filter((label): label is string => Boolean(label));
+  }, [reviews, selectedNeedReply]);
 
   const statItems = [
     {
       key: 'all',
       label: 'Tổng đánh giá',
-      value: stats.total,
-      sub: `Điểm trung bình: ${stats.average}`,
+      value: summary.total,
+      sub: `Điểm trung bình: ${summary.average.toFixed(1)}`,
       onClick: () => setActiveTab('all'),
     },
     {
       key: 'need_reply',
       label: 'Cần phản hồi',
-      value: stats.needReply,
+      value: summary.needReply,
       sub: 'Đánh giá chưa có phản hồi từ shop',
       tone: 'warning',
       onClick: () => setActiveTab('need_reply'),
     },
     {
       key: 'negative',
-      label: 'Đánh giá ≤ 3 sao',
-      value: stats.negative,
+      label: 'Đánh giá <= 3 sao',
+      value: summary.negative,
       sub: 'Tín hiệu cần chăm sóc ưu tiên',
       tone: 'info',
       onClick: () => setActiveTab('negative'),
@@ -239,15 +301,24 @@ const VendorReviews = () => {
     {
       key: 'reply_rate',
       label: 'Tỷ lệ phản hồi',
-      value: stats.total ? `${Math.round(((stats.total - stats.needReply) / stats.total) * 100)}%` : '0%',
+      value: summary.total ? `${Math.round(((summary.total - summary.needReply) / summary.total) * 100)}%` : '0%',
       sub: 'Tỷ lệ đánh giá đã được shop chăm sóc',
       tone: 'success',
       onClick: () => setActiveTab('all'),
     },
   ] as const;
 
-  const tabItems = TABS.map((tab) => ({ key: tab.key, label: tab.label }));
+  const tabCountMap = {
+    all: summary.total,
+    need_reply: summary.needReply,
+    negative: summary.negative,
+  };
 
+  const tabItems = TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    count: tabCountMap[tab.key],
+  }));
 
   return (
     <VendorLayout
@@ -271,6 +342,24 @@ const VendorReviews = () => {
                 <p className="admin-muted small">Bạn cần đăng nhập bằng tài khoản người bán để phản hồi đánh giá.</p>
               ) : null}
             </div>
+            <div className="vendor-reviews-head-actions">
+              <PanelSearchField
+                placeholder="Tìm theo sản phẩm, nội dung, mã đơn..."
+                value={searchQuery}
+                onChange={setSearchQuery}
+              />
+              {canVendorReply ? (
+                <button
+                  className="admin-ghost-btn"
+                  type="button"
+                  disabled={selectedNeedReply.length === 0}
+                  onClick={() => setConfirmReplyIds(selectedNeedReply)}
+                >
+                  <MessageSquare size={14} />
+                  Phản hồi đã chọn
+                </button>
+              ) : null}
+            </div>
           </div>
           {loading ? (
             <AdminStateBlock
@@ -288,98 +377,107 @@ const VendorReviews = () => {
             />
           ) : reviews.length === 0 ? (
             <AdminStateBlock
-              type={query.trim() ? 'search-empty' : 'empty'}
-              title={query.trim() ? 'Không có đánh giá phù hợp' : 'Chưa có đánh giá cần xử lý'}
+              type={debouncedQuery ? 'search-empty' : 'empty'}
+              title={debouncedQuery ? 'Không có đánh giá phù hợp' : 'Chưa có đánh giá cần xử lý'}
               description={
-                query.trim()
+                debouncedQuery
                   ? 'Thử đổi từ khóa hoặc tab để xem lại hàng đợi phản hồi của shop.'
                   : 'Khi khách để lại đánh giá, kênh người bán sẽ hiển thị tại đây.'
               }
-              actionLabel={query.trim() ? 'Đặt lại bộ lọc' : undefined}
-              onAction={query.trim() ? resetCurrentView : undefined}
+              actionLabel={debouncedQuery ? 'Đặt lại bộ lọc' : undefined}
+              onAction={debouncedQuery ? resetCurrentView : undefined}
             />
           ) : (
-            <div className="admin-table" role="table" aria-label="Bảng đánh giá của shop">
-              <div className="admin-table-row vendor-reviews admin-table-head" role="row">
-                <div role="columnheader">
-                  <input
-                    type="checkbox"
-                    checked={selected.size === reviews.length && reviews.length > 0}
-                    onChange={(event) => setSelected(event.target.checked ? new Set(reviews.map((item) => item.id)) : new Set())}
-                  />
-                </div>
-                <div role="columnheader">Sản phẩm</div>
-                <div role="columnheader">Đánh giá</div>
-                <div role="columnheader">Nội dung</div>
-                <div role="columnheader">Thời gian</div>
-                <div role="columnheader">Trạng thái</div>
-                <div role="columnheader">Phản hồi</div>
-                <div role="columnheader">Hành động</div>
-              </div>
-
-              {reviews.map((review, index) => (
-                <motion.div
-                  key={review.id}
-                  className="admin-table-row vendor-reviews"
-                  role="row"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: Math.min(index * 0.025, 0.14) }}
-                  whileHover={{ y: -1 }}
-                  onClick={() => setActiveReview(review)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div role="cell" onClick={(event) => event.stopPropagation()}>
+            <>
+              <div className="admin-table" role="table" aria-label="Bảng đánh giá của shop">
+                <div className="admin-table-row vendor-reviews admin-table-head" role="row">
+                  <div role="columnheader">
                     <input
                       type="checkbox"
-                      checked={selected.has(review.id)}
-                      onChange={(event) => {
-                        const next = new Set(selected);
-                        if (event.target.checked) next.add(review.id);
-                        else next.delete(review.id);
-                        setSelected(next);
-                      }}
+                      checked={selected.size === reviews.length && reviews.length > 0}
+                      onChange={(event) => setSelected(event.target.checked ? new Set(reviews.map((item) => item.id)) : new Set())}
                     />
                   </div>
-                  <div role="cell" className="vendor-admin-product-cell">
-                    <img src={review.productImage} alt={review.productName} className="vendor-admin-thumb" />
-                    <div className="vendor-admin-product-copy">
-                      <div className="admin-bold">{review.productName}</div>
-                      <div className="admin-muted small">Đơn #{toDisplayOrderCode(review.orderCode)}</div>
+                  <div role="columnheader">Sản phẩm</div>
+                  <div role="columnheader">Đánh giá</div>
+                  <div role="columnheader">Nội dung</div>
+                  <div role="columnheader">Thời gian</div>
+                  <div role="columnheader">Trạng thái</div>
+                  <div role="columnheader">Phản hồi</div>
+                  <div role="columnheader">Hành động</div>
+                </div>
+
+                {reviews.map((review, index) => (
+                  <motion.div
+                    key={review.id}
+                    className="admin-table-row vendor-reviews"
+                    role="row"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: Math.min(index * 0.025, 0.14) }}
+                    whileHover={{ y: -1 }}
+                    onClick={() => setActiveReview(review)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div role="cell" onClick={(event) => event.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(review.id)}
+                        onChange={(event) => {
+                          const next = new Set(selected);
+                          if (event.target.checked) next.add(review.id);
+                          else next.delete(review.id);
+                          setSelected(next);
+                        }}
+                      />
                     </div>
-                  </div>
-                  <div role="cell">
-                    <RatingStars rating={review.rating} />
-                  </div>
-                  <div role="cell" className="vendor-review-content">{review.content}</div>
-                  <div role="cell" className="admin-muted small">{formatDateTime(review.createdAt)}</div>
-                  <div role="cell">
-                    <span className={`admin-pill ${review.rating <= 3 ? 'pending' : 'success'}`}>
-                      {review.rating <= 3 ? 'Cần chăm sóc' : 'Ổn định'}
-                    </span>
-                  </div>
-                  <div role="cell">
-                    {review.shopReply ? (
-                      <div className="vendor-reply-badge">
-                        <span className="admin-bold">Đã phản hồi</span>
+                    <div role="cell" className="vendor-admin-product-cell">
+                      <img src={review.productImage} alt={review.productName} className="vendor-admin-thumb" />
+                      <div className="vendor-admin-product-copy">
+                        <div className="admin-bold">{review.productName}</div>
+                        <div className="admin-muted small">Đơn #{toDisplayOrderCode(review.orderCode)}</div>
                       </div>
-                    ) : (
-                      <span className="badge amber">Chưa phản hồi</span>
-                    )}
-                  </div>
-                  <div role="cell" className="admin-actions" onClick={(event) => event.stopPropagation()}>
-                    <button
-                      className="admin-icon-btn subtle"
-                      onClick={() => setActiveReview(review)}
-                      aria-label="Xem chi tiết đánh giá"
-                      title="Xem chi tiết đánh giá"
-                    >
-                      <Eye size={16} />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                    </div>
+                    <div role="cell">
+                      <RatingStars rating={review.rating} />
+                    </div>
+                    <div role="cell" className="vendor-review-content">{review.content}</div>
+                    <div role="cell" className="admin-muted small">{formatDateTime(review.createdAt)}</div>
+                    <div role="cell">
+                      <span className={`admin-pill ${review.rating <= 3 ? 'pending' : 'success'}`}>
+                        {review.rating <= 3 ? 'Cần chăm sóc' : 'Ổn định'}
+                      </span>
+                    </div>
+                    <div role="cell">
+                      {review.shopReply ? (
+                        <div className="vendor-reply-badge">
+                          <span className="admin-bold">Đã phản hồi</span>
+                        </div>
+                      ) : (
+                        <span className="badge amber">Chưa phản hồi</span>
+                      )}
+                    </div>
+                    <div role="cell" className="admin-actions" onClick={(event) => event.stopPropagation()}>
+                      <button
+                        className="admin-icon-btn subtle"
+                        onClick={() => setActiveReview(review)}
+                        aria-label="Xem chi tiết đánh giá"
+                        title="Xem chi tiết đánh giá"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <PanelTableFooter
+                page={safePage}
+                totalPages={reviewsPage.totalPages}
+                onPageChange={setPage}
+                meta={`Hiển thị ${startIndex}-${endIndex} / ${reviewsPage.totalElements} đánh giá`}
+              />
+            </>
           )}
         </div>
       </section>
@@ -520,4 +618,3 @@ const VendorReviews = () => {
 };
 
 export default VendorReviews;
-

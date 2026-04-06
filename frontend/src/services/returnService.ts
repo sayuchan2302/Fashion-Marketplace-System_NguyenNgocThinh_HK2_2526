@@ -68,6 +68,14 @@ export interface ReturnListResponse {
   number: number;
 }
 
+export interface VendorReturnSummary {
+  all: number;
+  needsAction: number;
+  inTransit: number;
+  toInspect: number;
+  disputed: number;
+}
+
 interface ReturnListParams {
   status?: ReturnStatus;
   statuses?: ReturnStatus[];
@@ -110,6 +118,10 @@ export const returnService = {
     if (params.size !== undefined) query.set('size', String(params.size));
     const qs = query.toString();
     return apiRequest<ReturnListResponse>(`/api/returns/my-store${qs ? `?${qs}` : ''}`, {}, { auth: true });
+  },
+
+  async getVendorSummary(): Promise<VendorReturnSummary> {
+    return apiRequest<VendorReturnSummary>('/api/returns/my-store/summary', {}, { auth: true });
   },
 
   async getAdminByIdentifier(identifier: string): Promise<ReturnRequest> {
