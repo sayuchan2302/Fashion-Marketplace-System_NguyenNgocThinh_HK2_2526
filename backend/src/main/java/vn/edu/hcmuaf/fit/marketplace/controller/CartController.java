@@ -3,7 +3,7 @@ package vn.edu.hcmuaf.fit.marketplace.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.CartItemRequest;
-import vn.edu.hcmuaf.fit.marketplace.entity.Cart;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.CartResponse;
 import vn.edu.hcmuaf.fit.marketplace.security.JwtService;
 import vn.edu.hcmuaf.fit.marketplace.service.CartService;
 
@@ -22,38 +22,38 @@ public class CartController {
     }
 
     @GetMapping
-    public ResponseEntity<Cart> getCart(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<CartResponse> getCart(@RequestHeader("Authorization") String authHeader) {
         String userIdStr = jwtService.extractUserId(authHeader.replace("Bearer ", ""));
         UUID userId = UUID.fromString(userIdStr);
-        return ResponseEntity.ok(cartService.getCartByUserId(userId));
+        return ResponseEntity.ok(cartService.getCartResponseByUserId(userId));
     }
 
     @PostMapping("/items")
-    public ResponseEntity<Cart> addItem(
+    public ResponseEntity<CartResponse> addItem(
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CartItemRequest request) {
         String userIdStr = jwtService.extractUserId(authHeader.replace("Bearer ", ""));
         UUID userId = UUID.fromString(userIdStr);
-        return ResponseEntity.ok(cartService.addItem(userId, request));
+        return ResponseEntity.ok(cartService.addItemResponse(userId, request));
     }
 
     @PutMapping("/items/{itemId}")
-    public ResponseEntity<Cart> updateItem(
+    public ResponseEntity<CartResponse> updateItem(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable UUID itemId,
             @RequestParam Integer quantity) {
         String userIdStr = jwtService.extractUserId(authHeader.replace("Bearer ", ""));
         UUID userId = UUID.fromString(userIdStr);
-        return ResponseEntity.ok(cartService.updateItemQuantity(userId, itemId, quantity));
+        return ResponseEntity.ok(cartService.updateItemQuantityResponse(userId, itemId, quantity));
     }
 
     @DeleteMapping("/items/{itemId}")
-    public ResponseEntity<Cart> removeItem(
+    public ResponseEntity<CartResponse> removeItem(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable UUID itemId) {
         String userIdStr = jwtService.extractUserId(authHeader.replace("Bearer ", ""));
         UUID userId = UUID.fromString(userIdStr);
-        return ResponseEntity.ok(cartService.removeItem(userId, itemId));
+        return ResponseEntity.ok(cartService.removeItemResponse(userId, itemId));
     }
 
     @DeleteMapping

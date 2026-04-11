@@ -1,12 +1,21 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useToast } from './ToastContext';
+import { useAuth } from './AuthContext';
+import { ApiError, apiRequest } from '../services/apiClient';
 import { authService } from '../services/authService';
-import { productService } from '../services/productService';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 export type CartItem = {
-  cartId: string;     // unique key = `${productId}-${color}-${size}`
+  cartId: string; // backend cart item id
   id: number | string;
   backendProductId?: string;
   backendVariantId?: string;
@@ -17,11 +26,10 @@ export type CartItem = {
   color: string;
   size: string;
   quantity: number;
-  // Multi-vendor fields (optional for backward compatibility)
   storeId?: string;
   storeName?: string;
   isOfficialStore?: boolean;
-}
+};
 
 export type StoreGroup = {
   storeId: string;
@@ -30,7 +38,7 @@ export type StoreGroup = {
   items: CartItem[];
   subtotal: number;
   shippingFee: number;
-}
+};
 
 interface CartContextValue {
   items: CartItem[];
@@ -43,10 +51,38 @@ interface CartContextValue {
   groupedByStore: () => StoreGroup[];
 }
 
-// ─── Context ──────────────────────────────────────────────────────────────────
+interface BackendCartProduct {
+  id?: string;
+  name?: string;
+  basePrice?: number | string;
+  salePrice?: number | string;
+  effectivePrice?: number | string;
+  imageUrl?: string;
+  storeId?: string;
+  storeName?: string;
+  officialStore?: boolean;
+}
+
+interface BackendCartVariant {
+  id?: string;
+  color?: string;
+  size?: string;
+}
+
+interface BackendCartItem {
+  id?: string;
+  quantity?: number;
+  unitPrice?: number | string;
+  product?: BackendCartProduct;
+  variant?: BackendCartVariant | null;
+}
+
+interface BackendCartResponse {
+  items?: BackendCartItem[];
+}
+
 const CartContext = createContext<CartContextValue | null>(null);
 
-const STORAGE_KEY = 'coolmate_cart_v1';
 const FREE_SHIPPING_THRESHOLD = 500000;
 const DEFAULT_SHIPPING_FEE = 30000;
 
@@ -56,12 +92,65 @@ const buildLoginRedirectTarget = () => {
   return `/login?reason=${encodeURIComponent('auth-required')}&redirect=${encodeURIComponent(current)}`;
 };
 
-// ─── Grouping Logic ────────────────────────────────────────────────────────────
-const groupByStore = (items: CartItem[]): StoreGroup[] => {
+const toNumber = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+};
+
+const toPositiveQuantity = (value: unknown): number => {
+  const quantity = Math.floor(toNumber(value));
+  return quantity > 0 ? quantity : 1;
+};
+
+const mapBackendCartToItems = (payload?: BackendCartResponse | null): CartItem[] => {
+  const rows = Array.isArray(payload?.items) ? payload.items : [];
+  return rows.map((row, index) => {
+    const productId = String(row.product?.id || '').trim();
+    const cartItemId = String(row.id || `${productId || 'cart-item'}-${index + 1}`).trim();
+    const variantId = String(row.variant?.id || '').trim();
+
+    const basePrice = toNumber(row.product?.basePrice);
+    const salePrice = toNumber(row.product?.salePrice);
+    const effectivePriceFromProduct = toNumber(row.product?.effectivePrice);
+    const unitPrice = toNumber(row.unitPrice);
+    const effectivePrice = unitPrice > 0
+      ? unitPrice
+      : (effectivePriceFromProduct > 0 ? effectivePriceFromProduct : (salePrice > 0 ? salePrice : basePrice));
+    const originalPrice = basePrice > effectivePrice ? basePrice : undefined;
+    const storeName = String(row.product?.storeName || '').trim();
+
+    return {
+      cartId: cartItemId,
+      id: productId || cartItemId,
+      backendProductId: productId || undefined,
+      backendVariantId: variantId || undefined,
+      name: (row.product?.name || '').trim() || `Item ${index + 1}`,
+      price: effectivePrice,
+      originalPrice,
+      image: String(row.product?.imageUrl || '').trim(),
+      color: (row.variant?.color || '').trim() || 'Mac dinh',
+      size: (row.variant?.size || '').trim() || 'F',
+      quantity: toPositiveQuantity(row.quantity),
+      storeId: String(row.product?.storeId || '').trim() || undefined,
+      storeName: storeName || 'Cua hang',
+      isOfficialStore: Boolean(row.product?.officialStore),
+    };
+  });
+};
+
+const normalizeStoreGroups = (items: CartItem[]): StoreGroup[] => {
   const groups = items.reduce((acc, item) => {
     const storeId = item.storeId || 'default-store';
-    const storeName = item.storeName || 'Cửa hàng';
-    
+    const storeName = item.storeName || 'Cua hang';
+
     if (!acc[storeId]) {
       acc[storeId] = {
         storeId,
@@ -72,181 +161,188 @@ const groupByStore = (items: CartItem[]): StoreGroup[] => {
         shippingFee: DEFAULT_SHIPPING_FEE,
       };
     }
+
     acc[storeId].items.push(item);
     acc[storeId].subtotal += item.price * item.quantity;
     return acc;
   }, {} as Record<string, StoreGroup>);
 
-  // Calculate shipping fee for each store
-  Object.values(groups).forEach(group => {
+  Object.values(groups).forEach((group) => {
     group.shippingFee = group.subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : DEFAULT_SHIPPING_FEE;
   });
 
   return Object.values(groups);
 };
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
+const toErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof ApiError) {
+    return error.message || fallback;
+  }
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+  return fallback;
+};
+
 export const CartProvider = ({ children }: { children: ReactNode }) => {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [items, setItems] = useState<CartItem[]>([]);
   const { addToast } = useToast();
+  const { token } = useAuth();
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
 
-  const ensureAuthenticated = () => {
-    const session = authService.getSession() || authService.getAdminSession();
-    const token = session?.token;
-    const isValid = Boolean(
-      token
-      && authService.isBackendJwtToken(token)
-      && !authService.isJwtExpired(token),
-    );
+  const hasBackendSession = Boolean(token && authService.isBackendJwtToken(token));
 
-    if (isValid) return true;
+  const enqueueMutation = useCallback((task: () => Promise<void>) => {
+    mutationQueueRef.current = mutationQueueRef.current
+      .then(task)
+      .catch(() => {
+        // Ignore queue errors because each task already reports user-facing errors.
+      });
+  }, []);
 
-    addToast('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.', 'info');
+  const ensureAuthenticated = useCallback(() => {
+    if (hasBackendSession) return true;
+
+    addToast('Vui long dang nhap de su dung gio hang.', 'info');
     if (typeof window !== 'undefined') {
       window.location.href = buildLoginRedirectTarget();
     }
     return false;
-  };
+  }, [addToast, hasBackendSession]);
 
-  // Persist to localStorage whenever cart changes
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  }, [items]);
-
-  // Backfill missing vendor info for legacy cart items added before store metadata existed.
-  useEffect(() => {
-    let cancelled = false;
-
-    const needsHydration = items.filter((item) => (
-      (!item.storeName || item.storeName.trim() === '' || item.storeName === 'Cửa hàng')
-      && Boolean(item.backendProductId || item.id)
-    ));
-    if (needsHydration.length === 0) {
-      return () => {
-        cancelled = true;
-      };
+  const refreshCartFromBackend = useCallback(async () => {
+    if (!hasBackendSession) {
+      setItems([]);
+      return;
     }
 
-    const hydrate = async () => {
-      const resolvedByKey = new Map<string, { storeId?: string; storeName?: string; isOfficialStore?: boolean }>();
+    try {
+      const cart = await apiRequest<BackendCartResponse>('/api/cart', {}, { auth: true });
+      setItems(mapBackendCartToItems(cart));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setItems([]);
+        return;
+      }
+      addToast(toErrorMessage(error, 'Khong the tai gio hang.'), 'error');
+    }
+  }, [addToast, hasBackendSession]);
 
-      await Promise.all(needsHydration.map(async (item) => {
-        const key = String(item.backendProductId || item.id);
-        if (resolvedByKey.has(key)) return;
-        try {
-          const product = await productService.getByIdentifier(key);
-          if (!product) return;
-          resolvedByKey.set(key, {
-            storeId: product.storeId,
-            storeName: product.storeName,
-            isOfficialStore: product.isOfficialStore,
-          });
-        } catch {
-          // Ignore hydration error and keep current cart row untouched.
-        }
-      }));
+  useEffect(() => {
+    void refreshCartFromBackend();
+  }, [refreshCartFromBackend]);
 
-      if (cancelled || resolvedByKey.size === 0) return;
-
-      setItems((prev) => {
-        let changed = false;
-        const next = prev.map((item) => {
-          const key = String(item.backendProductId || item.id);
-          const resolved = resolvedByKey.get(key);
-          if (!resolved) return item;
-
-          const nextStoreId = item.storeId || resolved.storeId;
-          const nextStoreName = (item.storeName && item.storeName !== 'Cửa hàng')
-            ? item.storeName
-            : (resolved.storeName || item.storeName);
-          const nextOfficial = item.isOfficialStore ?? resolved.isOfficialStore;
-
-          if (
-            nextStoreId === item.storeId
-            && nextStoreName === item.storeName
-            && nextOfficial === item.isOfficialStore
-          ) {
-            return item;
-          }
-
-          changed = true;
-          return {
-            ...item,
-            storeId: nextStoreId,
-            storeName: nextStoreName,
-            isOfficialStore: nextOfficial,
-          };
-        });
-
-        return changed ? next : prev;
-      });
-    };
-
-    void hydrate();
-    return () => {
-      cancelled = true;
-    };
-  }, [items]);
-
-  const addToCart = (
-    newItem: Omit<CartItem, 'cartId' | 'quantity'> & { quantity?: number }
-  ) => {
+  const addToCart = useCallback((newItem: Omit<CartItem, 'cartId' | 'quantity'> & { quantity?: number }) => {
     if (!ensureAuthenticated()) {
       return;
     }
 
-    const cartId = `${newItem.id}-${newItem.color}-${newItem.size}`;
-    const qty = newItem.quantity ?? 1;
-
-    const existing = items.find(i => i.cartId === cartId);
-    if (existing) {
-      setItems(prev => prev.map(i =>
-        i.cartId === cartId
-          ? { ...i, quantity: Math.min(i.quantity + qty, 10) }
-          : i
-      ));
-    } else {
-      setItems(prev => [...prev, { ...newItem, cartId, quantity: qty }]);
+    const productId = String(newItem.backendProductId || '').trim();
+    if (!productId) {
+      addToast('San pham chua dong bo backend, khong the them vao gio hang.', 'error');
+      return;
     }
-  };
 
-  const removeFromCart = (cartId: string) => {
-    setItems(prev => prev.filter(i => i.cartId !== cartId));
-  };
+    const variantId = String(newItem.backendVariantId || '').trim() || undefined;
+    const quantity = Math.max(1, Math.min(toPositiveQuantity(newItem.quantity), 10));
 
-  const updateQuantity = (cartId: string, quantity: number) => {
+    enqueueMutation(async () => {
+      try {
+        const cart = await apiRequest<BackendCartResponse>(
+          '/api/cart/items',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              productId,
+              variantId,
+              quantity,
+            }),
+          },
+          { auth: true },
+        );
+        setItems(mapBackendCartToItems(cart));
+      } catch (error) {
+        addToast(toErrorMessage(error, 'Khong the them vao gio hang.'), 'error');
+      }
+    });
+  }, [addToast, enqueueMutation, ensureAuthenticated]);
+
+  const removeFromCart = useCallback((cartId: string) => {
+    const normalized = String(cartId || '').trim();
+    if (!normalized || !hasBackendSession) {
+      return;
+    }
+
+    enqueueMutation(async () => {
+      try {
+        const cart = await apiRequest<BackendCartResponse>(
+          `/api/cart/items/${encodeURIComponent(normalized)}`,
+          { method: 'DELETE' },
+          { auth: true },
+        );
+        setItems(mapBackendCartToItems(cart));
+      } catch (error) {
+        addToast(toErrorMessage(error, 'Khong the xoa san pham khoi gio hang.'), 'error');
+      }
+    });
+  }, [addToast, enqueueMutation, hasBackendSession]);
+
+  const updateQuantity = useCallback((cartId: string, quantity: number) => {
+    const normalized = String(cartId || '').trim();
+    if (!normalized || !hasBackendSession) {
+      return;
+    }
     if (quantity <= 0) {
-      removeFromCart(cartId);
-    } else {
-      setItems(prev =>
-        prev.map(i => (i.cartId === cartId ? { ...i, quantity } : i))
-      );
+      removeFromCart(normalized);
+      return;
     }
-  };
 
-  const clearCart = () => setItems([]);
+    enqueueMutation(async () => {
+      try {
+        const cart = await apiRequest<BackendCartResponse>(
+          `/api/cart/items/${encodeURIComponent(normalized)}?quantity=${encodeURIComponent(String(quantity))}`,
+          { method: 'PUT' },
+          { auth: true },
+        );
+        setItems(mapBackendCartToItems(cart));
+      } catch (error) {
+        addToast(toErrorMessage(error, 'Khong the cap nhat so luong.'), 'error');
+      }
+    });
+  }, [addToast, enqueueMutation, hasBackendSession, removeFromCart]);
 
-  // Header badge should reflect number of product rows in cart, not total unit quantity.
+  const clearCart = useCallback(() => {
+    if (!hasBackendSession) {
+      setItems([]);
+      return;
+    }
+
+    enqueueMutation(async () => {
+      try {
+        await apiRequest<void>('/api/cart', { method: 'DELETE' }, { auth: true });
+        setItems([]);
+      } catch (error) {
+        addToast(toErrorMessage(error, 'Khong the xoa gio hang.'), 'error');
+      }
+    });
+  }, [addToast, enqueueMutation, hasBackendSession]);
+
   const totalItems = items.length;
-  const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const groupedByStore = () => groupByStore(items);
+  const totalPrice = useMemo(
+    () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [items],
+  );
+  const groupedByStore = useCallback(() => normalizeStoreGroups(items), [items]);
 
   return (
     <CartContext.Provider
-      value={{ 
-        items, 
-        addToCart, 
-        removeFromCart, 
-        updateQuantity, 
-        clearCart, 
-        totalItems, 
+      value={{
+        items,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+        totalItems,
         totalPrice,
         groupedByStore,
       }}
@@ -256,7 +352,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 export const useCart = (): CartContextValue => {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error('useCart must be used within a CartProvider');

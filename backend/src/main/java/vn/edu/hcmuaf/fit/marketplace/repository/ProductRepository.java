@@ -198,6 +198,13 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images WHERE p.id = :id")
     Optional<Product> findByIdWithDetails(UUID id);
 
+    @Query("""
+            SELECT DISTINCT p FROM Product p
+            LEFT JOIN FETCH p.images
+            WHERE p.id IN :ids
+            """)
+    List<Product> findAllByIdInWithImages(@Param("ids") List<UUID> ids);
+
     // ─── Multi-vendor: Store-scoped queries ────────────────────────────────────
     
     /**
