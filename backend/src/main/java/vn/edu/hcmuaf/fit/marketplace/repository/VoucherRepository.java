@@ -58,6 +58,21 @@ public interface VoucherRepository extends JpaRepository<Voucher, UUID> {
     Optional<Voucher> findByStoreIdAndCode(UUID storeId, String code);
 
     @Query("""
+            SELECT COUNT(v) > 0
+            FROM Voucher v
+            WHERE UPPER(v.code) = UPPER(:code)
+              AND v.status = :status
+              AND (v.startDate IS NULL OR v.startDate <= :today)
+              AND (v.endDate IS NULL OR v.endDate >= :today)
+              AND COALESCE(v.usedCount, 0) < COALESCE(v.totalIssued, 0)
+            """)
+    boolean existsPublicAvailableByCode(
+            @Param("code") String code,
+            @Param("status") Voucher.VoucherStatus status,
+            @Param("today") LocalDate today
+    );
+
+    @Query("""
             SELECT v FROM Voucher v
             WHERE UPPER(v.code) = UPPER(:code)
               AND v.storeId IN :storeIds

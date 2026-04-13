@@ -314,7 +314,7 @@ const AdminReturns = () => {
             />
           ) : (
             <>
-              <div className="admin-table" role="table" aria-label="Bảng yêu cầu hoàn trả">
+<div className="admin-table" role="table" aria-label="Bảng yêu cầu hoàn trả">
                 <div className="admin-table-row admin-table-head returns-row" role="row">
                   <div role="columnheader" className="returns-checkbox-cell">
                     <input
@@ -326,16 +326,16 @@ const AdminReturns = () => {
                       }}
                     />
                   </div>
-                  <div role="columnheader">Mã hoàn trả</div>
+                  <div role="columnheader">STT</div>
                   <div role="columnheader">Khách hàng</div>
                   <div role="columnheader">Gian hàng</div>
                   <div role="columnheader">Sản phẩm</div>
                   <div role="columnheader">Trạng thái</div>
                   <div role="columnheader">Giá trị</div>
                   <div role="columnheader">Hành động</div>
-                </div>
+</div>
 
-                {rows.map((item) => (
+                {rows.map((item, index) => (
                   <motion.div
                     key={item.id}
                     className={`admin-table-row returns-row ${item.status === 'DISPUTED' ? 'returns-row-disputed' : ''}`}
@@ -344,10 +344,11 @@ const AdminReturns = () => {
                     onClick={() => setDrawerItem(item)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <div role="cell" className="returns-checkbox-cell">
+<div role="cell" className="returns-checkbox-cell" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.has(item.id)}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(event) => {
                           const next = new Set(selected);
                           if (event.target.checked) next.add(item.id);
@@ -357,19 +358,18 @@ const AdminReturns = () => {
                         aria-label={`Chọn ${toDisplayReturnCode(item.code)}`}
                       />
                     </div>
-                    <div role="cell" className="returns-code-cell" title={toDisplayReturnCode(item.code)}>
-                      <strong className="returns-ellipsis">{toDisplayReturnCode(item.code)}</strong>
-                      <small className="admin-muted returns-ellipsis">{formatDateTime(item.createdAt)}</small>
+                    <div role="cell">
+                      <span className="returns-ellipsis" style={{ fontSize: '12px', fontWeight: 700 }}>{(safePage - 1) * PAGE_SIZE + index + 1}</span>
                     </div>
-                    <div role="cell" className="returns-customer-cell" title={item.customerName}>
-                      <strong className="returns-ellipsis">{item.customerName}</strong>
+<div role="cell" className="returns-customer-cell" title={item.customerName}>
+                      <span className="returns-ellipsis" style={{ fontSize: '12px', fontWeight: 700 }}>{item.customerName}</span>
                       <small className="admin-muted returns-ellipsis">{item.customerEmail || 'Chưa có email'}</small>
                     </div>
                     <div role="cell" className="returns-store-cell" title={item.storeName || 'Chưa xác định gian hàng'}>
-                      <strong className="returns-ellipsis">{item.storeName || 'Chưa xác định'}</strong>
+                      <span className="returns-ellipsis" style={{ fontSize: '12px', fontWeight: 700 }}>{item.storeName || 'Chưa xác định'}</span>
                     </div>
                     <div role="cell" className="returns-product-cell" title={item.items.map((i) => i.productName).join(', ')}>
-                      <span className="returns-ellipsis">
+                      <span className="returns-ellipsis" style={{ fontSize: '12px', fontWeight: 700 }}>
                         {item.items.map((product) => `${product.productName} (x${product.quantity})`).join(', ')}
                       </span>
                     </div>

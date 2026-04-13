@@ -14,9 +14,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.entity.Voucher;
+import vn.edu.hcmuaf.fit.marketplace.repository.PromotionNotificationDispatchRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.PromotionNotificationEventRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.UserRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.VoucherRepository;
+import vn.edu.hcmuaf.fit.marketplace.service.PromotionNotificationDispatcherService;
 
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +51,18 @@ class VoucherControllerMarketplaceCampaignIntegrationTest {
 
     @Autowired
     private VoucherRepository voucherRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PromotionNotificationEventRepository promotionNotificationEventRepository;
+
+    @Autowired
+    private PromotionNotificationDispatchRepository promotionNotificationDispatchRepository;
+
+    @Autowired
+    private PromotionNotificationDispatcherService promotionNotificationDispatcherService;
 
     @Test
     void adminCanCreateMarketplaceCampaignAndCustomerGetsPromotionNotification() throws Exception {
@@ -90,6 +107,17 @@ class VoucherControllerMarketplaceCampaignIntegrationTest {
         List<UUID> approvedStoreIds = approvedActiveStores.stream().map(Store::getId).toList();
         List<Voucher> createdVouchers = voucherRepository.findByCodeAndStoreIds(uniqueCode, approvedStoreIds);
         assertEquals(createdCount, createdVouchers.size(), "Created vouchers should match endpoint summary");
+
+        String marketplaceEventKey = "MARKETPLACE_NEW:" + uniqueCode + ":" + payload.get("startDate") + ":" + payload.get("endDate");
+        var marketplaceEvent = promotionNotificationEventRepository.findByEventKey(marketplaceEventKey).orElse(null);
+        assertNotNull(marketplaceEvent, "Expected marketplace promotion event row to be created");
+        assertTrue(
+                promotionNotificationDispatchRepository.countByEventId(marketplaceEvent.getId()) > 0,
+                "Expected per-recipient dispatch rows for marketplace event"
+        );
+
+        int firstBatch = promotionNotificationDispatcherService.dispatchDueAt(LocalDateTime.now());
+        assertTrue(firstBatch > 0, "Expected dispatcher to process queued promotion dispatches");
 
         ResponseEntity<String> notificationsResponse = restTemplate.exchange(
                 "/api/notifications/me?type=promotion&page=0&size=50",
@@ -137,6 +165,82 @@ class VoucherControllerMarketplaceCampaignIntegrationTest {
                 String.class
         );
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+
+    @Test
+    void vendorRunningVoucherNotifiesFollowersThroughDispatchPipeline() throws Exception {
+        String vendorToken = loginAndExtractToken(VENDOR_EMAIL, TEST_PASSWORD);
+        String customerToken = loginAndExtractToken(CUSTOMER_EMAIL, TEST_PASSWORD);
+
+        UUID vendorStoreId = userRepository.findByEmail(VENDOR_EMAIL)
+                .orElseThrow()
+                .getStoreId();
+        assertNotNull(vendorStoreId, "Expected vendor store id from seed data");
+
+        ResponseEntity<String> followResponse = restTemplate.exchange(
+                "/api/stores/" + vendorStoreId + "/follow",
+                HttpMethod.POST,
+                authorizedEntity(customerToken),
+                String.class
+        );
+        assertEquals(HttpStatus.OK, followResponse.getStatusCode());
+
+        String uniqueCode = "FOL" + System.currentTimeMillis();
+        Map<String, Object> payload = Map.of(
+                "name", "Follower Promo Integration",
+                "code", uniqueCode,
+                "description", "Follower should receive promotion notification",
+                "discountType", "PERCENT",
+                "discountValue", 12,
+                "minOrderValue", 100000,
+                "totalIssued", 100,
+                "startDate", LocalDate.now().minusDays(1).toString(),
+                "endDate", LocalDate.now().plusDays(4).toString(),
+                "status", "RUNNING"
+        );
+
+        ResponseEntity<String> createResponse = restTemplate.exchange(
+                "/api/vouchers/my-store",
+                HttpMethod.POST,
+                authorizedJsonEntity(vendorToken, payload),
+                String.class
+        );
+        assertEquals(HttpStatus.CREATED, createResponse.getStatusCode());
+        JsonNode created = objectMapper.readTree(createResponse.getBody());
+        String voucherId = created.path("id").asText();
+        assertFalse(voucherId.isBlank());
+
+        String storeEventKey = "STORE_NEW:" + voucherId;
+        var storeEvent = promotionNotificationEventRepository.findByEventKey(storeEventKey).orElse(null);
+        assertNotNull(storeEvent, "Expected store promotion event row to be created");
+        assertTrue(
+                promotionNotificationDispatchRepository.countByEventId(storeEvent.getId()) > 0,
+                "Expected dispatch rows for followers"
+        );
+
+        int processed = promotionNotificationDispatcherService.dispatchDueAt(LocalDateTime.now());
+        assertTrue(processed > 0, "Expected dispatcher to process follower promotion dispatches");
+
+        ResponseEntity<String> notificationsResponse = restTemplate.exchange(
+                "/api/notifications/me?type=promotion&page=0&size=50",
+                HttpMethod.GET,
+                authorizedEntity(customerToken),
+                String.class
+        );
+        assertEquals(HttpStatus.OK, notificationsResponse.getStatusCode());
+        JsonNode notificationsBody = objectMapper.readTree(notificationsResponse.getBody());
+        JsonNode content = notificationsBody.path("content");
+        assertTrue(content.isArray());
+
+        boolean foundFollowerPromotion = false;
+        for (JsonNode item : content) {
+            if ("promotion".equalsIgnoreCase(item.path("type").asText())
+                    && item.path("title").asText().contains(uniqueCode)) {
+                foundFollowerPromotion = true;
+                break;
+            }
+        }
+        assertTrue(foundFollowerPromotion, "Expected promotion notification from followed shop voucher");
     }
 
     @SuppressWarnings("unchecked")

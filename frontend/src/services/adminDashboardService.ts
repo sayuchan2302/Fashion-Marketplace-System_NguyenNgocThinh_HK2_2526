@@ -8,6 +8,7 @@ export interface AdminDashboardMetrics {
   lockedUsers: number;
   totalCustomers: number;
   runningCampaigns: number;
+  totalStores: number;
 }
 
 export interface AdminDashboardQuickViews {

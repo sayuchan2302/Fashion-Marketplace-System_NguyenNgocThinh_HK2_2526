@@ -958,14 +958,15 @@
 
 .admin-table-row.vendor-products {
   grid-template-columns:
+    38px
     44px
-    minmax(250px, 2.3fr)
-    minmax(220px, 1.9fr)
-    minmax(110px, 0.95fr)
-    minmax(110px, 0.95fr)
-    minmax(96px, 0.9fr)
-    minmax(116px, 0.95fr)
-    minmax(132px, 0.9fr);
+    minmax(220px, 2.1fr)
+    minmax(200px, 1.7fr)
+    minmax(100px, 0.85fr)
+    minmax(100px, 0.85fr)
+    minmax(90px, 0.8fr)
+    minmax(100px, 0.85fr)
+    minmax(120px, 0.85fr);
 }
 
 .admin-table-row.vendor-orders {

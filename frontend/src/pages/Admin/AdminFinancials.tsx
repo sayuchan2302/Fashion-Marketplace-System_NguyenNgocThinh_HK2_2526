@@ -278,18 +278,18 @@ const AdminFinancials = () => {
                           onChange={(event) => setSelected(event.target.checked ? new Set(records.map((item) => item.storeId)) : new Set())}
                         />
                       </div>
-                      <div role="columnheader">Slug cửa hàng</div>
+                      <div role="columnheader">STT</div>
                       <div role="columnheader">Tên Cửa hàng</div>
+                      <div role="columnheader">Slug cửa hàng</div>
                       <div role="columnheader">Khả dụng</div>
                       <div role="columnheader">Đóng băng</div>
                       <div role="columnheader">Hành động</div>
                     </div>
 
-                    {records.map((record) => (
+                    {records.map((record, index) => (
                       <motion.div
                         key={record.id}
                         className="admin-table-row financials"
-                        style={{ gridTemplateColumns: '40px 1.2fr 1.5fr 1fr 1fr 100px' }}
                         role="row"
                         whileHover={{ y: -1 }}
                       >
@@ -305,11 +305,12 @@ const AdminFinancials = () => {
                             }}
                           />
                         </div>
-                        <div role="cell">
-                          <div className="admin-bold">{toStoreRef(record)}</div>
-                        </div>
+                        <div role="cell" className="admin-mono">{(page - 1) * PAGE_SIZE + index + 1}</div>
                         <div role="cell">
                           <div className="admin-bold">{record.storeName}</div>
+                        </div>
+                        <div role="cell">
+                          <div className="admin-bold">{toStoreRef(record)}</div>
                         </div>
                         <div role="cell" className="admin-bold">
                           <span className={`admin-pill ${record.availableBalance > 0 ? 'success' : 'neutral'}`}>{formatCurrency(record.availableBalance)}</span>
@@ -354,6 +355,7 @@ const AdminFinancials = () => {
                 <>
                   <div className="admin-table" role="table" aria-label="Bảng yêu cầu rút tiền">
                     <div className="admin-table-row financials admin-table-head" role="row">
+                      <div role="columnheader">STT</div>
                       <div role="columnheader">Store</div>
                       <div role="columnheader">Số tiền</div>
                       <div role="columnheader">Ngân hàng</div>
@@ -362,14 +364,14 @@ const AdminFinancials = () => {
                       <div role="columnheader">Hành động</div>
                     </div>
 
-                    {pendingPayouts.map((payout) => (
+                    {pendingPayouts.map((payout, index) => (
                       <motion.div
                         key={payout.id}
                         className="admin-table-row financials"
-                        style={{ gridTemplateColumns: '1.5fr 1fr 1.2fr 1fr 1fr 140px' }}
                         role="row"
                         whileHover={{ y: -1 }}
                       >
+                        <div role="cell" className="admin-mono">{(payoutPage - 1) * PAGE_SIZE + index + 1}</div>
                         <div role="cell">
                           <div className="admin-bold">{payout.storeName}</div>
                           <small className="admin-muted">{toStoreRef({ storeSlug: payout.storeSlug } as VendorWallet)}</small>

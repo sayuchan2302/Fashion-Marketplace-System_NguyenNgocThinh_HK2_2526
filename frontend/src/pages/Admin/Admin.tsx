@@ -289,8 +289,8 @@ const Admin = () => {
         spark: gmvSpark,
       },
       {
-        label: 'Chờ duyệt vendor',
-        value: String(metrics?.pendingStoreApprovals || 0),
+        label: 'Tổng gian hàng',
+        value: String(metrics?.totalStores || 0),
         change: 'Live',
         icon: <Store size={18} />,
         to: '/admin/stores',

@@ -43,6 +43,16 @@ jwt:
 app:
   seed:
     enabled: ${APP_SEED_ENABLED:true}
+  notifications:
+    promotion:
+      timezone: ${APP_PROMOTION_NOTIFICATION_TIMEZONE:Asia/Ho_Chi_Minh}
+      dispatcher:
+        fixed-delay-ms: ${APP_PROMOTION_DISPATCHER_DELAY_MS:15000}
+        batch-size: ${APP_PROMOTION_DISPATCHER_BATCH_SIZE:100}
+        max-attempts: ${APP_PROMOTION_DISPATCHER_MAX_ATTEMPTS:8}
+        backoff-minutes: ${APP_PROMOTION_DISPATCHER_BACKOFF_MINUTES:1,5,15,60}
+      reminder:
+        cron: ${APP_PROMOTION_REMINDER_CRON:0 */10 * * * *}
 
 springdoc:
   api-docs:

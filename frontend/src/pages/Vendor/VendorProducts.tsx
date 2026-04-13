@@ -740,6 +740,7 @@ const VendorProducts = () => {
                   <div role="columnheader">
                     <input type="checkbox" aria-label="Chọn tất cả sản phẩm" checked={allSelected} onChange={(event) => toggleSelectAll(event.target.checked)} />
                   </div>
+                  <div role="columnheader">STT</div>
                   <div role="columnheader">Sản phẩm</div>
                   <div role="columnheader">Danh mục</div>
                   <div role="columnheader">Giá bán</div>
@@ -764,6 +765,7 @@ const VendorProducts = () => {
                     <div role="cell" onClick={(event) => event.stopPropagation()}>
                       <input type="checkbox" aria-label={`Chọn ${product.name}`} checked={selected.has(product.id)} onChange={(event) => toggleOne(product.id, event.target.checked)} />
                     </div>
+                    <div role="cell" className="admin-mono">{startIndex + index}</div>
                     <div role="cell" className="vendor-admin-product-cell">
                       <img src={product.image} alt={product.name} className="vendor-admin-thumb" />
                       <div className="vendor-admin-product-copy">

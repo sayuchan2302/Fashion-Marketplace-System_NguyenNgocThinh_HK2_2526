@@ -264,6 +264,7 @@ const AdminReviews = () => {
                       onChange={(e) => setSelected(e.target.checked ? new Set(filteredItems.map((r) => r.id)) : new Set())}
                     />
                   </div>
+                  <div role="columnheader">STT</div>
                   <div role="columnheader">Sản phẩm</div>
                   <div role="columnheader">Khách hàng</div>
                   <div role="columnheader">Đánh giá</div>
@@ -272,7 +273,7 @@ const AdminReviews = () => {
                   <div role="columnheader" style={{ textAlign: 'right', paddingRight: '12px' }}>Hành động</div>
                 </div>
 
-                {pagedItems.map((review) => (
+                {pagedItems.map((review, index) => (
                   <motion.div
                     key={review.id}
                     className="admin-table-row reviews"
@@ -295,12 +296,12 @@ const AdminReviews = () => {
                         }}
                       />
                     </div>
+                    <div role="cell" className="admin-mono">{startIndex + index}</div>
                     <div role="cell">
                       <div className="admin-customer">
                         <img src={review.productImage} alt={review.productName} />
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <span className="admin-bold">{review.productName}</span>
-                          <span className="admin-muted small">Order #{toDisplayOrderCode(review.orderCode)}</span>
                         </div>
                       </div>
                     </div>

@@ -408,9 +408,10 @@ const AdminPromotions = () => {
               onAction={resetView}
             />
           ) : (
-            <div className="admin-table" role="table" aria-label="Bảng chiến dịch toàn sàn">
+<div className="admin-table" role="table" aria-label="Bảng chiến dịch toàn sàn">
               <div className="admin-table-row admin-table-head promotions" role="row">
                 <div role="columnheader"><input type="checkbox" checked={selected.size === filteredItems.length && filteredItems.length > 0} onChange={(e) => setSelected(e.target.checked ? new Set(filteredItems.map((item) => item.id)) : new Set())} /></div>
+                <div role="columnheader">STT</div>
                 <div role="columnheader">Chiến dịch</div>
                 <div role="columnheader">Loại giảm giá</div>
                 <div role="columnheader">Giá trị</div>
@@ -420,7 +421,7 @@ const AdminPromotions = () => {
                 <div role="columnheader">Trạng thái</div>
                 <div role="columnheader">Hành động</div>
               </div>
-              {pagedItems.map((promo) => {
+              {pagedItems.map((promo, index) => {
                 const usedPercent = promo.totalIssued > 0 ? Math.min(100, Math.round((promo.usedCount / promo.totalIssued) * 100)) : 0;
                 const currentStatus = deriveStatus(promo);
                 const isGlobalCampaign = globalCampaignKeys.has(campaignScopeKey(promo));
@@ -445,6 +446,7 @@ const AdminPromotions = () => {
                         }}
                       />
                     </div>
+                    <div role="cell" className="admin-mono">{startIndex + index}</div>
                     <div role="cell">
                       <p className="admin-bold promo-name">{promo.name}</p>
                       <p className="admin-muted promo-code">{promo.code}</p>

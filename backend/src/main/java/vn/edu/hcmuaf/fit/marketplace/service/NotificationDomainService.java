@@ -92,12 +92,31 @@ public class NotificationDomainService {
             String message,
             String link
     ) {
+        return createAndPushInternal(userId, type, title, message, link, true);
+    }
+
+    @Transactional
+    public NotificationResponse createAndPushStrict(
+            UUID userId,
+            Notification.NotificationType type,
+            String title,
+            String message,
+            String link
+    ) {
+        return createAndPushInternal(userId, type, title, message, link, false);
+    }
+
+    private NotificationResponse createAndPushInternal(
+            UUID userId,
+            Notification.NotificationType type,
+            String title,
+            String message,
+            String link,
+            boolean suppressException
+    ) {
         try {
-            User user = userRepository.findById(userId).orElse(null);
-            if (user == null) {
-                log.warn("Skip notification creation because user {} does not exist", userId);
-                return null;
-            }
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalStateException("Cannot create notification because user does not exist: " + userId));
 
             Notification notification = Notification.builder()
                     .user(user)
@@ -114,6 +133,12 @@ public class NotificationDomainService {
             pushCreatedEvent(user.getEmail(), response, unreadCount);
             return response;
         } catch (Exception ex) {
+            if (!suppressException) {
+                if (ex instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
+                throw new IllegalStateException("Cannot create/push notification", ex);
+            }
             log.warn("Cannot create/push notification for userId={}: {}", userId, ex.getMessage());
             return null;
         }

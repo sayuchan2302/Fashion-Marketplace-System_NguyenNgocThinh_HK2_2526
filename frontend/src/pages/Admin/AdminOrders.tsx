@@ -304,7 +304,7 @@ const AdminOrders = () => {
                     onChange={(event) => toggleAll(event.target.checked)}
                   />
                 </div>
-                <div role="columnheader">Mã đơn</div>
+                <div role="columnheader">STT</div>
                 <div role="columnheader">Khách hàng</div>
                 <div role="columnheader">Sản phẩm</div>
                 <div role="columnheader" className="orders-col-gmv">GMV</div>
@@ -313,7 +313,7 @@ const AdminOrders = () => {
                 <div role="columnheader" className="orders-col-actions">Hành động</div>
               </div>
 
-              {pagedOrders.map((order) => (
+              {pagedOrders.map((order, index) => (
                 <motion.div
                   key={order.id}
                   className="admin-table-row orders"
@@ -334,7 +334,7 @@ const AdminOrders = () => {
                       onChange={(event) => toggleOne(order.id, event.target.checked)}
                     />
                   </div>
-                  <div role="cell" className="admin-bold">#{displayOrderCode(order.code)}</div>
+                  <div role="cell" className="admin-bold">{(page - 1) * 6 + index + 1}</div>
                   <div role="cell" className="customer-info-cell">
                     <img src={order.avatar} alt={order.customer} className="customer-avatar" />
                     <div className="customer-text">

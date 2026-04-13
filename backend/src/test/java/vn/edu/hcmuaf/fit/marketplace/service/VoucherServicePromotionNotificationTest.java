@@ -114,6 +114,8 @@ class VoucherServicePromotionNotificationTest {
         assertEquals(0, response.getFailedCount());
         assertEquals(1, promotionNotificationService.marketplaceCampaignCodes.size());
         assertEquals("MEGA123", promotionNotificationService.marketplaceCampaignCodes.get(0));
+        assertEquals(request.getStartDate(), promotionNotificationService.marketplaceCampaignStartDates.get(0));
+        assertEquals(request.getEndDate(), promotionNotificationService.marketplaceCampaignEndDates.get(0));
     }
 
     private VoucherRequest buildVoucherRequest(
@@ -173,9 +175,11 @@ class VoucherServicePromotionNotificationTest {
     private static final class CapturingPromotionNotificationService extends PromotionNotificationService {
         private final List<Voucher> storeVoucherInvocations = new ArrayList<>();
         private final List<String> marketplaceCampaignCodes = new ArrayList<>();
+        private final List<LocalDate> marketplaceCampaignStartDates = new ArrayList<>();
+        private final List<LocalDate> marketplaceCampaignEndDates = new ArrayList<>();
 
         private CapturingPromotionNotificationService() {
-            super(null, null, null, null);
+            super(null, null, null, null, null, null);
         }
 
         @Override
@@ -184,8 +188,10 @@ class VoucherServicePromotionNotificationTest {
         }
 
         @Override
-        public void notifyMarketplaceCampaign(String voucherCode) {
+        public void notifyMarketplaceCampaign(String voucherCode, LocalDate startDate, LocalDate endDate) {
             marketplaceCampaignCodes.add(voucherCode);
+            marketplaceCampaignStartDates.add(startDate);
+            marketplaceCampaignEndDates.add(endDate);
         }
     }
 }

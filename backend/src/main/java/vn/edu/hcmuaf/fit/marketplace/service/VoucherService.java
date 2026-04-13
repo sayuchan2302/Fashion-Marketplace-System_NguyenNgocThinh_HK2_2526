@@ -332,7 +332,11 @@ public class VoucherService {
         }
 
         if (createdCount > 0 && isCampaignRunningAndPubliclyAvailable(request)) {
-            promotionNotificationService.notifyMarketplaceCampaign(normalizedCode);
+            promotionNotificationService.notifyMarketplaceCampaign(
+                    normalizedCode,
+                    request.getStartDate(),
+                    request.getEndDate()
+            );
         }
 
         return MarketplaceCampaignResponse.builder()
