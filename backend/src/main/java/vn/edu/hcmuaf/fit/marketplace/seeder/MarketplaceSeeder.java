@@ -9,40 +9,21 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import vn.edu.hcmuaf.fit.marketplace.entity.Address;
-import vn.edu.hcmuaf.fit.marketplace.entity.Cart;
-import vn.edu.hcmuaf.fit.marketplace.entity.CartItem;
 import vn.edu.hcmuaf.fit.marketplace.entity.Category;
 import vn.edu.hcmuaf.fit.marketplace.entity.ContentPage;
-import vn.edu.hcmuaf.fit.marketplace.entity.Order;
-import vn.edu.hcmuaf.fit.marketplace.entity.OrderItem;
-import vn.edu.hcmuaf.fit.marketplace.entity.Product;
-import vn.edu.hcmuaf.fit.marketplace.entity.ProductImage;
-import vn.edu.hcmuaf.fit.marketplace.entity.ProductVariant;
-import vn.edu.hcmuaf.fit.marketplace.entity.ReturnRequest;
-import vn.edu.hcmuaf.fit.marketplace.entity.Review;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.entity.User;
 import vn.edu.hcmuaf.fit.marketplace.entity.Voucher;
-import vn.edu.hcmuaf.fit.marketplace.repository.AddressRepository;
-import vn.edu.hcmuaf.fit.marketplace.repository.CartRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.CategoryRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ContentPageRepository;
-import vn.edu.hcmuaf.fit.marketplace.repository.OrderRepository;
-import vn.edu.hcmuaf.fit.marketplace.repository.ProductRepository;
-import vn.edu.hcmuaf.fit.marketplace.repository.ProductVariantRepository;
-import vn.edu.hcmuaf.fit.marketplace.repository.ReturnRequestRepository;
-import vn.edu.hcmuaf.fit.marketplace.repository.ReviewRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.UserRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.VoucherRepository;
-import vn.edu.hcmuaf.fit.marketplace.service.PublicCodeService;
 import vn.edu.hcmuaf.fit.marketplace.service.ContentKeywordUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -59,19 +40,11 @@ public class MarketplaceSeeder implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final StoreRepository storeRepository;
-    private final CartRepository cartRepository;
     private final CategoryRepository categoryRepository;
-    private final ProductRepository productRepository;
-    private final ProductVariantRepository productVariantRepository;
-    private final AddressRepository addressRepository;
-    private final OrderRepository orderRepository;
-    private final ReturnRequestRepository returnRequestRepository;
     private final VoucherRepository voucherRepository;
     private final ContentPageRepository contentPageRepository;
-    private final ReviewRepository reviewRepository;
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
-    private final PublicCodeService publicCodeService;
 
     private static String unsplashImage(String photoId, int width, int height) {
         return "https://images.unsplash.com/"
@@ -86,35 +59,19 @@ public class MarketplaceSeeder implements ApplicationRunner {
     public MarketplaceSeeder(
             UserRepository userRepository,
             StoreRepository storeRepository,
-            CartRepository cartRepository,
             CategoryRepository categoryRepository,
-            ProductRepository productRepository,
-            ProductVariantRepository productVariantRepository,
-            AddressRepository addressRepository,
-            OrderRepository orderRepository,
-            ReturnRequestRepository returnRequestRepository,
             VoucherRepository voucherRepository,
             ContentPageRepository contentPageRepository,
-            ReviewRepository reviewRepository,
             JdbcTemplate jdbcTemplate,
-            PasswordEncoder passwordEncoder,
-            PublicCodeService publicCodeService
+            PasswordEncoder passwordEncoder
     ) {
         this.userRepository = userRepository;
         this.storeRepository = storeRepository;
-        this.cartRepository = cartRepository;
         this.categoryRepository = categoryRepository;
-        this.productRepository = productRepository;
-        this.productVariantRepository = productVariantRepository;
-        this.addressRepository = addressRepository;
-        this.orderRepository = orderRepository;
-        this.returnRequestRepository = returnRequestRepository;
         this.voucherRepository = voucherRepository;
         this.contentPageRepository = contentPageRepository;
-        this.reviewRepository = reviewRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
-        this.publicCodeService = publicCodeService;
     }
 
     @Override
@@ -295,185 +252,6 @@ public class MarketplaceSeeder implements ApplicationRunner {
         createCategory("Đồng hồ", "dong-ho", "Đồng hồ.", pkKhac, 2);
         createCategory("Trang sức", "trang-suc", "Trang sức.", pkKhac, 3);
 
-        Product aoThunPremium = createProduct(
-                storeAn, menAoThun, "Áo thun cotton premium", "ao-thun-cotton-premium",
-                new BigDecimal("249000"), new BigDecimal("199000"), Product.Gender.UNISEX, Product.ProductStatus.ACTIVE,
-                true, "Cotton compact 240gsm", "Regular fit", "Áo thun mềm mịn, thấm hút tốt, phù hợp mặc hằng ngày.",
-                unsplashImage("photo-1521572163474-6864f9cf17ab", 672, 990), "Áo thun cotton premium"
-        );
-        Product quanJeanSlim = createProduct(
-                storeAn, menQuanJeans, "Quần jean slim wash", "quan-jean-slim-wash",
-                new BigDecimal("459000"), new BigDecimal("379000"), Product.Gender.MALE, Product.ProductStatus.ACTIVE,
-                false, "Denim co giãn", "Slim fit", "Quần jean ôm vừa, màu wash hiện đại.",
-                unsplashImage("photo-1542272604-787c3835535d", 672, 990), "Quần jean slim wash"
-        );
-        Product damMidi = createProduct(
-                storeBinh, womenVayLien, "Đầm midi hoa nhí", "dam-midi-hoa-nhi",
-                new BigDecimal("529000"), new BigDecimal("449000"), Product.Gender.FEMALE, Product.ProductStatus.ACTIVE,
-                true, "Voan lụa", "Dáng xòe", "Đầm nhẹ, thoáng, phù hợp đi làm và dạo phố.",
-                unsplashImage("photo-1496747611176-843222e1e57c", 672, 990), "Đầm midi hoa nhí"
-        );
-        Product blazerNu = createProduct(
-                storeBinh, womenAoKhoac, "Áo blazer nữ basic", "ao-blazer-nu-basic",
-                new BigDecimal("699000"), new BigDecimal("599000"), Product.Gender.FEMALE, Product.ProductStatus.ACTIVE,
-                false, "Tweed pha", "Regular fit", "Blazer tối giản, phù hợp môi trường công sở.",
-                unsplashImage("photo-1483985988355-763728e1935b", 672, 990), "Áo blazer nữ basic"
-        );
-        Product tuiDaMem = createProduct(
-                storeBinh, accessoryTuiDeoCheo, "Túi đeo chéo da mềm", "tui-deo-cheo-da-mem",
-                new BigDecimal("489000"), new BigDecimal("409000"), Product.Gender.UNISEX, Product.ProductStatus.ACTIVE,
-                true, "Da PU cao cấp", "Đeo chéo", "Túi nhỏ gọn, có nhiều ngăn tiện lợi.",
-                unsplashImage("photo-1542291026-7eec264c27ff", 672, 990), "Túi đeo chéo da mềm"
-        );
-        Product sanPhamNhap = createProduct(
-                storeChoDuyet, menAoThun, "Áo thun local draft", "ao-thun-local-draft",
-                new BigDecimal("199000"), BigDecimal.ZERO, Product.Gender.UNISEX, Product.ProductStatus.DRAFT,
-                false, "Cotton 2 chiều", "Regular fit", "Sản phẩm nháp chờ gian hàng được duyệt.",
-                unsplashImage("photo-1434389677669-e08b4cac3105", 672, 990), "Áo thun local draft"
-        );
-
-        ProductVariant aoThunDenM = createVariant(aoThunPremium, "AN-TEE-PRM-BLK-M", "Đen", "M", 90, BigDecimal.ZERO, true);
-        ProductVariant aoThunTrangL = createVariant(aoThunPremium, "AN-TEE-PRM-WHT-L", "Trắng", "L", 70, new BigDecimal("5000"), true);
-        ProductVariant jeanXanh30 = createVariant(quanJeanSlim, "AN-JEAN-SLIM-BLU-30", "Xanh", "30", 40, BigDecimal.ZERO, true);
-        ProductVariant jeanXanh32 = createVariant(quanJeanSlim, "AN-JEAN-SLIM-BLU-32", "Xanh", "32", 55, BigDecimal.ZERO, true);
-        ProductVariant damKemS = createVariant(damMidi, "BINH-DRESS-FLR-S", "Kem", "S", 26, BigDecimal.ZERO, true);
-        ProductVariant damKemM = createVariant(damMidi, "BINH-DRESS-FLR-M", "Kem", "M", 34, BigDecimal.ZERO, true);
-        ProductVariant blazerBeM = createVariant(blazerNu, "BINH-BLAZER-BEI-M", "Be", "M", 22, BigDecimal.ZERO, true);
-        ProductVariant blazerDenL = createVariant(blazerNu, "BINH-BLAZER-BLK-L", "Đen", "L", 18, new BigDecimal("15000"), true);
-        ProductVariant tuiDenFree = createVariant(tuiDaMem, "BINH-BAG-CRS-BLK-F", "Đen", "Free", 64, BigDecimal.ZERO, true);
-        createVariant(sanPhamNhap, "DUYET-TEE-DRF-WHT-M", "Trắng", "M", 12, BigDecimal.ZERO, true);
-
-        // Additional products for vendor testing (listing, filter, pagination, inventory states)
-        Product aoPoloAirFlex = createProduct(
-                storeAn, menAoPolo, "Ao polo air flex", "ao-polo-air-flex",
-                new BigDecimal("329000"), new BigDecimal("279000"), Product.Gender.MALE, Product.ProductStatus.ACTIVE,
-                true, "Cotton pique", "Slim fit", "Ao polo chat lieu thoang khi, phu hop di lam va di choi.",
-                unsplashImage("photo-1617137984095-74e4e5e3613f", 672, 990), "Ao polo air flex"
-        );
-        Product aoThunOversize = createProduct(
-                storeAn, menAoThun, "Ao thun oversize street", "ao-thun-oversize-street",
-                new BigDecimal("289000"), new BigDecimal("239000"), Product.Gender.UNISEX, Product.ProductStatus.ACTIVE,
-                false, "Cotton 2 chieu", "Oversize", "Form rong thoai mai, phoi do linh hoat.",
-                unsplashImage("photo-1503342217505-b0a15ec3261c", 672, 990), "Ao thun oversize street"
-        );
-        Product quanKakiFlex = createProduct(
-                storeAn, menQuanKaki, "Quan kaki flex tapered", "quan-kaki-flex-tapered",
-                new BigDecimal("499000"), new BigDecimal("419000"), Product.Gender.MALE, Product.ProductStatus.ACTIVE,
-                false, "Kaki co gian", "Tapered", "Quan kaki de mac, de phoi voi ao polo va so mi.",
-                unsplashImage("photo-1473966968600-fa801b869a1a", 672, 990), "Quan kaki flex tapered"
-        );
-        Product quanJeansStraight = createProduct(
-                storeAn, menQuanJeans, "Quan jeans straight dark", "quan-jeans-straight-dark",
-                new BigDecimal("539000"), new BigDecimal("459000"), Product.Gender.MALE, Product.ProductStatus.ACTIVE,
-                false, "Denim 12oz", "Straight", "Mau denim dam, hop phong cach toi gian.",
-                unsplashImage("photo-1475180098004-ca77a66827be", 672, 990), "Quan jeans straight dark"
-        );
-        Product aoPoloSeasonOld = createProduct(
-                storeAn, menAoPolo, "Ao polo old season", "ao-polo-old-season",
-                new BigDecimal("299000"), new BigDecimal("199000"), Product.Gender.MALE, Product.ProductStatus.INACTIVE,
-                false, "Cotton blend", "Regular", "Mau cu de test trang thai inactive tren dashboard vendor.",
-                unsplashImage("photo-1562157873-818bc0726f68", 672, 990), "Ao polo old season"
-        );
-
-        Product aoSoMiLuaNu = createProduct(
-                storeBinh, womenAoSoMi, "Ao so mi lua basic", "ao-so-mi-lua-basic",
-                new BigDecimal("459000"), new BigDecimal("389000"), Product.Gender.FEMALE, Product.ProductStatus.ACTIVE,
-                true, "Lua mem", "Regular", "Ao so mi thanh lich cho moi truong cong so.",
-                unsplashImage("photo-1524504388940-b1c1722653e1", 672, 990), "Ao so mi lua basic"
-        );
-        Product quanJeansBaggyNu = createProduct(
-                storeBinh, womenQuanJeans, "Quan jeans baggy nu", "quan-jeans-baggy-nu",
-                new BigDecimal("499000"), new BigDecimal("429000"), Product.Gender.FEMALE, Product.ProductStatus.ACTIVE,
-                false, "Denim mem", "Baggy", "Form baggy de mac, phu hop phong cach tre trung.",
-                unsplashImage("photo-1541099649105-f69ad21f3246", 672, 990), "Quan jeans baggy nu"
-        );
-        Product damLinen = createProduct(
-                storeBinh, womenVayLien, "Dam linen canh tien", "dam-linen-canh-tien",
-                new BigDecimal("629000"), new BigDecimal("549000"), Product.Gender.FEMALE, Product.ProductStatus.ACTIVE,
-                false, "Linen", "A-line", "Dam chat lieu linen nhe, mac mat trong mua he.",
-                unsplashImage("photo-1515886657613-9f3515b0c78f", 672, 990), "Dam linen canh tien"
-        );
-        Product aoCardigan = createProduct(
-                storeBinh, womenAoKhoac, "Ao cardigan knit", "ao-cardigan-knit",
-                new BigDecimal("559000"), new BigDecimal("489000"), Product.Gender.FEMALE, Product.ProductStatus.ACTIVE,
-                false, "Knit", "Regular", "Ao khoac mong nhe, phoi cung vay va quan jeans.",
-                unsplashImage("photo-1445205170230-053b83016050", 672, 990), "Ao cardigan knit"
-        );
-        Product tuiMiniCross = createProduct(
-                storeBinh, accessoryTuiDeoCheo, "Tui mini crossbody", "tui-mini-crossbody",
-                new BigDecimal("429000"), new BigDecimal("359000"), Product.Gender.UNISEX, Product.ProductStatus.ACTIVE,
-                false, "PU leather", "Crossbody", "Tui mini gon nhe, phu hop di choi va di cafe.",
-                unsplashImage("photo-1584917865442-de89df76afd3", 672, 990), "Tui mini crossbody"
-        );
-        Product baloUrban = createProduct(
-                storeBinh, accessoryBalo, "Balo urban daily", "balo-urban-daily",
-                new BigDecimal("639000"), new BigDecimal("559000"), Product.Gender.UNISEX, Product.ProductStatus.ACTIVE,
-                false, "Canvas", "Daily", "Balo dung laptop 14 inch, nhieu ngan tien loi.",
-                unsplashImage("photo-1491637639811-60e2756cc1c7", 672, 990), "Balo urban daily"
-        );
-        Product viSlim = createProduct(
-                storeBinh, accessoryVi, "Vi slim da mem", "vi-slim-da-mem",
-                new BigDecimal("329000"), new BigDecimal("279000"), Product.Gender.UNISEX, Product.ProductStatus.ACTIVE,
-                false, "PU leather", "Slim", "Vi mong gon, phu hop bo tui quan jean.",
-                unsplashImage("photo-1627123424574-724758594e93", 672, 990), "Vi slim da mem"
-        );
-        Product damDraftSample = createProduct(
-                storeBinh, womenVayLien, "Dam sample pending", "dam-sample-pending",
-                new BigDecimal("399000"), BigDecimal.ZERO, Product.Gender.FEMALE, Product.ProductStatus.DRAFT,
-                false, "Cotton blend", "Regular", "San pham nhap de test trang thai draft cua vendor.",
-                unsplashImage("photo-1485230895905-ec40ba36b9bc", 672, 990), "Dam sample pending"
-        );
-
-        createVariant(aoPoloAirFlex, "AN-POLO-AIR-BLK-M", "Den", "M", 45, BigDecimal.ZERO, true);
-        createVariant(aoPoloAirFlex, "AN-POLO-AIR-BLK-L", "Den", "L", 38, BigDecimal.ZERO, true);
-        createVariant(aoThunOversize, "AN-TEE-OVR-CRM-M", "Kem", "M", 60, BigDecimal.ZERO, true);
-        createVariant(aoThunOversize, "AN-TEE-OVR-CRM-L", "Kem", "L", 52, BigDecimal.ZERO, true);
-        createVariant(quanKakiFlex, "AN-KAKI-FLX-BEI-30", "Be", "30", 31, BigDecimal.ZERO, true);
-        createVariant(quanKakiFlex, "AN-KAKI-FLX-BEI-32", "Be", "32", 28, BigDecimal.ZERO, true);
-        createVariant(quanJeansStraight, "AN-JEAN-STR-IND-30", "Indigo", "30", 27, BigDecimal.ZERO, true);
-        createVariant(quanJeansStraight, "AN-JEAN-STR-IND-32", "Indigo", "32", 25, BigDecimal.ZERO, true);
-        createVariant(aoPoloSeasonOld, "AN-POLO-OLD-GRY-M", "Xam", "M", 10, BigDecimal.ZERO, true);
-
-        createVariant(aoSoMiLuaNu, "BINH-SHIRT-SIL-WHT-S", "Trang", "S", 35, BigDecimal.ZERO, true);
-        createVariant(aoSoMiLuaNu, "BINH-SHIRT-SIL-WHT-M", "Trang", "M", 29, BigDecimal.ZERO, true);
-        createVariant(quanJeansBaggyNu, "BINH-JEANS-BAG-BLU-S", "Xanh", "S", 24, BigDecimal.ZERO, true);
-        createVariant(quanJeansBaggyNu, "BINH-JEANS-BAG-BLU-M", "Xanh", "M", 22, BigDecimal.ZERO, true);
-        createVariant(damLinen, "BINH-DRESS-LIN-BEI-S", "Be", "S", 19, BigDecimal.ZERO, true);
-        createVariant(damLinen, "BINH-DRESS-LIN-BEI-M", "Be", "M", 17, BigDecimal.ZERO, true);
-        createVariant(aoCardigan, "BINH-CARDI-KNT-IVR-S", "Trang ngà", "S", 20, BigDecimal.ZERO, true);
-        createVariant(aoCardigan, "BINH-CARDI-KNT-IVR-M", "Trang ngà", "M", 18, BigDecimal.ZERO, true);
-        createVariant(tuiMiniCross, "BINH-BAG-MINI-BLK-F", "Den", "Free", 44, BigDecimal.ZERO, true);
-        createVariant(baloUrban, "BINH-BALO-URB-BLK-F", "Den", "Free", 26, BigDecimal.ZERO, true);
-        createVariant(viSlim, "BINH-WALLET-SLM-BRN-F", "Nau", "Free", 56, BigDecimal.ZERO, true);
-        createVariant(damDraftSample, "BINH-DRESS-SMP-BEI-M", "Be", "M", 14, BigDecimal.ZERO, true);
-
-        Address addressMinh = createAddress(customerMinh, "Phạm Minh Khang", "0901000001", "TP. Hồ Chí Minh", "Quận 1", "Phường Bến Nghé", "18 Nguyễn Huệ", true, "Nhà riêng");
-        Address addressLan = createAddress(customerLan, "Đỗ Ngọc Lan", "0901000002", "TP. Hồ Chí Minh", "Quận 3", "Phường Võ Thị Sáu", "212 Nam Kỳ Khởi Nghĩa", true, "Công ty");
-        Address addressHuy = createAddress(customerHuy, "Vũ Đức Huy", "0901000003", "Đà Nẵng", "Hải Châu", "Phường Thạch Thang", "55 Trần Phú", true, "Nhà riêng");
-
-        createCart(customerLan, List.of(new SeederCartLine(tuiDaMem, tuiDenFree, 1), new SeederCartLine(aoThunPremium, aoThunTrangL, 2)));
-        createCart(customerHuy, List.of(new SeederCartLine(damMidi, damKemS, 1)));
-
-        Order orderDaGiao = createOrder(customerMinh, addressMinh, storeAn, Order.OrderStatus.DELIVERED, Order.PaymentMethod.BANK_TRANSFER, Order.PaymentStatus.PAID, "DH-SEED-DELIVERED-001", "GHN100000001", "GHN", new BigDecimal("25000"), new BigDecimal("20000"), LocalDateTime.now().minusDays(6));
-        OrderItem itemDaGiao = addOrderItem(orderDaGiao, aoThunPremium, aoThunDenM, 2, new BigDecimal("199000"), storeAn.getId());
-        addOrderItem(orderDaGiao, quanJeanSlim, jeanXanh30, 1, new BigDecimal("379000"), storeAn.getId());
-
-        Order orderXuLy = createOrder(customerMinh, addressMinh, storeAn, Order.OrderStatus.PROCESSING, Order.PaymentMethod.COD, Order.PaymentStatus.UNPAID, "DH-SEED-PROCESSING-001", null, null, new BigDecimal("30000"), BigDecimal.ZERO, null);
-        addOrderItem(orderXuLy, aoThunPremium, aoThunTrangL, 1, new BigDecimal("204000"), storeAn.getId());
-
-        Order orderDangGiao = createOrder(customerLan, addressLan, storeBinh, Order.OrderStatus.SHIPPED, Order.PaymentMethod.MOMO, Order.PaymentStatus.PAID, "DH-SEED-SHIPPED-001", "GHTK200000001", "GHTK", new BigDecimal("22000"), new BigDecimal("15000"), LocalDateTime.now().minusDays(2));
-        addOrderItem(orderDangGiao, damMidi, damKemM, 1, new BigDecimal("449000"), storeBinh.getId());
-        addOrderItem(orderDangGiao, tuiDaMem, tuiDenFree, 1, new BigDecimal("409000"), storeBinh.getId());
-
-        Order orderDaHuy = createOrder(customerHuy, addressHuy, storeBinh, Order.OrderStatus.CANCELLED, Order.PaymentMethod.VNPAY, Order.PaymentStatus.FAILED, "DH-SEED-CANCELLED-001", null, null, new BigDecimal("25000"), BigDecimal.ZERO, null);
-        addOrderItem(orderDaHuy, blazerNu, blazerDenL, 1, new BigDecimal("614000"), storeBinh.getId());
-
-        createReturnRequest(orderDaGiao, customerMinh, itemDaGiao, ReturnRequest.ReturnReason.SIZE, ReturnRequest.ReturnResolution.EXCHANGE, ReturnRequest.ReturnStatus.PENDING_VENDOR, "Khách muốn đổi size M sang L.", "Đã tiếp nhận và chờ cửa hàng xác nhận tồn kho.");
-
-        createReview(aoThunPremium, customerMinh, orderDaGiao, storeAn.getId(), 5, "Áo mặc rất thoải mái", "Chất vải mát, form đẹp, giao nhanh.", Review.ReviewStatus.APPROVED, "Cảm ơn bạn đã ủng hộ shop.", List.of(unsplashImage("photo-1521572163474-6864f9cf17ab", 672, 990)));
-        createReview(damMidi, customerLan, orderDangGiao, storeBinh.getId(), 5, "Đầm lên dáng xinh", "Vải nhẹ, không nhăn nhiều.", Review.ReviewStatus.PENDING, null, List.of());
-        createReview(blazerNu, customerHuy, null, storeBinh.getId(), 3, "Áo đẹp nhưng hơi dày", "Nên mặc phòng lạnh sẽ hợp hơn.", Review.ReviewStatus.APPROVED, "Shop ghi nhận góp ý để cải tiến chất liệu.", List.of());
-
         createVoucher(storeAn.getId(), "CHAOAN10", "Giảm 10% đơn đầu tiên", "Áp dụng cho khách mới, tối đa giảm 40.000đ.", Voucher.DiscountType.PERCENT, new BigDecimal("10"), new BigDecimal("299000"), 1500, 320, Voucher.VoucherStatus.RUNNING, LocalDate.now().minusDays(15), LocalDate.now().plusDays(45));
         createVoucher(storeAn.getId(), "FREESHIP30", "Hỗ trợ phí ship 30k", "Giảm trực tiếp 30.000đ vào phí vận chuyển.", Voucher.DiscountType.FIXED, new BigDecimal("30000"), new BigDecimal("199000"), 900, 440, Voucher.VoucherStatus.RUNNING, LocalDate.now().minusDays(5), LocalDate.now().plusDays(20));
         createVoucher(storeBinh.getId(), "BINHNEW12", "Chào mừng khách mới", "Giảm 12% toàn bộ sản phẩm của gian hàng.", Voucher.DiscountType.PERCENT, new BigDecimal("12"), new BigDecimal("399000"), 1100, 210, Voucher.VoucherStatus.RUNNING, LocalDate.now().minusDays(20), LocalDate.now().plusDays(35));
@@ -508,8 +286,8 @@ public class MarketplaceSeeder implements ApplicationRunner {
                 List.of()
         );
 
-        log.info("Seed hoan tat: {} users, {} stores, {} products, {} orders, {} reviews.",
-                userRepository.count(), storeRepository.count(), productRepository.count(), orderRepository.count(), reviewRepository.count());
+        log.info("Seed hoan tat: {} users, {} stores, {} categories, {} vouchers, {} pages.",
+                userRepository.count(), storeRepository.count(), categoryRepository.count(), voucherRepository.count(), contentPageRepository.count());
     }
 
     private void truncateAllData() {
@@ -657,244 +435,6 @@ public class MarketplaceSeeder implements ApplicationRunner {
         category.setSortOrder(sortOrder);
         category.setImage(CATEGORY_IMAGE);
         return categoryRepository.save(category);
-    }
-
-    private Product createProduct(
-            Store store,
-            Category category,
-            String name,
-            String slug,
-            BigDecimal basePrice,
-            BigDecimal salePrice,
-            Product.Gender gender,
-            Product.ProductStatus status,
-            boolean featured,
-            String material,
-            String fit,
-            String description,
-            String imageUrl,
-            String imageAlt
-    ) {
-        Product product = new Product();
-        product.setName(name);
-        product.setSlug(slug);
-        product.setStoreId(store.getId());
-        product.setCategory(category);
-        product.setBasePrice(basePrice);
-        product.setSalePrice(salePrice);
-        product.setGender(gender);
-        product.setStatus(status);
-        product.setApprovalStatus(Product.ApprovalStatus.APPROVED);
-        product.setIsFeatured(featured);
-        product.setMaterial(material);
-        product.setFit(fit);
-        product.setDescription(description);
-
-        ProductImage image = new ProductImage();
-        image.setProduct(product);
-        image.setUrl(imageUrl);
-        image.setAlt(imageAlt);
-        image.setSortOrder(0);
-        image.setIsPrimary(true);
-        product.setImages(new ArrayList<>(List.of(image)));
-        product.setVariants(new ArrayList<>());
-        return productRepository.save(product);
-    }
-
-    private ProductVariant createVariant(
-            Product product,
-            String sku,
-            String color,
-            String size,
-            int stockQuantity,
-            BigDecimal priceAdjustment,
-            boolean isActive
-    ) {
-        ProductVariant variant = new ProductVariant();
-        variant.setProduct(product);
-        variant.setSku(sku);
-        variant.setColor(color);
-        variant.setSize(size);
-        variant.setStockQuantity(stockQuantity);
-        variant.setPriceAdjustment(priceAdjustment);
-        variant.setIsActive(isActive);
-        return productVariantRepository.save(variant);
-    }
-
-    private Address createAddress(
-            User user,
-            String fullName,
-            String phone,
-            String province,
-            String district,
-            String ward,
-            String detail,
-            boolean isDefault,
-            String label
-    ) {
-        Address address = new Address();
-        address.setUser(user);
-        address.setFullName(fullName);
-        address.setPhone(phone);
-        address.setProvince(province);
-        address.setDistrict(district);
-        address.setWard(ward);
-        address.setDetail(detail);
-        address.setIsDefault(isDefault);
-        address.setLabel(label);
-        return addressRepository.save(address);
-    }
-
-    private void createCart(User user, List<SeederCartLine> lines) {
-        Cart cart = new Cart();
-        cart.setUser(user);
-        cart.setItems(new ArrayList<>());
-        for (SeederCartLine line : lines) {
-            CartItem item = new CartItem();
-            item.setCart(cart);
-            item.setProduct(line.product());
-            item.setVariant(line.variant());
-            item.setQuantity(line.quantity());
-            item.setUnitPrice(line.variant() != null ? line.variant().getPrice() : line.product().getEffectivePrice());
-            cart.getItems().add(item);
-        }
-        cart.calculateTotal();
-        cartRepository.save(cart);
-    }
-
-    private Order createOrder(
-            User customer,
-            Address shippingAddress,
-            Store store,
-            Order.OrderStatus status,
-            Order.PaymentMethod paymentMethod,
-            Order.PaymentStatus paymentStatus,
-            String note,
-            String trackingNumber,
-            String shippingCarrier,
-            BigDecimal shippingFee,
-            BigDecimal discount,
-            LocalDateTime paidAt
-    ) {
-        Order order = new Order();
-        order.setUser(customer);
-        order.setOrderCode(publicCodeService.nextOrderCode());
-        order.setShippingAddress(shippingAddress);
-        order.setStoreId(store.getId());
-        order.setStatus(status);
-        order.setPaymentMethod(paymentMethod);
-        order.setPaymentStatus(paymentStatus);
-        order.setNote(note);
-        order.setTrackingNumber(trackingNumber);
-        order.setShippingCarrier(shippingCarrier);
-        order.setShippingFee(shippingFee);
-        order.setDiscount(discount);
-        order.setParentOrder(null);
-        order.setItems(new ArrayList<>());
-        order.setSubtotal(BigDecimal.ZERO);
-        order.calculateTotal();
-        order.setCommissionFee(BigDecimal.ZERO);
-        order.setVendorPayout(BigDecimal.ZERO);
-        order.setPaidAt(paidAt);
-        return orderRepository.save(order);
-    }
-
-    private OrderItem addOrderItem(
-            Order order,
-            Product product,
-            ProductVariant variant,
-            int quantity,
-            BigDecimal unitPrice,
-            UUID storeId
-    ) {
-        OrderItem item = new OrderItem();
-        item.setOrder(order);
-        item.setProduct(product);
-        item.setVariant(variant);
-        item.setProductName(product.getName());
-        item.setVariantName((variant.getColor() != null ? variant.getColor() : "") + " / " + (variant.getSize() != null ? variant.getSize() : ""));
-        item.setProductImage(product.getImages() != null && !product.getImages().isEmpty() ? product.getImages().get(0).getUrl() : null);
-        item.setQuantity(quantity);
-        item.setUnitPrice(unitPrice);
-        item.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(quantity)));
-        item.setStoreId(storeId);
-        order.getItems().add(item);
-
-        BigDecimal subtotal = order.getItems().stream()
-                .map(OrderItem::getTotalPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        order.setSubtotal(subtotal);
-        order.calculateTotal();
-        BigDecimal commission = order.getTotal().multiply(new BigDecimal("0.05"));
-        order.setCommissionFee(commission);
-        order.setVendorPayout(order.getTotal().subtract(commission));
-        orderRepository.save(order);
-        return item;
-    }
-
-    private void createReturnRequest(
-            Order order,
-            User user,
-            OrderItem orderItem,
-            ReturnRequest.ReturnReason reason,
-            ReturnRequest.ReturnResolution resolution,
-            ReturnRequest.ReturnStatus status,
-            String note,
-            String adminNote
-    ) {
-        ReturnRequest request = new ReturnRequest();
-        request.setOrder(order);
-        request.setReturnCode(publicCodeService.nextReturnCode());
-        request.setUser(user);
-        request.setStoreId(orderItem.getStoreId());
-        request.setReason(reason);
-        request.setResolution(resolution);
-        request.setStatus(status);
-        request.setNote(note);
-        request.setAdminNote(adminNote);
-        request.setUpdatedBy(SEED_ACTOR);
-        request.setItems(new ArrayList<>(List.of(
-                new ReturnRequest.ReturnItemSnapshot(
-                        orderItem.getId(),
-                        orderItem.getProductName(),
-                        orderItem.getVariantName(),
-                        orderItem.getProductImage(),
-                        null,
-                        1,
-                        orderItem.getUnitPrice()
-                )
-        )));
-        returnRequestRepository.save(request);
-    }
-
-    private void createReview(
-            Product product,
-            User user,
-            Order order,
-            UUID storeId,
-            int rating,
-            String title,
-            String content,
-            Review.ReviewStatus status,
-            String shopReply,
-            List<String> imageUrls
-    ) {
-        Review review = new Review();
-        review.setProduct(product);
-        review.setUser(user);
-        review.setOrder(order);
-        review.setStoreId(storeId);
-        review.setRating(rating);
-        review.setTitle(title);
-        review.setContent(content);
-        review.setStatus(status);
-        review.setHelpful(Math.max(0, rating - 1));
-        review.setShopReply(shopReply);
-        review.setImages(new ArrayList<>(imageUrls));
-        if (shopReply != null && !shopReply.isBlank()) {
-            review.setShopReplyAt(LocalDateTime.now().minusDays(1));
-        }
-        reviewRepository.save(review);
     }
 
     private void createVoucher(

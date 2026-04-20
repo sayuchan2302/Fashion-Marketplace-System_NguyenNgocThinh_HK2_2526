@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronRight, Star, Store, CheckCircle, Clock, Send, MessageSquare } from 'lucide-react';
 import ProductGallery from '../../components/ProductGallery/ProductGallery';
 import ProductInfo from '../../components/ProductInfo/ProductInfo';
 import ProductActions from '../../components/ProductActions/ProductActions';
 import ProductDescription from '../../components/ProductDescription/ProductDescription';
-import ProductSection from '../../components/ProductSection/ProductSection';
 import ProductDetailSkeleton from '../../components/ProductDetailSkeleton/ProductDetailSkeleton';
 import StoreInfoCard from '../../components/StoreInfoCard/StoreInfoCard';
 import { productService } from '../../services/productService';
@@ -87,8 +86,6 @@ const ProductDetail = () => {
 
   const productId = id || '';
   const storeSlug = normalizeStoreSlug(product?.storeSlug);
-
-  const relatedProducts = useMemo(() => productService.getRelated(productId, 4), [productId]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -417,9 +414,6 @@ const ProductDetail = () => {
             ) : null}
           </div>
 
-          <div className="related-products-section">
-            <ProductSection title={t.related} products={relatedProducts} />
-          </div>
         </div>
       </div>
     </div>

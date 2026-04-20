@@ -1,0 +1,154 @@
+[
+  {
+    "url": "https://www.gap.com/browse/men/jeans?cid=6998",
+    "gender": "Men",
+    "masterCategory": "Apparel",
+    "subCategory": "Bottomwear",
+    "articleType": "Jeans",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/men/pants?cid=80799",
+    "gender": "Men",
+    "masterCategory": "Apparel",
+    "subCategory": "Bottomwear",
+    "articleType": "Trousers",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/men/shorts?cid=5156",
+    "gender": "Men",
+    "masterCategory": "Apparel",
+    "subCategory": "Bottomwear",
+    "articleType": "Shorts",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/men/t-shirts?cid=5225",
+    "gender": "Men",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Tshirts",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/men/shirts?cid=15043",
+    "gender": "Men",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Shirts",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/men/sweatshirts-and-sweatpants?cid=1166248",
+    "gender": "Men",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Sweatshirts",
+    "usage": "Sports"
+  },
+  {
+    "url": "https://www.gap.com/browse/men/sweaters?cid=5180",
+    "gender": "Men",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Sweaters",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/men/coats-and-jackets?cid=5168",
+    "gender": "Men",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Jackets",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/jeans?cid=5664",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Bottomwear",
+    "articleType": "Jeans",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/pants?cid=1011761",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Bottomwear",
+    "articleType": "Trousers",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/shorts?cid=11728",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Bottomwear",
+    "articleType": "Shorts",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/dresses?cid=13658",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Dress",
+    "articleType": "Dresses",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/shirts-and-tops?cid=34608",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Tops",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/t-shirts-and-tanks?cid=17076",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Tshirts",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/sweaters?cid=5745",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Sweaters",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/sweatshirts-and-sweatpants?cid=1034200",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Sweatshirts",
+    "usage": "Sports"
+  },
+  {
+    "url": "https://www.gap.com/browse/women/coats-and-jackets?cid=1147437",
+    "gender": "Women",
+    "masterCategory": "Apparel",
+    "subCategory": "Topwear",
+    "articleType": "Jackets",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/category.do?cid=3041527",
+    "gender": "Women",
+    "masterCategory": "Accessories",
+    "subCategory": "Fashion Accessories",
+    "articleType": "Accessories",
+    "usage": "Casual"
+  },
+  {
+    "url": "https://www.gap.com/browse/category.do?cid=5300",
+    "gender": "Men",
+    "masterCategory": "Accessories",
+    "subCategory": "Fashion Accessories",
+    "articleType": "Accessories",
+    "usage": "Casual"
+  }
+]

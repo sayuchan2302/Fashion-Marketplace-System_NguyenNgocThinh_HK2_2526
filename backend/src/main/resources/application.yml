@@ -43,12 +43,12 @@ jwt:
 app:
   seed:
     enabled: ${APP_SEED_ENABLED:true}
-    kaggle:
-      enabled: ${APP_SEED_KAGGLE_ENABLED:true}
-      target-count: ${APP_SEED_KAGGLE_TARGET_COUNT:1000}
-      styles-path: ${APP_SEED_KAGGLE_STYLES_PATH:data/styles.csv}
-      images-path: ${APP_SEED_KAGGLE_IMAGES_PATH:data/images.csv}
-      clean-before-import: ${APP_SEED_KAGGLE_CLEAN_BEFORE_IMPORT:true}
+    gap:
+      enabled: ${APP_SEED_GAP_ENABLED:true}
+      target-count: ${APP_SEED_GAP_TARGET_COUNT:1000}
+      styles-path: ${APP_SEED_GAP_STYLES_PATH:data/gap-raw1800/styles.csv}
+      images-path: ${APP_SEED_GAP_IMAGES_PATH:data/gap-raw1800/images.csv}
+      clean-before-import: ${APP_SEED_GAP_CLEAN_BEFORE_IMPORT:true}
   chatbot:
     ai-fallback-enabled: ${APP_CHATBOT_AI_FALLBACK_ENABLED:false}
     direct-line-secret: ${BOT_DIRECT_LINE_SECRET:}

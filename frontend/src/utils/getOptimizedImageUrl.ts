@@ -93,7 +93,10 @@ export const getOptimizedImageUrl = (
     if (url.pathname.includes(CDN_CGI_PREFIX)) {
       return optimizeCloudflarePath(url, normalized);
     }
-    return optimizeWeservProxy(url, normalized);
+    if (isWeservHost(url.hostname)) {
+      return optimizeWeservProxy(url, normalized);
+    }
+    return url.toString();
   } catch {
     return trimmed;
   }
