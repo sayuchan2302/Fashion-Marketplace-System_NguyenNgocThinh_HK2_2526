@@ -6,6 +6,7 @@ import { useWishlist } from '../../contexts/WishlistContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useCartAnimation } from '../../context/CartAnimationContext';
 import { productService } from '../../services/productService';
+import { resolveColorSwatch } from '../../utils/colorSwatch';
 import './QuickViewModal.css';
 
 interface QuickViewProduct {
@@ -177,7 +178,7 @@ const QuickViewModal = ({ product, isOpen, onClose }: QuickViewModalProps) => {
                     <button
                       key={idx}
                       className={`qv-color-swatch ${selectedColorIdx === idx ? 'selected' : ''}`}
-                      style={{ backgroundColor: color }}
+                      style={{ backgroundColor: resolveColorSwatch(color) }}
                       onClick={() => setSelectedColorIdx(idx)}
                       aria-label={`Màu ${idx + 1}`}
                     />

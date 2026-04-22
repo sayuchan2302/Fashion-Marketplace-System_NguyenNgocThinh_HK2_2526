@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Star } from 'lucide-react';
+import { resolveColorSwatch } from '../../utils/colorSwatch';
 import './ProductInfo.css';
 
 interface ProductInfoProps {
@@ -91,7 +92,7 @@ const ProductInfo = ({ product, averageRating = null, reviewCount = 0, onVariant
               title={color}
               aria-label={`Select color ${color}`}
             >
-              <span className="color-swatch-inner" style={{ backgroundColor: color }}></span>
+              <span className="color-swatch-inner" style={{ backgroundColor: resolveColorSwatch(color) }}></span>
             </button>
           ))}
         </div>

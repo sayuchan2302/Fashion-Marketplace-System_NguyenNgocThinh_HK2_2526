@@ -23,6 +23,12 @@ import { useToast } from '../../contexts/ToastContext';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import Drawer from '../../components/Drawer/Drawer';
 import { normalizePositiveInteger } from './vendorHelpers';
+import {
+  VENDOR_COLOR_PRESETS,
+  getColorPresetByName,
+  normalizeHexColor,
+  resolveColorSwatch,
+} from '../../utils/colorSwatch';
 
 type ProductTab = 'all' | 'active' | 'outOfStock' | 'draft';
 
@@ -57,6 +63,7 @@ interface VariantRowFormState {
   key: string;
   axis1: string;
   axis2: string;
+  colorHex: string;
   stockQuantity: number;
   priceAdjustment: number;
   isActive: boolean;
@@ -66,6 +73,7 @@ const createVariantRow = (): VariantRowFormState => ({
   key: `variant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   axis1: '',
   axis2: '',
+  colorHex: '#111827',
   stockQuantity: 0,
   priceAdjustment: 0,
   isActive: true,
@@ -120,6 +128,23 @@ const normalizeVariantAxis = (value: string) => {
 };
 
 const normalizeVariantText = (value: string) => (value || '').trim();
+const CUSTOM_COLOR_PRESET_VALUE = '__custom__';
+
+const resolveVariantPresetValue = (row: VariantRowFormState) => {
+  if (!row.axis1.trim()) {
+    return CUSTOM_COLOR_PRESET_VALUE;
+  }
+  const presetByName = getColorPresetByName(row.axis1);
+  return presetByName?.name || CUSTOM_COLOR_PRESET_VALUE;
+};
+
+const resolveVariantColorHex = (row: VariantRowFormState) => {
+  const byHex = normalizeHexColor(row.colorHex, '');
+  if (byHex) {
+    return byHex;
+  }
+  return resolveColorSwatch(row.axis1, '#d1d5db');
+};
 
 const buildVariantKey = (axis1: string, axis2: string) =>
   `${normalizeVariantAxis(axis1)}__${normalizeVariantAxis(axis2)}`.toLowerCase();
@@ -497,6 +522,7 @@ const VendorProducts = () => {
         key,
         axis1,
         axis2,
+        colorHex: resolveColorSwatch(axis1, '#111827'),
         stockQuantity: Math.max(0, Number(variant.stockQuantity || 0)),
         priceAdjustment: Number(variant.priceAdjustment || 0),
         isActive: variant.isActive !== false,
@@ -973,18 +999,82 @@ const VendorProducts = () => {
                 <div />
               </div>
 
-              {variantRows.map((row) => (
+              {variantRows.map((row) => {
+                const selectedColorPreset = resolveVariantPresetValue(row);
+                const isCustomColor = selectedColorPreset === CUSTOM_COLOR_PRESET_VALUE;
+                const resolvedColorHex = resolveVariantColorHex(row);
+
+                return (
                 <div key={row.key} className="vendor-variant-row">
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="Ví dụ: Đen"
-                      value={row.axis1}
-                      onChange={(event) => updateVariantRow(row.key, (current) => ({
-                        ...current,
-                        axis1: event.target.value,
-                      }))}
-                    />
+                  <div className="vendor-variant-color-cell">
+                    <select
+                      value={selectedColorPreset}
+                      onChange={(event) => {
+                        const selected = event.target.value;
+                        if (selected === CUSTOM_COLOR_PRESET_VALUE) {
+                          updateVariantRow(row.key, (current) => ({
+                            ...current,
+                            axis1: getColorPresetByName(current.axis1) ? '' : current.axis1,
+                            colorHex: normalizeHexColor(current.colorHex, '#111827'),
+                          }));
+                          return;
+                        }
+
+                        const preset = VENDOR_COLOR_PRESETS.find((item) => item.name === selected);
+                        if (!preset) {
+                          return;
+                        }
+
+                        updateVariantRow(row.key, (current) => ({
+                          ...current,
+                          axis1: preset.name,
+                          colorHex: preset.hex,
+                        }));
+                      }}
+                    >
+                      <option value={CUSTOM_COLOR_PRESET_VALUE}>Chọn màu tự nhập</option>
+                      {VENDOR_COLOR_PRESETS.map((preset) => (
+                        <option key={preset.name} value={preset.name}>{preset.name}</option>
+                      ))}
+                    </select>
+                    {isCustomColor ? (
+                      <div className="vendor-variant-color-custom">
+                        <input
+                          type="text"
+                          placeholder="Tên màu (vd: New Classic Navy Blue)"
+                          value={row.axis1}
+                          onChange={(event) => updateVariantRow(row.key, (current) => ({
+                            ...current,
+                            axis1: event.target.value,
+                          }))}
+                        />
+                        <div className="vendor-variant-color-hex-row">
+                          <input
+                            type="color"
+                            value={normalizeHexColor(row.colorHex, resolveColorSwatch(row.axis1, '#111827'))}
+                            onChange={(event) => updateVariantRow(row.key, (current) => ({
+                              ...current,
+                              colorHex: normalizeHexColor(event.target.value, '#111827'),
+                            }))}
+                            aria-label="Chọn mã màu"
+                          />
+                          <input
+                            type="text"
+                            placeholder="#000000"
+                            value={normalizeHexColor(row.colorHex, resolveColorSwatch(row.axis1, '#111827'))}
+                            onChange={(event) => updateVariantRow(row.key, (current) => ({
+                              ...current,
+                              colorHex: normalizeHexColor(event.target.value, current.colorHex || '#111827'),
+                            }))}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="vendor-variant-color-preview">
+                        <span className="vendor-variant-color-dot" style={{ backgroundColor: resolvedColorHex }} />
+                        <input type="text" readOnly value={resolvedColorHex.toUpperCase()} />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <input
@@ -1041,7 +1131,8 @@ const VendorProducts = () => {
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <p className="admin-muted small vendor-variant-total">
               Tổng kho: {variantStockTotal}

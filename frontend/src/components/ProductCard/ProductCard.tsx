@@ -8,6 +8,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { productService } from '../../services/productService';
 import QuickViewModal from '../QuickViewModal/QuickViewModal';
 import { isCanonicalStoreSlug } from '../../utils/storeIdentity';
+import { resolveColorSwatch } from '../../utils/colorSwatch';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -334,11 +335,10 @@ const ProductCardInteractive = ({
               <button
                 key={idx}
                 className={`color-swatch-btn ${selectedColorIdx === idx ? 'selected' : ''}`}
-                style={{ '--swatch-color': color } as React.CSSProperties}
                 onClick={(e) => handleColorClick(e, idx)}
                 aria-label={`Chọn màu ${idx + 1}`}
               >
-                <span className="swatch-inner" style={{ backgroundColor: color }}></span>
+                <span className="swatch-inner" style={{ backgroundColor: resolveColorSwatch(color) }}></span>
               </button>
             ))}
           </div>
