@@ -1,12 +1,12 @@
 .plp-page {
-  background-color: var(--co-admin-bg);
+  background-color: var(--co-admin-bg, var(--co-white));
   padding-bottom: 80px;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 /* Breadcrumbs */
 .breadcrumb-wrapper {
-  background-color: var(--co-admin-bg);
+  background-color: var(--co-admin-bg, var(--bg-secondary));
   padding: 12px 0;
   margin-bottom: 30px;
 }
@@ -15,26 +15,26 @@
   display: flex;
   align-items: center;
   font-size: 13px;
-  color: var(--co-admin-text-muted);
+  color: var(--co-admin-text-muted, var(--co-gray-600));
 }
 
 .breadcrumb-link {
-  color: var(--co-admin-text-muted);
+  color: var(--co-admin-text-muted, var(--co-gray-600));
   text-decoration: none;
   transition: color 0.3s ease;
 }
 
 .breadcrumb-link:hover {
-  color: var(--co-admin-blue);
+  color: var(--co-admin-blue, var(--co-blue));
 }
 
 .breadcrumb-separator {
   margin: 0 8px;
-  color: var(--co-admin-text-muted);
+  color: var(--co-admin-text-muted, var(--co-gray-500));
 }
 
 .breadcrumb-current {
-  color: var(--co-admin-text);
+  color: var(--co-admin-text, var(--co-black));
   font-weight: 700;
 }
 
@@ -48,14 +48,14 @@
 .plp-title {
   font-size: 28px;
   font-weight: 800;
-  color: var(--co-admin-text);
+  color: var(--co-admin-text, var(--co-black));
   margin: 0;
   text-transform: uppercase;
 }
 
 .plp-count {
   font-size: 15px;
-  color: var(--co-admin-text-muted);
+  color: var(--co-admin-text-muted, var(--co-gray-600));
   margin-left: 12px;
 }
 
@@ -67,16 +67,16 @@
   gap: 8px;
   margin-bottom: 16px;
   padding: 12px 16px;
-  background: var(--co-admin-surface);
+  background: var(--co-admin-surface, var(--co-white));
   border-radius: 12px;
-  border: 1px solid var(--co-admin-border);
+  border: 1px solid var(--co-admin-border, var(--border-color));
   animation: fadeIn 0.2s ease;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
 }
 
 .active-filters-label {
   font-size: 13px;
-  color: var(--co-admin-text);
+  color: var(--co-admin-text, var(--co-black));
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -92,7 +92,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: var(--co-admin-blue);
+  background: var(--co-admin-blue, var(--co-blue));
   color: white;
   border: none;
   padding: 5px 12px 5px 14px;
@@ -116,7 +116,7 @@
 .clear-all-filters {
   background: none;
   border: none;
-  color: var(--co-admin-blue);
+  color: var(--co-admin-blue, var(--co-blue));
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -131,7 +131,7 @@
 }
 
 .mobile-filter-badge {
-  background: var(--co-admin-blue);
+  background: var(--co-admin-blue, var(--co-blue));
   color: white;
   border-radius: 999px;
   font-size: 11px;
@@ -148,7 +148,7 @@
   align-items: flex-start;
 }
 
-.plp-sidebar {
+  .plp-sidebar {
   width: 250px;
   flex-shrink: 0;
   transition: transform 0.3s ease;
@@ -195,24 +195,24 @@
     align-items: center;
     gap: 8px;
     padding: 10px 16px;
-    background-color: var(--co-admin-surface);
-    border: 1px solid var(--co-admin-border);
+    background-color: var(--co-admin-surface, var(--co-white));
+    border: 1px solid var(--co-admin-border, var(--border-color));
     border-radius: 12px;
     font-weight: 700;
-    color: var(--co-admin-text);
+    color: var(--co-admin-text, var(--co-black));
     width: 100%;
     justify-content: center;
     margin-bottom: 16px;
   }
 
-  .plp-sidebar {
+.plp-sidebar {
     position: fixed;
     top: 0;
     left: 0;
     width: 300px;
     max-width: 85vw;
     height: 100vh;
-    background-color: var(--co-admin-surface);
+    background-color: var(--co-admin-surface, var(--co-white));
     z-index: 1000;
     transform: translateX(-100%);
     display: flex;
@@ -228,14 +228,14 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--co-admin-border);
+    border-bottom: 1px solid var(--co-admin-border, var(--border-color));
   }
 
   .mobile-filter-header h3 {
     margin: 0;
     font-size: 18px;
     font-weight: 700;
-    color: var(--co-admin-text);
+    color: var(--co-admin-text, var(--co-black));
   }
 
   .sidebar-content {

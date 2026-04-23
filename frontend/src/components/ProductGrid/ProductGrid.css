@@ -1,6 +1,6 @@
 .product-grid-container {
   width: 100%;
-  background: var(--co-admin-bg);
+  background: var(--co-admin-bg, var(--co-white));
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
@@ -11,15 +11,15 @@
   align-items: center;
   margin-bottom: 24px;
   padding: 12px 16px;
-  background-color: var(--co-admin-surface);
+  background-color: var(--co-admin-surface, var(--co-white));
   border-radius: 14px;
-  border: 1px solid var(--co-admin-border);
+  border: 1px solid var(--co-admin-border, var(--border-color));
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .results-count {
   font-size: 14px;
-  color: var(--co-admin-text);
+  color: var(--co-admin-text, var(--co-black));
   font-weight: 700;
 }
 
@@ -31,7 +31,7 @@
 
 .sort-label {
   font-size: 14px;
-  color: var(--co-admin-text);
+  color: var(--co-admin-text, var(--co-black));
   font-weight: 700;
   font-family: 'Inter', sans-serif;
 }
@@ -39,12 +39,12 @@
 .sort-select {
   padding: 10px 36px 10px 14px;
   font-size: 14px;
-  border: 1px solid var(--co-admin-border);
+  border: 1px solid var(--co-admin-border, var(--border-color));
   border-radius: 12px;
-  background-color: var(--co-admin-bg);
+  background-color: var(--co-admin-bg, var(--co-white));
   cursor: pointer;
   appearance: none;
-  color: var(--co-admin-text);
+  color: var(--co-admin-text, var(--co-black));
   font-family: 'Inter', sans-serif;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23838BA7' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -53,7 +53,7 @@
 }
 
 .sort-select:focus-visible {
-  outline: 2px solid var(--co-admin-blue);
+  outline: 2px solid var(--co-admin-blue, var(--co-blue));
   outline-offset: 2px;
 }
 
@@ -91,9 +91,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--co-admin-border);
-  background-color: var(--co-admin-surface);
-  color: var(--co-admin-text);
+  border: 1px solid var(--co-admin-border, var(--border-color));
+  background-color: var(--co-admin-surface, var(--co-white));
+  color: var(--co-admin-text, var(--co-black));
   border-radius: 10px;
   font-size: 14px;
   font-weight: 700;
@@ -102,14 +102,14 @@
 }
 
 .page-number:hover {
-  border-color: var(--co-admin-blue);
+  border-color: var(--co-admin-blue, var(--co-blue));
   box-shadow: 0 6px 12px rgba(15, 23, 42, 0.08);
 }
 
 .page-number.active {
-  background-color: var(--co-admin-blue);
+  background-color: var(--co-admin-blue, var(--co-blue));
   color: white;
-  border-color: var(--co-admin-blue);
+  border-color: var(--co-admin-blue, var(--co-blue));
 }
 
 .page-dots {
@@ -123,9 +123,9 @@
 
 .pagination-btn {
   padding: 10px 20px;
-  background-color: var(--co-admin-surface);
-  border: 1px solid var(--co-admin-border);
-  color: var(--co-admin-text);
+  background-color: var(--co-admin-surface, var(--co-white));
+  border: 1px solid var(--co-admin-border, var(--border-color));
+  color: var(--co-admin-text, var(--co-black));
   font-weight: 700;
   border-radius: 999px;
   cursor: pointer;
@@ -133,17 +133,17 @@
 }
 
 .pagination-btn:hover:not(.disabled) {
-  background-color: var(--co-admin-blue);
+  background-color: var(--co-admin-blue, var(--co-blue));
   color: white;
-  border-color: var(--co-admin-blue);
+  border-color: var(--co-admin-blue, var(--co-blue));
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
 }
 
 .pagination-btn.disabled {
-  border-color: var(--co-admin-border);
-  color: var(--co-admin-text-muted);
+  border-color: var(--co-admin-border, var(--border-color));
+  color: var(--co-admin-text-muted, var(--co-gray-500));
   cursor: not-allowed;
-  background: var(--co-admin-bg-alt);
+  background: var(--co-admin-bg-alt, var(--co-gray-100));
 }
 
 /* Responsiveness */
