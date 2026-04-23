@@ -38,12 +38,12 @@
 }
 
 .desc-tab-btn:hover {
-  color: var(--co-admin-text, var(--co-black));
+  color: var(--co-blue, #2f5acf);
   background: rgba(255, 255, 255, 0.72);
 }
 
 .desc-tab-btn.active {
-  color: var(--co-admin-text, var(--co-black));
+  color: var(--co-blue-dark, #1e40af);
   background: var(--co-admin-surface, #ffffff);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
 }
@@ -76,7 +76,7 @@
 
 .tab-pane h3 {
   margin: 0 0 18px;
-  color: var(--co-admin-text, var(--co-black));
+  color: var(--co-blue-dark, #1e40af);
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -88,6 +88,11 @@
   color: var(--co-admin-text, var(--text-color));
   font-size: 15px;
   line-height: 1.8;
+}
+
+.tab-text strong,
+.tab-text b {
+  color: var(--co-blue, #2f5acf);
 }
 
 .admin-muted {
@@ -126,7 +131,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: var(--co-admin-text, var(--co-black));
+  background: var(--co-blue, #2f5acf);
   color: var(--co-admin-surface, #ffffff);
   font-size: 11px;
   font-weight: 800;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle, RotateCcw, X } from 'lucide-react';
 import './ChatWidget.css';
 import { chatbotService } from '../../services/chatbotService';
@@ -10,7 +10,8 @@ const DIRECT_LINE_USER_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 const ABSOLUTE_IMAGE_URL_PATTERN = /^https?:\/\//i;
 const DATA_IMAGE_PATTERN = /^data:image\//i;
 const WEBCHAT_JOIN_EVENT = 'webchat/join';
-type WebChatComponent = ComponentType<Record<string, unknown>>;
+const WEBCHAT_RUNTIME_SCRIPT_ID = 'fashmarket-webchat-runtime';
+const WEBCHAT_RUNTIME_URL = 'https://cdn.botframework.com/botframework-webchat/latest/webchat.js';
 
 type WebChatAction = {
   type: string;
@@ -18,6 +19,36 @@ type WebChatAction = {
 };
 
 type WebChatDispatch = (action: WebChatAction) => unknown;
+type DirectLineClient = { end?: () => void; setUserId?: (id: string) => void };
+
+type WebChatRuntime = {
+  createDirectLine: (options: {
+    token: string;
+    conversationId?: string;
+    streamUrl?: string;
+  }) => DirectLineClient;
+  createStore: (
+    initialState?: unknown,
+    enhancer?: (storeApi: { dispatch: WebChatDispatch }) => (next: WebChatDispatch) => WebChatDispatch
+  ) => unknown;
+  renderWebChat: (
+    options: {
+      directLine: DirectLineClient;
+      locale: string;
+      styleOptions: Record<string, string | number | boolean>;
+      store: unknown;
+      userID: string;
+    },
+    element: HTMLElement
+  ) => void;
+};
+
+declare global {
+  interface Window {
+    WebChat?: WebChatRuntime;
+    __fashMarketWebChatLoader?: Promise<WebChatRuntime>;
+  }
+}
 
 const getInitials = (name: string) =>
   name
@@ -56,14 +87,76 @@ const resolveErrorMessage = (error: unknown) => {
   return 'Không thể kết nối chatbot lúc này. Vui lòng thử lại sau.';
 };
 
+const loadWebChatRuntime = (): Promise<WebChatRuntime> => {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('WebChat runtime chỉ hỗ trợ trên trình duyệt.'));
+  }
+
+  if (window.WebChat) {
+    return Promise.resolve(window.WebChat);
+  }
+
+  if (window.__fashMarketWebChatLoader) {
+    return window.__fashMarketWebChatLoader;
+  }
+
+  const loadPromise = new Promise<WebChatRuntime>((resolve, reject) => {
+    const existingScript = document.getElementById(WEBCHAT_RUNTIME_SCRIPT_ID) as HTMLScriptElement | null;
+    if (existingScript) {
+      if (existingScript.dataset.fashLoaded === 'true' && window.WebChat) {
+        resolve(window.WebChat);
+        return;
+      }
+
+      existingScript.addEventListener('load', () => {
+        existingScript.dataset.fashLoaded = 'true';
+        if (window.WebChat) {
+          resolve(window.WebChat);
+          return;
+        }
+        reject(new Error('Không tìm thấy WebChat runtime sau khi tải script.'));
+      }, { once: true });
+      existingScript.addEventListener('error', () => {
+        reject(new Error('Tải WebChat runtime thất bại.'));
+      }, { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = WEBCHAT_RUNTIME_SCRIPT_ID;
+    script.src = WEBCHAT_RUNTIME_URL;
+    script.async = true;
+    script.onload = () => {
+      script.dataset.fashLoaded = 'true';
+      if (window.WebChat) {
+        resolve(window.WebChat);
+        return;
+      }
+      reject(new Error('Không tìm thấy WebChat runtime sau khi tải script.'));
+    };
+    script.onerror = () => {
+      reject(new Error('Tải WebChat runtime thất bại.'));
+    };
+    document.head.appendChild(script);
+  });
+
+  window.__fashMarketWebChatLoader = loadPromise.catch((error) => {
+    window.__fashMarketWebChatLoader = undefined;
+    throw error;
+  });
+
+  return window.__fashMarketWebChatLoader;
+};
+
 const ChatWidget = () => {
   const { user } = useAuth();
-  const [ReactWebChatComponent, setReactWebChatComponent] = useState<WebChatComponent | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [webChatRuntime, setWebChatRuntime] = useState<WebChatRuntime | null>(null);
   const [directLine, setDirectLine] = useState<{ end?: () => void } | null>(null);
   const [webChatStore, setWebChatStore] = useState<unknown>(null);
+  const webChatHostRef = useRef<HTMLDivElement | null>(null);
 
   const visitorId = useMemo(buildVisitorId, []);
   const userAvatar = useMemo(() => {
@@ -114,21 +207,17 @@ const ChatWidget = () => {
     setErrorMessage(null);
 
     try {
-      const webChatModule = await import('botframework-webchat');
+      const loadedWebChatRuntime = await loadWebChatRuntime();
       const tokenData = await chatbotService.createDirectLineToken(visitorId);
 
-      if (!ReactWebChatComponent) {
-        setReactWebChatComponent(() => webChatModule.default as WebChatComponent);
-      }
-
-      const createdDirectLine = webChatModule.createDirectLine({
+      const createdDirectLine = loadedWebChatRuntime.createDirectLine({
         token: tokenData.token,
         conversationId: tokenData.conversationId,
         streamUrl: tokenData.streamUrl,
-      }) as { end?: () => void; setUserId?: (id: string) => void };
+      });
 
       let didSendJoinEvent = false;
-      const createdStore = webChatModule.createStore({}, ({ dispatch }: { dispatch: WebChatDispatch }) =>
+      const createdStore = loadedWebChatRuntime.createStore({}, ({ dispatch }: { dispatch: WebChatDispatch }) =>
         (next: WebChatDispatch) =>
           (action: WebChatAction) => {
             if (!didSendJoinEvent && action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
@@ -158,6 +247,7 @@ const ChatWidget = () => {
         };
       }
 
+      setWebChatRuntime(loadedWebChatRuntime);
       setDirectLine(createdDirectLine);
       setWebChatStore(createdStore);
     } catch (error) {
@@ -165,7 +255,7 @@ const ChatWidget = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [ReactWebChatComponent, directLine, isLoading, visitorId]);
+  }, [directLine, isLoading, visitorId]);
 
   useEffect(() => {
     if (isOpen && !directLine && !isLoading) {
@@ -178,6 +268,25 @@ const ChatWidget = () => {
       directLine.end();
     }
   }, [directLine]);
+
+  useEffect(() => {
+    if (!isOpen || !webChatRuntime || !directLine || webChatStore === null || !webChatHostRef.current) {
+      return;
+    }
+
+    const hostElement = webChatHostRef.current;
+    webChatRuntime.renderWebChat({
+      directLine,
+      locale: 'vi-VN',
+      styleOptions,
+      store: webChatStore,
+      userID: visitorId,
+    }, hostElement);
+
+    return () => {
+      hostElement.innerHTML = '';
+    };
+  }, [directLine, isOpen, styleOptions, visitorId, webChatRuntime, webChatStore]);
 
   return (
     <div className="chat-widget" aria-live="polite">
@@ -215,14 +324,8 @@ const ChatWidget = () => {
               </div>
             )}
 
-            {!isLoading && !errorMessage && directLine && webChatStore !== null && ReactWebChatComponent && (
-              <ReactWebChatComponent
-                directLine={directLine}
-                locale="vi-VN"
-                styleOptions={styleOptions}
-                store={webChatStore}
-                userID={visitorId}
-              />
+            {!isLoading && !errorMessage && directLine && webChatStore !== null && (
+              <div ref={webChatHostRef} />
             )}
           </div>
         </div>

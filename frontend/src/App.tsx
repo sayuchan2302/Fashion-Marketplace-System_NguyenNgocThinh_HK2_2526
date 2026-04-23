@@ -18,7 +18,6 @@ const Policy = lazy(() => import('./pages/Policy/Policy'));
 const About = lazy(() => import('./pages/About/About'));
 const Contact = lazy(() => import('./pages/Contact/Contact'));
 const OrderDetail = lazy(() => import('./pages/OrderDetail/OrderDetail'));
-const ScrollToTop = lazy(() => import('./components/ScrollToTop/ScrollToTop'));
 const OrdersPage = lazy(() => import('./pages/Account/OrdersPage'));
 const AddressesPage = lazy(() => import('./pages/Account/AddressesPage'));
 const SecurityPage = lazy(() => import('./pages/Account/SecurityPage'));
@@ -52,7 +51,9 @@ import { CartProvider } from './contexts/CartContext';
 import { FilterProvider } from './contexts/FilterContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
-import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner';
+import RouteLoader from './components/RouteLoader/RouteLoader';
+import PageFallback from './components/Transitions/PageFallback';
+import ScrollToTop from './components/ScrollToTop/ScrollToTop';
 const ChatWidget = lazy(() => import('./components/ChatWidget/ChatWidget'));
 
 const MainLayout = () => {
@@ -65,7 +66,9 @@ const MainLayout = () => {
     <>
       {!isAdmin && !isVendorPortal && <TopBar />}
       {!isAdmin && !isVendorPortal && <Header />}
-      <Outlet />
+      <RouteLoader fallback={<PageFallback />}>
+        <Outlet />
+      </RouteLoader>
       {!isCheckout && !isAdmin && !isVendorPortal && <Footer />}
       {!isCheckout && !isAdmin && !isVendorPortal && (
         <Suspense fallback={null}>
@@ -75,12 +78,6 @@ const MainLayout = () => {
     </>
   );
 };
-
-const RouteLoader = ({ children, text }: { children: React.ReactNode; text?: string }) => (
-  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text={text || 'Đang tải...'} />}>
-    {children}
-  </Suspense>
-);
 
 function App() {
   return (
@@ -92,47 +89,47 @@ function App() {
               <FilterProvider>
                 <NotificationProvider>
                   <Router>
-                    <RouteLoader>
-                      <ScrollToTop />
-                      <div className="app-container">
-                        <Routes>
-                          {/* All routes share standard layout (Header, Footer) */}
-                          <Route element={<MainLayout />}>
-                            <Route path="/" element={<Home />} />
-                            <Route path="/category/:id" element={<ProductListing />} />
-                            <Route path="/product/:id" element={<ProductDetail />} />
-                            <Route path="/cart" element={<Cart />} />
-                            <Route path="/checkout" element={<Checkout />} />
-                            <Route path="/login" element={<Login />} />
-                            <Route path="/register" element={<Register />} />
-                            <Route path="/forgot" element={<ForgotPassword />} />
-                            <Route path="/reset-password" element={<ResetPassword />} />
-                            <Route path="/vendor/register" element={<VendorRegister />} />
-                            <Route path="/order-success" element={<OrderSuccess />} />
-                            <Route path="/search" element={<Search />} />
-                            <Route path="/wishlist" element={<Wishlist />} />
-                            <Route path="/order-tracking" element={<OrderTracking />} />
-                            <Route path="/returns" element={<Returns />} />
-                            <Route path="/payment-result" element={<PaymentResult />} />
-                            <Route path="/faq" element={<FAQ />} />
-                            <Route path="/size-guide" element={<SizeGuide />} />
-                            <Route path="/store/:slug" element={<StoreProfile />} />
-                            <Route path="/policy/:type" element={<Policy />} />
-                            <Route path="/about" element={<About />} />
-                            <Route path="/contact" element={<Contact />} />
-                            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                            <Route path="/profile/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
-                            <Route path="/account/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
-                            <Route path="/account/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
-                            <Route path="/account/addresses" element={<ProtectedRoute><AddressesPage /></ProtectedRoute>} />
-                            <Route path="/account/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
-                            <Route path="*" element={<NotFound />} />
-                          </Route>
+                    <ScrollToTop />
+                    <div className="app-container">
+                      <Routes>
+                        {/* All routes share standard layout (Header, Footer) */}
+                        <Route element={<MainLayout />}>
+                          <Route path="/" element={<Home />} />
+                          <Route path="/category/:id" element={<ProductListing />} />
+                          <Route path="/product/:id" element={<ProductDetail />} />
+                          <Route path="/cart" element={<Cart />} />
+                          <Route path="/checkout" element={<Checkout />} />
+                          <Route path="/login" element={<Login />} />
+                          <Route path="/register" element={<Register />} />
+                          <Route path="/forgot" element={<ForgotPassword />} />
+                          <Route path="/reset-password" element={<ResetPassword />} />
+                          <Route path="/vendor/register" element={<VendorRegister />} />
+                          <Route path="/order-success" element={<OrderSuccess />} />
+                          <Route path="/search" element={<Search />} />
+                          <Route path="/wishlist" element={<Wishlist />} />
+                          <Route path="/order-tracking" element={<OrderTracking />} />
+                          <Route path="/returns" element={<Returns />} />
+                          <Route path="/payment-result" element={<PaymentResult />} />
+                          <Route path="/faq" element={<FAQ />} />
+                          <Route path="/size-guide" element={<SizeGuide />} />
+                          <Route path="/store/:slug" element={<StoreProfile />} />
+                          <Route path="/policy/:type" element={<Policy />} />
+                          <Route path="/about" element={<About />} />
+                          <Route path="/contact" element={<Contact />} />
+                          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                          <Route path="/profile/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
+                          <Route path="/account/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+                          <Route path="/account/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
+                          <Route path="/account/addresses" element={<ProtectedRoute><AddressesPage /></ProtectedRoute>} />
+                          <Route path="/account/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
+                          <Route path="*" element={<NotFound />} />
+                        </Route>
 
-                          {/* Admin routes - SUPER_ADMIN only */}
-                          <Route
-                            path="/admin/*"
-                            element={(
+                        {/* Admin routes - SUPER_ADMIN only */}
+                        <Route
+                          path="/admin/*"
+                          element={(
+                            <RouteLoader fallback={<PageFallback />}>
                               <ProtectedRoute
                                 allowedRoles={['SUPER_ADMIN']}
                                 redirectUnauthenticatedToLogin
@@ -141,13 +138,15 @@ function App() {
                               >
                                 <AdminWorkspace />
                               </ProtectedRoute>
-                            )}
-                          />
+                            </RouteLoader>
+                          )}
+                        />
 
-                          {/* Vendor Portal routes - VENDOR only */}
-                          <Route
-                            path="/vendor/*"
-                            element={(
+                        {/* Vendor Portal routes - VENDOR only */}
+                        <Route
+                          path="/vendor/*"
+                          element={(
+                            <RouteLoader fallback={<PageFallback />}>
                               <ProtectedRoute
                                 allowedRoles={['VENDOR']}
                                 requireVendorApproval
@@ -157,11 +156,11 @@ function App() {
                               >
                                 <VendorWorkspace />
                               </ProtectedRoute>
-                            )}
-                          />
-                        </Routes>
-                      </div>
-                    </RouteLoader>
+                            </RouteLoader>
+                          )}
+                        />
+                      </Routes>
+                    </div>
                   </Router>
                 </NotificationProvider>
               </FilterProvider>

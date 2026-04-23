@@ -1,9 +1,10 @@
-import { isValidElement, lazy, Suspense, useCallback, useState } from 'react';
+import { isValidElement, lazy, useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import { AdminShellContext, type AdminShellState } from '../Admin/AdminShellContext';
 import PageFallback from '../../components/Transitions/PageFallback';
+import RouteLoader from '../../components/RouteLoader/RouteLoader';
 
 const VendorDashboard = lazy(() => import('./VendorDashboard'));
 const VendorOrders = lazy(() => import('./VendorOrders'));
@@ -106,7 +107,7 @@ const VendorWorkspace = () => {
         breadcrumbs={shellState.breadcrumbs}
       >
         <div className="admin-route-transition">
-          <Suspense fallback={<PageFallback />}>
+          <RouteLoader fallback={<PageFallback />}>
             <Routes>
               <Route index element={<Navigate to="/vendor/dashboard" replace />} />
               <Route path="dashboard" element={<VendorDashboard />} />
@@ -121,7 +122,7 @@ const VendorWorkspace = () => {
               <Route path="settings" element={<VendorSettings />} />
               <Route path="*" element={<Navigate to="/vendor/dashboard" replace />} />
             </Routes>
-          </Suspense>
+          </RouteLoader>
         </div>
       </VendorLayout>
     </AdminShellContext.Provider>

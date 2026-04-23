@@ -1,0 +1,136 @@
+name: Frontend Quality Gate
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fashion-store
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fashion-store"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/fashion-store
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      APP_SEED_ENABLED: "true"
+      APP_SEED_GAP_ENABLED: "true"
+      APP_SEED_GAP_TARGET_COUNT: "300"
+      APP_SEED_GAP_CLEAN_BEFORE_IMPORT: "true"
+      APP_CHATBOT_AI_FALLBACK_ENABLED: "false"
+      AZURE_BOT_AUTH_ENABLED: "false"
+      VITE_API_URL: http://localhost:8080
+      BASE_URL: http://localhost:5173
+      CI: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start backend
+        run: |
+          mkdir -p .ci-logs
+          ./backend/mvnw -f backend/pom.xml spring-boot:run > .ci-logs/backend.log 2>&1 &
+          echo $! > .ci-logs/backend.pid
+
+      - name: Wait for backend health
+        run: |
+          for i in {1..180}; do
+            if curl -sf http://localhost:8080/actuator/health > /dev/null; then
+              echo "Backend is healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not become healthy in time."
+          tail -n 200 .ci-logs/backend.log || true
+          exit 1
+
+      - name: Frontend lint
+        run: npm run lint --prefix frontend
+
+      - name: Frontend build
+        run: npm run build --prefix frontend
+
+      - name: Start frontend preview
+        run: |
+          npm run preview --prefix frontend -- --host 0.0.0.0 --port 5173 > .ci-logs/frontend.log 2>&1 &
+          echo $! > .ci-logs/frontend.pid
+
+      - name: Wait for frontend
+        run: |
+          for i in {1..90}; do
+            if curl -sf http://localhost:5173 > /dev/null; then
+              echo "Frontend is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Frontend did not become ready in time."
+          tail -n 200 .ci-logs/frontend.log || true
+          exit 1
+
+      - name: Frontend smoke regression
+        run: npm run smoke --prefix frontend
+
+      - name: Upload CI logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-quality-gate-logs
+          path: .ci-logs
+          if-no-files-found: ignore
+
+      - name: Stop background services
+        if: always()
+        run: |
+          if [ -f .ci-logs/frontend.pid ]; then
+            kill "$(cat .ci-logs/frontend.pid)" || true
+          fi
+          if [ -f .ci-logs/backend.pid ]; then
+            kill "$(cat .ci-logs/backend.pid)" || true
+          fi

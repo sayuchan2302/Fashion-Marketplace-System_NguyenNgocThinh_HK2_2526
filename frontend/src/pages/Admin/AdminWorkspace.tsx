@@ -1,10 +1,11 @@
-import { isValidElement, lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { isValidElement, lazy, useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AdminShellContext, type AdminShellState } from './AdminShellContext';
 import { AdminMountedContext } from './useAdminPageAnimation';
 import AdminLayout from './AdminLayout';
 import PageFallback from '../../components/Transitions/PageFallback';
+import RouteLoader from '../../components/RouteLoader/RouteLoader';
 
 const Admin = lazy(() => import('./Admin'));
 const AdminOrders = lazy(() => import('./AdminOrders'));
@@ -115,7 +116,7 @@ const AdminWorkspace = () => {
       >
         <AdminMountedContext.Provider value={isMounted}>
           <div className="admin-route-transition">
-            <Suspense fallback={<PageFallback />}>
+            <RouteLoader fallback={<PageFallback />}>
               <Routes>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<Admin />} />
@@ -136,7 +137,7 @@ const AdminWorkspace = () => {
                 <Route path="customer" element={<Navigate to="/admin/users" replace />} />
                 <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
               </Routes>
-            </Suspense>
+            </RouteLoader>
           </div>
         </AdminMountedContext.Provider>
       </AdminLayout>

@@ -34,7 +34,7 @@
 }
 
 .breadcrumb-current {
-  color: var(--co-admin-text);
+  color: var(--co-blue-dark);
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -111,7 +111,7 @@
 
 .pdp-review-count {
   font-weight: 700;
-  color: var(--co-admin-text);
+  color: var(--co-blue-dark);
 }
 
 .pdp-reviews-section {
@@ -135,7 +135,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 800;
-  color: var(--co-admin-text);
+  color: var(--co-blue-dark);
 }
 
 .pdp-reviews-badge {
@@ -257,7 +257,7 @@
   color: #f59e0b;
 }
 .pdp-star-filled { color: #f59e0b; }
-.pdp-avg-value { color: var(--co-admin-text); }
+.pdp-avg-value { color: var(--co-blue-dark); }
 
 .pdp-reviews-title-row {
   display: flex;
@@ -304,7 +304,7 @@
   margin: 0 0 4px;
   font-size: 16px;
   font-weight: 800;
-  color: var(--co-admin-text);
+  color: var(--co-blue-dark);
 }
 .pdp-write-review-sub {
   margin: 0;
@@ -343,7 +343,7 @@
 .pdp-form-label {
   font-size: 14px;
   font-weight: 700;
-  color: var(--co-admin-text);
+  color: var(--co-blue-dark);
 }
 .pdp-form-label .required { color: #ef4444; margin-left: 2px; }
 .pdp-review-textarea {
