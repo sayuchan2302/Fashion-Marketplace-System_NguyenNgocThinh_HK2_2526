@@ -120,6 +120,10 @@ interface StoreUpdateRequest {
   warehousePhone?: string;
 }
 
+interface BackendUploadImageResponse {
+  url?: string;
+}
+
 export interface StoreRegistrationResponse {
   storeId: string;
   approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -406,5 +410,25 @@ export const storeService = {
       body: JSON.stringify(payload),
     }, { auth: true });
     return mapBackendStore(store);
+  },
+
+  async uploadStoreImage(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiRequest<BackendUploadImageResponse>(
+      '/api/stores/upload-image',
+      {
+        method: 'POST',
+        body: formData,
+      },
+      { auth: true },
+    );
+
+    const nextUrl = String(response?.url || '').trim();
+    if (!nextUrl) {
+      throw new Error('Không nhận được URL ảnh sau khi tải lên.');
+    }
+    return nextUrl;
   },
 };

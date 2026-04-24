@@ -3,6 +3,7 @@ package vn.edu.hcmuaf.fit.marketplace.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.StoreRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.PublicStoreResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.StoreFollowResponse;
@@ -10,9 +11,11 @@ import vn.edu.hcmuaf.fit.marketplace.dto.response.StoreResponse;
 import vn.edu.hcmuaf.fit.marketplace.security.AuthContext;
 import vn.edu.hcmuaf.fit.marketplace.security.JwtService;
 import vn.edu.hcmuaf.fit.marketplace.service.StoreFollowService;
+import vn.edu.hcmuaf.fit.marketplace.service.StoreImageStorageService;
 import vn.edu.hcmuaf.fit.marketplace.service.StoreService;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -23,17 +26,20 @@ public class StoreController {
     private final StoreFollowService storeFollowService;
     private final JwtService jwtService;
     private final AuthContext authContext;
+    private final StoreImageStorageService storeImageStorageService;
 
     public StoreController(
             StoreService storeService,
             StoreFollowService storeFollowService,
             JwtService jwtService,
-            AuthContext authContext
+            AuthContext authContext,
+            StoreImageStorageService storeImageStorageService
     ) {
         this.storeService = storeService;
         this.storeFollowService = storeFollowService;
         this.jwtService = jwtService;
         this.authContext = authContext;
+        this.storeImageStorageService = storeImageStorageService;
     }
 
     @PostMapping("/register")
@@ -174,6 +180,16 @@ public class StoreController {
             @RequestBody StoreRequest request) {
         UUID userId = UUID.fromString(jwtService.extractUserId(authHeader.replace("Bearer ", "")));
         return ResponseEntity.ok(storeService.updateStore(userId, request));
+    }
+
+    @PostMapping("/upload-image")
+    public ResponseEntity<Map<String, String>> uploadStoreImage(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam("file") MultipartFile file
+    ) {
+        authContext.requireVendor(authHeader);
+        String imageUrl = storeImageStorageService.storeStoreImage(file);
+        return ResponseEntity.ok(Map.of("url", imageUrl));
     }
 
     public static class RejectRequest {

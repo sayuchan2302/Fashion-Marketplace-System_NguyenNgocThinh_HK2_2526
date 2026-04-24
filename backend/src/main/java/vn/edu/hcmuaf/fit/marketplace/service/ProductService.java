@@ -45,6 +45,7 @@ public class ProductService {
     private final OrderRepository orderRepository;
 
     private static final int LOW_STOCK_THRESHOLD = 10;
+    private static final int MAX_PRODUCT_IMAGES = 4;
 
     public enum InventoryState {
         LOW,
@@ -264,8 +265,9 @@ public class ProductService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category is required");
         }
 
-        if (request.getImageUrl() == null || request.getImageUrl().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image URL is required");
+        List<String> incomingImageUrls = resolveIncomingImageUrls(request);
+        if (incomingImageUrls.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product image is required");
         }
 
         BigDecimal effectivePrice = request.getSalePrice() != null && request.getSalePrice().compareTo(BigDecimal.ZERO) > 0
@@ -299,7 +301,7 @@ public class ProductService {
         Category category = resolveLeafCategoryOrThrow(request.getCategoryId());
         product.setCategory(category);
 
-        syncPrimaryImage(product, request.getImageUrl());
+        syncImages(product, incomingImageUrls);
         syncVariants(product, request);
         validatePublishRules(product, status);
         validateSlugUniquenessForCreate(product.getSlug());
@@ -370,7 +372,9 @@ public class ProductService {
             Category category = resolveLeafCategoryOrThrow(request.getCategoryId());
             product.setCategory(category);
         }
-        syncPrimaryImage(product, request.getImageUrl());
+        if (request.getImageUrls() != null || request.getImageUrl() != null) {
+            syncImages(product, resolveIncomingImageUrls(request));
+        }
         syncVariants(product, request);
         validatePublishRules(product, product.getStatus());
         validateSlugUniquenessForUpdate(product.getSlug(), product.getId());
@@ -390,39 +394,59 @@ public class ProductService {
         }
     }
 
-    private void syncPrimaryImage(Product product, String imageUrl) {
-        if (imageUrl == null || imageUrl.isBlank()) {
+    private List<String> resolveIncomingImageUrls(ProductRequest request) {
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+
+        if (request.getImageUrls() != null) {
+            for (String imageUrl : request.getImageUrls()) {
+                if (imageUrl == null) {
+                    continue;
+                }
+                String value = imageUrl.trim();
+                if (!value.isBlank()) {
+                    normalized.add(value);
+                }
+            }
+        }
+
+        if (normalized.isEmpty() && request.getImageUrl() != null) {
+            String legacySingleImage = request.getImageUrl().trim();
+            if (!legacySingleImage.isBlank()) {
+                normalized.add(legacySingleImage);
+            }
+        }
+
+        if (normalized.size() > MAX_PRODUCT_IMAGES) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Product images must not exceed " + MAX_PRODUCT_IMAGES + " items"
+            );
+        }
+
+        return new ArrayList<>(normalized);
+    }
+
+    private void syncImages(Product product, List<String> imageUrls) {
+        if (imageUrls == null) {
             return;
         }
 
         List<ProductImage> images = ensureImageList(product);
+        images.clear();
 
-        ProductImage image = images.stream()
-                .filter(existing -> Boolean.TRUE.equals(existing.getIsPrimary()))
-                .findFirst()
-                .orElseGet(() -> images.stream().findFirst().orElse(null));
-
-        if (image == null) {
-            ProductImage newImage = ProductImage.builder()
+        for (int index = 0; index < imageUrls.size(); index++) {
+            String imageUrl = imageUrls.get(index);
+            if (imageUrl == null || imageUrl.isBlank()) {
+                continue;
+            }
+            ProductImage image = ProductImage.builder()
                     .product(product)
                     .url(imageUrl.trim())
                     .alt(product.getName())
-                    .sortOrder(0)
-                    .isPrimary(true)
+                    .sortOrder(index)
+                    .isPrimary(index == 0)
                     .build();
-            images.add(newImage);
-            return;
-        }
-
-        image.setUrl(imageUrl.trim());
-        if (image.getAlt() == null || image.getAlt().isBlank()) {
-            image.setAlt(product.getName());
-        }
-        if (image.getSortOrder() == null) {
-            image.setSortOrder(0);
-        }
-        if (image.getIsPrimary() == null) {
-            image.setIsPrimary(true);
+            images.add(image);
         }
     }
 
@@ -602,12 +626,16 @@ public class ProductService {
                 .filter(quantity -> quantity != null && quantity > 0)
                 .reduce(0, Integer::sum);
 
-        String primaryImage = images.stream()
-                .sorted((left, right) -> Boolean.compare(Boolean.TRUE.equals(right.getIsPrimary()), Boolean.TRUE.equals(left.getIsPrimary())))
+        List<String> orderedImages = images.stream()
+                .sorted(
+                        java.util.Comparator
+                                .comparing((ProductImage image) -> !Boolean.TRUE.equals(image.getIsPrimary()))
+                                .thenComparing(image -> image.getSortOrder() == null ? Integer.MAX_VALUE : image.getSortOrder())
+                )
                 .map(ProductImage::getUrl)
                 .filter(url -> url != null && !url.isBlank())
-                .findFirst()
-                .orElse(null);
+                .toList();
+        String primaryImage = orderedImages.isEmpty() ? null : orderedImages.get(0);
         long soldCount = salesSnapshot != null ? salesSnapshot.soldCount() : 0L;
         BigDecimal grossRevenue = salesSnapshot != null ? salesSnapshot.grossRevenue() : BigDecimal.ZERO;
         List<VendorProductSummaryResponse.VariantRow> variantRows = variants.stream()
@@ -644,6 +672,7 @@ public class ProductService {
                 .grossRevenue(grossRevenue)
                 .primarySku(primarySku)
                 .primaryImage(primaryImage)
+                .images(orderedImages)
                 .variants(variantRows)
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())

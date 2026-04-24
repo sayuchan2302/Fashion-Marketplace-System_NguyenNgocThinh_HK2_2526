@@ -1,7 +1,7 @@
 import './Vendor.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import { formatCurrency } from '../../services/commissionService';
@@ -49,7 +49,7 @@ interface ProductFormState {
   basePrice: number;
   salePrice: number;
   stock: number;
-  image: string;
+  images: string[];
   description: string;
   material: string;
   highlights: string;
@@ -87,6 +87,8 @@ type ProductFormErrors = {
 };
 
 const PAGE_SIZE = 8;
+const MAX_PRODUCT_IMAGES = 4;
+const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
 const TABS: Array<{ key: ProductTab; label: string }> = [
   { key: 'all', label: 'Tất cả' },
@@ -159,7 +161,7 @@ const emptyForm = (): ProductFormState => ({
   basePrice: 0,
   salePrice: 0,
   stock: 0,
-  image: '',
+  images: [],
   description: '',
   material: '',
   highlights: '',
@@ -190,6 +192,7 @@ const VendorProducts = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [working, setWorking] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -255,6 +258,7 @@ const VendorProducts = () => {
   );
 
   const toastTimerRef = useRef<number | null>(null);
+  const productImageInputRef = useRef<HTMLInputElement | null>(null);
 
   const updateQuery = useCallback(
     (mutate: (query: URLSearchParams) => void, replace = false) => {
@@ -455,6 +459,86 @@ const VendorProducts = () => {
     openCreateDrawer();
   };
 
+  const openProductImagePicker = () => {
+    if (imageUploading) {
+      return;
+    }
+    productImageInputRef.current?.click();
+  };
+
+  const removeProductImage = (index: number) => {
+    setProductForm((current) => {
+      const nextImages = current.images.filter((_, imageIndex) => imageIndex !== index);
+      return {
+        ...current,
+        images: nextImages,
+      };
+    });
+  };
+
+  const setPrimaryProductImage = (index: number) => {
+    setProductForm((current) => {
+      if (index <= 0 || index >= current.images.length) {
+        return current;
+      }
+      const nextImages = [...current.images];
+      const [selected] = nextImages.splice(index, 1);
+      nextImages.unshift(selected);
+      return {
+        ...current,
+        images: nextImages,
+      };
+    });
+  };
+
+  const handleProductImagesSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (files.length === 0) {
+      return;
+    }
+
+    const remainingSlots = MAX_PRODUCT_IMAGES - productForm.images.length;
+    if (remainingSlots <= 0) {
+      addToast(`Chỉ được tối đa ${MAX_PRODUCT_IMAGES} ảnh cho mỗi sản phẩm.`, 'info');
+      return;
+    }
+
+    const selectedFiles = files.slice(0, remainingSlots);
+    const tooLarge = selectedFiles.find((file) => file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES);
+    if (tooLarge) {
+      addToast('Ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.', 'error');
+      return;
+    }
+
+    try {
+      setImageUploading(true);
+      const uploadedUrls = await Promise.all(
+        selectedFiles.map((file) => vendorProductService.uploadProductImage(file)),
+      );
+      setProductForm((current) => {
+        const nextImages = Array.from(new Set([...current.images, ...uploadedUrls])).slice(0, MAX_PRODUCT_IMAGES);
+        return {
+          ...current,
+          images: nextImages,
+        };
+      });
+      setFormErrors((current) => {
+        if (!current.image) {
+          return current;
+        }
+        const nextErrors = { ...current };
+        delete nextErrors.image;
+        return nextErrors;
+      });
+      addToast('Đã tải ảnh sản phẩm lên thành công.', 'success');
+    } catch (error: unknown) {
+      addToast(getUiErrorMessage(error, 'Không thể tải ảnh sản phẩm lên'), 'error');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const addVariantRow = () => {
     setVariantRows((current) => [...current, createVariantRow()]);
     setFormErrors((current) => {
@@ -503,7 +587,7 @@ const VendorProducts = () => {
       careInstructions: current.careInstructions || '',
       gender: current.gender || '',
       fit: current.fit || '',
-      image: current.image,
+      images: current.images && current.images.length > 0 ? [...current.images] : (current.image ? [current.image] : []),
       description: current.description,
       material: current.material,
       visible: current.visible,
@@ -540,7 +624,7 @@ const VendorProducts = () => {
     const errors: ProductFormErrors = {};
     if (!form.name.trim()) errors.name = 'Tên sản phẩm không được để trống.';
     if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục sản phẩm.';
-    if (!form.image.trim()) errors.image = 'Vui lòng nhập ảnh đại diện sản phẩm.';
+    if (!form.images.length) errors.image = 'Vui lòng tải lên ít nhất 1 ảnh sản phẩm.';
     if (normalizedVariants.length === 0) {
       errors.variants = 'Vui lòng nhập Màu sắc/Kích cỡ để tạo ít nhất một biến thể.';
     }
@@ -597,7 +681,10 @@ const VendorProducts = () => {
       careInstructions: productForm.careInstructions.trim(),
       gender: productForm.gender,
       fit: productForm.fit,
-      image: productForm.image.trim(),
+      images: productForm.images
+        .map((image) => image.trim())
+        .filter((image) => Boolean(image))
+        .slice(0, MAX_PRODUCT_IMAGES),
       basePrice: productForm.basePrice,
       salePrice: productForm.salePrice,
       stock: normalizedVariants.length > 0 ? variantDrivenStock : productForm.stock,
@@ -619,7 +706,7 @@ const VendorProducts = () => {
           price: normalizedForm.basePrice,
           salePrice: normalizedForm.salePrice,
           stock: normalizedForm.stock,
-          image: normalizedForm.image,
+          images: normalizedForm.images,
           description: normalizedForm.description,
           highlights: normalizedForm.highlights,
           careInstructions: normalizedForm.careInstructions,
@@ -636,7 +723,7 @@ const VendorProducts = () => {
           price: normalizedForm.basePrice,
           salePrice: normalizedForm.salePrice,
           stock: normalizedForm.stock,
-          image: normalizedForm.image,
+          images: normalizedForm.images,
           description: normalizedForm.description,
           highlights: normalizedForm.highlights,
           careInstructions: normalizedForm.careInstructions,
@@ -958,21 +1045,75 @@ const VendorProducts = () => {
                 </div>
               </div>
 
-              <label className="form-field">
-                <span>Ảnh sản phẩm (URL)</span>
-                <input value={productForm.image} onChange={(event) => setProductForm((current) => ({ ...current, image: event.target.value }))} placeholder="https://..." />
-                {formErrors.image && <small className="form-field-error">{formErrors.image}</small>}
-              </label>
-
-              <div className="form-field vendor-product-image-preview">
-                <span>Xem trước ảnh</span>
-                <div className="vendor-product-image-preview-card">
-                  {productForm.image.trim() ? (
-                    <img src={productForm.image} alt={productForm.name || 'Ảnh sản phẩm'} />
-                  ) : (
-                    <p className="admin-muted small">Thêm URL ảnh để xem trước.</p>
-                  )}
+              <div className="form-field full vendor-product-image-upload-block">
+                <span>Ảnh sản phẩm</span>
+                <div className="vendor-product-image-upload-head">
+                  <button
+                    type="button"
+                    className="admin-ghost-btn small vendor-product-upload-btn"
+                    onClick={openProductImagePicker}
+                    disabled={imageUploading || productForm.images.length >= MAX_PRODUCT_IMAGES}
+                  >
+                    <Upload size={14} />
+                    <span>
+                      {imageUploading
+                        ? 'Đang tải ảnh...'
+                        : productForm.images.length >= MAX_PRODUCT_IMAGES
+                          ? `Đã đủ ${MAX_PRODUCT_IMAGES} ảnh`
+                          : 'Tải ảnh từ máy'}
+                    </span>
+                  </button>
+                  <small className="admin-muted">
+                    Tối đa {MAX_PRODUCT_IMAGES} ảnh, mỗi ảnh không quá 5MB.
+                  </small>
                 </div>
+                <input
+                  ref={productImageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                  multiple
+                  hidden
+                  onChange={(event) => void handleProductImagesSelected(event)}
+                />
+                {formErrors.image && <small className="form-field-error">{formErrors.image}</small>}
+              </div>
+
+              <div className="form-field full vendor-product-image-preview">
+                <span>Xem trước ảnh</span>
+                {productForm.images.length > 0 ? (
+                  <div className="vendor-product-image-grid">
+                    {productForm.images.map((imageUrl, index) => (
+                      <div key={`${imageUrl}-${index}`} className="vendor-product-image-item">
+                        <img src={imageUrl} alt={`${productForm.name || 'Sản phẩm'} - ảnh ${index + 1}`} />
+                        <div className="vendor-product-image-actions">
+                          {index === 0 ? (
+                            <span className="vendor-product-image-primary">Ảnh chính</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="vendor-product-image-link"
+                              onClick={() => setPrimaryProductImage(index)}
+                            >
+                              Đặt ảnh chính
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="admin-icon-btn subtle danger-icon"
+                            aria-label="Xóa ảnh"
+                            onClick={() => removeProductImage(index)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="vendor-product-image-preview-card">
+                    <p className="admin-muted small">Chưa có ảnh. Hãy tải ảnh từ máy để hiển thị sản phẩm.</p>
+                  </div>
+                )}
               </div>
 
             </div>

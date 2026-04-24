@@ -36,6 +36,7 @@ public class VendorProductSummaryResponse {
     private BigDecimal grossRevenue;
     private String primarySku;
     private String primaryImage;
+    private List<String> images;
     private List<VariantRow> variants;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -29,6 +29,7 @@ public class ProductRequest {
     private String sku;
     private Integer stockQuantity;
     private String imageUrl;
+    private List<String> imageUrls;
     private List<VariantRequest> variants;
 
     @Data

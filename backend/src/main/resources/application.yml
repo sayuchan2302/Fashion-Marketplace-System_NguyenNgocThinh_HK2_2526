@@ -44,6 +44,8 @@ app:
   upload:
     base-dir: ${APP_UPLOAD_BASE_DIR:backend/upload}
     max-avatar-size-bytes: ${APP_UPLOAD_MAX_AVATAR_SIZE_BYTES:3145728}
+    max-product-image-size-bytes: ${APP_UPLOAD_MAX_PRODUCT_IMAGE_SIZE_BYTES:5242880}
+    max-store-image-size-bytes: ${APP_UPLOAD_MAX_STORE_IMAGE_SIZE_BYTES:5242880}
   seed:
     enabled: ${APP_SEED_ENABLED:true}
     gap:

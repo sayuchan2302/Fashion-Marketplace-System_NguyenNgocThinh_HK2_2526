@@ -1,6 +1,6 @@
 ﻿import './Vendor.css';
-import { useEffect, useMemo, useState } from 'react';
-import { ImagePlus, Save, ShieldCheck } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { ImagePlus, Save, ShieldCheck, Upload } from 'lucide-react';
 import VendorLayout from './VendorLayout';
 import { vendorPortalService, type VendorSettingsData } from '../../services/vendorPortalService';
 import { storeService, type StoreProfile } from '../../services/storeService';
@@ -10,6 +10,7 @@ import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 
 const PLACEHOLDER_BANNER =
   'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1600&h=600&fit=crop';
+const STORE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 const defaultSettings: VendorSettingsData = {
   storeInfo: { name: '', slug: '', description: '', logo: '', banner: '', contactEmail: '', phone: '', address: '' },
@@ -112,6 +113,9 @@ const VendorStorefront = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [uploadingAsset, setUploadingAsset] = useState<'logo' | 'banner' | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -167,6 +171,47 @@ const VendorStorefront = () => {
       addToast(getUiErrorMessage(err, 'Lưu gian hàng thất bại'), 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openImagePicker = (field: 'logo' | 'banner') => {
+    if (uploadingAsset) {
+      return;
+    }
+    if (field === 'logo') {
+      logoInputRef.current?.click();
+      return;
+    }
+    bannerInputRef.current?.click();
+  };
+
+  const handleImageSelected = async (field: 'logo' | 'banner', event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    if (file.size > STORE_IMAGE_MAX_BYTES) {
+      addToast('Ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.', 'error');
+      return;
+    }
+
+    try {
+      setUploadingAsset(field);
+      const imageUrl = await storeService.uploadStoreImage(file);
+      setSettings((current) => ({
+        ...current,
+        storeInfo: {
+          ...current.storeInfo,
+          [field]: imageUrl,
+        },
+      }));
+      addToast(field === 'logo' ? 'Đã tải logo gian hàng.' : 'Đã tải banner gian hàng.', 'success');
+    } catch (err: unknown) {
+      addToast(getUiErrorMessage(err, 'Không thể tải ảnh gian hàng lên'), 'error');
+    } finally {
+      setUploadingAsset(null);
     }
   };
 
@@ -304,15 +349,35 @@ const VendorStorefront = () => {
                   <h2>Thiết lập thương hiệu</h2>
                 </div>
                 <div className="form-grid">
-                  <label className="form-field full">
-                    <span>Đường dẫn banner</span>
+                  <div className="form-field full storefront-upload-block">
+                    <span>Banner gian hàng</span>
+                    <div className="storefront-upload-actions">
+                      <button
+                        type="button"
+                        className="admin-ghost-btn small storefront-upload-btn"
+                        onClick={() => openImagePicker('banner')}
+                        disabled={uploadingAsset !== null}
+                      >
+                        <Upload size={14} />
+                        <span>{uploadingAsset === 'banner' ? 'Đang tải banner...' : 'Tải banner từ máy'}</span>
+                      </button>
+                      <small className="admin-muted">JPG, PNG, WEBP, GIF (tối đa 5MB).</small>
+                    </div>
                     <input
-                      value={settings.storeInfo.banner}
-                      onChange={(e) =>
-                        setSettings((current) => ({ ...current, storeInfo: { ...current.storeInfo, banner: e.target.value } }))
-                      }
+                      ref={bannerInputRef}
+                      type="file"
+                      hidden
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                      onChange={(event) => void handleImageSelected('banner', event)}
                     />
-                  </label>
+                    {settings.storeInfo.banner ? (
+                      <div className="storefront-upload-preview is-banner">
+                        <img src={settings.storeInfo.banner} alt="Banner gian hàng" />
+                      </div>
+                    ) : (
+                      <p className="admin-muted small">Chưa có banner. Hãy tải ảnh để hiển thị trên storefront.</p>
+                    )}
+                  </div>
                   <label className="form-field">
                     <span>Tên gian hàng</span>
                     <input
@@ -322,15 +387,34 @@ const VendorStorefront = () => {
                       }
                     />
                   </label>
-                  <label className="form-field">
-                    <span>Đường dẫn logo</span>
+                  <div className="form-field storefront-upload-block">
+                    <span>Logo gian hàng</span>
+                    <div className="storefront-upload-actions">
+                      <button
+                        type="button"
+                        className="admin-ghost-btn small storefront-upload-btn"
+                        onClick={() => openImagePicker('logo')}
+                        disabled={uploadingAsset !== null}
+                      >
+                        <Upload size={14} />
+                        <span>{uploadingAsset === 'logo' ? 'Đang tải logo...' : 'Tải logo từ máy'}</span>
+                      </button>
+                    </div>
                     <input
-                      value={settings.storeInfo.logo}
-                      onChange={(e) =>
-                        setSettings((current) => ({ ...current, storeInfo: { ...current.storeInfo, logo: e.target.value } }))
-                      }
+                      ref={logoInputRef}
+                      type="file"
+                      hidden
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                      onChange={(event) => void handleImageSelected('logo', event)}
                     />
-                  </label>
+                    {settings.storeInfo.logo ? (
+                      <div className="storefront-upload-preview is-logo">
+                        <img src={settings.storeInfo.logo} alt="Logo gian hàng" />
+                      </div>
+                    ) : (
+                      <p className="admin-muted small">Chưa có logo.</p>
+                    )}
+                  </div>
                   <label className="form-field full">
                     <span>Mô tả gian hàng</span>
                     <textarea

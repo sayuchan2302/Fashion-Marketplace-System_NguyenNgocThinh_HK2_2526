@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.ProductRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VendorProductPageResponse;
@@ -14,10 +15,12 @@ import vn.edu.hcmuaf.fit.marketplace.dto.response.VendorProductSummaryResponse;
 import vn.edu.hcmuaf.fit.marketplace.entity.Product;
 import vn.edu.hcmuaf.fit.marketplace.security.AuthContext;
 import vn.edu.hcmuaf.fit.marketplace.security.AuthContext.UserContext;
+import vn.edu.hcmuaf.fit.marketplace.service.ProductImageStorageService;
 import vn.edu.hcmuaf.fit.marketplace.service.ProductService;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -26,10 +29,16 @@ public class ProductController {
 
     private final ProductService productService;
     private final AuthContext authContext;
+    private final ProductImageStorageService productImageStorageService;
 
-    public ProductController(ProductService productService, AuthContext authContext) {
+    public ProductController(
+            ProductService productService,
+            AuthContext authContext,
+            ProductImageStorageService productImageStorageService
+    ) {
         this.productService = productService;
         this.authContext = authContext;
+        this.productImageStorageService = productImageStorageService;
     }
 
     @GetMapping
@@ -97,6 +106,16 @@ public class ProductController {
         UserContext ctx = authContext.requireVendor(authHeader);
         UUID storeId = authContext.resolveStoreId(ctx, null);
         return ResponseEntity.ok(productService.createVendorProduct(request, storeId));
+    }
+
+    @PostMapping("/upload-image")
+    public ResponseEntity<Map<String, String>> uploadProductImage(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam("file") MultipartFile file
+    ) {
+        authContext.requireVendor(authHeader);
+        String imageUrl = productImageStorageService.storeProductImage(file);
+        return ResponseEntity.ok(Map.of("url", imageUrl));
     }
 
     @PutMapping("/{id}")

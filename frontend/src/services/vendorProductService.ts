@@ -32,6 +32,7 @@ interface BackendVendorProduct {
   grossRevenue?: number;
   primarySku?: string;
   primaryImage?: string;
+  images?: string[];
   variants?: BackendVendorVariant[];
 }
 
@@ -76,6 +77,7 @@ interface BackendProductRequest {
   sku?: string;
   stockQuantity?: number;
   imageUrl?: string;
+  imageUrls?: string[];
   variants?: Array<{
     sku?: string;
     color: string;
@@ -109,6 +111,7 @@ export interface VendorProductRecord {
   status: VendorProductStatus;
   visible: boolean;
   image: string;
+  images: string[];
   description: string;
   variants: VendorProductVariant[];
 }
@@ -136,9 +139,14 @@ export interface VendorProductUpsertInput {
   fit?: string;
   gender?: string;
   image?: string;
+  images?: string[];
   visible: boolean;
   slug?: string;
   variants?: VendorProductVariantInput[];
+}
+
+interface BackendUploadImageResponse {
+  url?: string;
 }
 
 export interface VendorProductVariant {
@@ -246,6 +254,20 @@ const mapBackendProduct = (product: BackendVendorProduct): VendorProductRecord =
       isActive: true,
     }];
 
+  const normalizedImages = (product.images || [])
+    .map((value) => normalizeText(value))
+    .filter((value) => Boolean(value))
+    .map((value) => getOptimizedImageUrl(value, { width: 520, format: 'webp', quality: 74 }))
+    .filter((value): value is string => Boolean(value));
+
+  const primaryImage = getOptimizedImageUrl(normalizeText(product.primaryImage), { width: 520, format: 'webp', quality: 74 });
+  if (primaryImage && !normalizedImages.includes(primaryImage)) {
+    normalizedImages.unshift(primaryImage);
+  }
+  if (normalizedImages.length === 0) {
+    normalizedImages.push(getOptimizedImageUrl(FALLBACK_IMAGE, { width: 520, format: 'webp', quality: 74 }) || FALLBACK_IMAGE);
+  }
+
   return {
     id: product.id,
     slug: normalizeText(product.slug) || fallbackSku,
@@ -266,9 +288,8 @@ const mapBackendProduct = (product: BackendVendorProduct): VendorProductRecord =
     grossRevenue: Number(product.grossRevenue || 0),
     status,
     visible: Boolean(product.visible),
-    image:
-      getOptimizedImageUrl(normalizeText(product.primaryImage), { width: 520, format: 'webp', quality: 74 })
-      || getOptimizedImageUrl(FALLBACK_IMAGE, { width: 520, format: 'webp', quality: 74 }),
+    image: normalizedImages[0],
+    images: normalizedImages,
     description: normalizeText(product.description),
     variants: normalizedVariants,
   };
@@ -297,6 +318,12 @@ const toRequestPayload = (
   const normalizedSlug =
     normalizeText(input.slug) || slugify(`${normalizedName}-${timestamp}`) || `sp-${timestamp}`;
   const normalizedImage = normalizeText(input.image);
+  const normalizedImages = Array.from(new Set((input.images || [])
+    .map((value) => normalizeText(value))
+    .filter((value) => Boolean(value))));
+  if (normalizedImages.length === 0 && normalizedImage) {
+    normalizedImages.push(normalizedImage);
+  }
 
   return {
     name: normalizedName,
@@ -312,7 +339,8 @@ const toRequestPayload = (
     gender: normalizeText(input.gender) || undefined,
     status: options?.forceStatus || (input.visible ? 'ACTIVE' : 'DRAFT'),
     stockQuantity: Math.max(0, Number(input.stock || 0)),
-    imageUrl: normalizedImage || undefined,
+    imageUrl: normalizedImages[0] || undefined,
+    imageUrls: normalizedImages.length > 0 ? normalizedImages : undefined,
     variants: (input.variants || [])
       .map((variant) => ({
         color: normalizeText(variant.color) || 'Default',
@@ -436,6 +464,26 @@ export const vendorProductService = {
     );
 
     return mapBackendProduct(updated);
+  },
+
+  async uploadProductImage(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiRequest<BackendUploadImageResponse>(
+      '/api/products/upload-image',
+      {
+        method: 'POST',
+        body: formData,
+      },
+      { auth: true },
+    );
+
+    const url = normalizeText(response?.url);
+    if (!url) {
+      throw new Error('Không nhận được URL ảnh sau khi tải lên.');
+    }
+    return url;
   },
 
   async setVisibility(id: string, visible: boolean): Promise<VendorProductRecord> {

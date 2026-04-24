@@ -102,7 +102,7 @@ public class SecurityConfig {
                         // ─── Products: public read, vendor/admin write ─────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/products").hasAnyRole("VENDOR", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/products/**").hasAnyRole("VENDOR", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("VENDOR", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("VENDOR", "SUPER_ADMIN")
                         
