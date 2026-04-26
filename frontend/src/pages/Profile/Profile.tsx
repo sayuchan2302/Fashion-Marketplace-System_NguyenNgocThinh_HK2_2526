@@ -8,32 +8,23 @@ import {
   MessageSquare,
   ChevronRight,
   LogOut,
-  X,
-  Lock,
-  Eye,
-  EyeOff,
-  Trash2,
   Bell,
-  Package,
-  Tag,
-  Star,
-  Info,
-  Trash,
-  Pencil,
-  Store,
   Camera
 } from 'lucide-react';
 import AddressModal from './AddressModal';
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
-import EmptyState from '../../components/EmptyState/EmptyState';
 import ReviewModal from '../../components/ReviewModal/ReviewModal';
+import ProfileTabContent from './components/ProfileTabContent';
+import ProfileAccountModal from './components/ProfileAccountModal';
+import ProfilePasswordModal from './components/ProfilePasswordModal';
+import ProfileFollowingModal from './components/ProfileFollowingModal';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_TOAST_MESSAGES } from '../../utils/clientMessages';
-import { notificationService } from '../../services/notificationService';
+import type { Notification } from '../../services/notificationService';
 import { addressService } from '../../services/addressService';
 import { orderService } from '../../services/orderService';
 import { reviewService, type EligibleReviewItem, type Review as CustomerReview } from '../../services/reviewService';
@@ -250,8 +241,14 @@ const Profile = () => {
     setEditingAddress(null);
   };
 
-  const orders = activeTab === 'orders' ? allOrders : [];
-  const vouchers = activeTab === 'vouchers' ? displayVoucherWallet : [];
+  const orders = useMemo(
+    () => (activeTab === 'orders' ? allOrders : []),
+    [activeTab, allOrders],
+  );
+  const vouchers = useMemo(
+    () => (activeTab === 'vouchers' ? displayVoucherWallet : []),
+    [activeTab, displayVoucherWallet],
+  );
   const totalVoucherPages = useMemo(
     () => Math.max(1, Math.ceil(vouchers.length / VOUCHERS_PER_PAGE)),
     [vouchers.length],
@@ -717,539 +714,24 @@ const Profile = () => {
     }
   };
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'account':
-        return (
-          <div className="tab-pane">
-            <div className="profile-content-header mb-6">
-              <h2 className="profile-content-title">Thông tin tài khoản</h2>
-            </div>
-            {profileLoading ? <p className="account-meta">Đang tải hồ sơ tài khoản...</p> : null}
-            {profileError ? <p className="account-meta">{profileError}</p> : null}
+  const handleMarkAllNotificationsRead = useCallback(() => {
+    markAllAsRead();
+    addToast(CLIENT_TOAST_MESSAGES.notifications.markedAllRead, 'success');
+  }, [addToast, markAllAsRead]);
 
-            <div className="account-info-form">
-              {/* Personal Info */}
-              <div className="info-group">
-                <div className="info-row">
-                  <span className="info-label text-gray-500">Họ và tên</span>
-                  <span className="info-value font-medium">{user.name}</span>
-                </div>
-                <div className="info-row">
-                  <span className="info-label text-gray-500">Số điện thoại</span>
-                  <span className="info-value font-medium">{user.phone}</span>
-                </div>
-                <div className="info-row">
-                  <span className="info-label text-gray-500">Giới tính</span>
-                  <span className="info-value font-medium">{user.gender}</span>
-                </div>
-                <div className="info-row">
-                  <span className="info-label text-gray-500">Ngày sinh</span>
-                  <span className="info-value font-medium">{user.dob}</span>
-                </div>
-                <div className="info-row">
-                  <span className="info-label text-gray-500">Chiều cao</span>
-                  <span className="info-value font-medium">{user.height}</span>
-                </div>
-                <div className="info-row">
-                  <span className="info-label text-gray-500">Cân nặng</span>
-                  <span className="info-value font-medium">{user.weight}</span>
-                </div>
-
-                <button 
-                  className="profile-btn-outline mt-8"
-                  onClick={() => setIsAccountModalOpen(true)}
-                >
-                  CẬP NHẬT
-                </button>
-              </div>
-
-              {/* Login Info */}
-              <div className="info-group mt-10">
-                <div className="profile-content-header mb-6">
-                  <h3 className="profile-content-title" style={{ color: '#000000' }}>Thông tin đăng nhập</h3>
-                </div>
-                <div className="info-row">
-                  <span className="info-label text-gray-500">Email</span>
-                  <span className="info-value font-medium">{user.email}</span>
-                </div>
-                <div className="info-row">
-                  <span className="info-label text-gray-500">Mật khẩu</span>
-                  <span className="info-value font-medium">••••••••••••••</span>
-                </div>
-
-                <button 
-                  className="profile-btn-outline mt-8"
-                  onClick={() => setIsPasswordModalOpen(true)}
-                >
-                  CẬP NHẬT
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      case 'orders':
-        return (
-          <div className="tab-pane">
-            <div className="profile-content-header">
-              <h2 className="profile-content-title">Lịch sử đơn hàng</h2>
-            </div>
-
-            {/* Order Status Filter Tabs */}
-            <div className="order-filter-tabs">
-              {['Tất cả', 'Chờ xác nhận', 'Đang giao', 'Đã giao', 'Đã hủy'].map((status) => (
-                <button 
-                  key={status} 
-                  className={`order-filter-btn ${orderFilter === status ? 'active' : ''}`}
-                  onClick={() => setOrderFilter(status)}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-
-            {/* Order Status Filter */}
-            {(() => {
-              const statusMap: Record<string, string> = {
-                'Tất cả': 'all',
-                'Chờ xác nhận': 'pending',
-                'Đang giao': 'shipping',
-                'Đã giao': 'delivered',
-                'Đã hủy': 'cancelled',
-              };
-              const filteredOrders = orderFilter === 'Tất cả' 
-                ? orders 
-                : orders.filter(o => o.status === statusMap[orderFilter]);
-              return (
-            <div className="order-list">
-              {ordersLoading ? (
-                <div className="account-meta">Đang tải đơn hàng...</div>
-              ) : ordersError ? (
-                <div className="account-meta">{ordersError}</div>
-              ) : filteredOrders.length === 0 ? (
-                <EmptyState 
-                  icon={<Package size={80} strokeWidth={1} />}
-                  title="Bạn chưa có đơn hàng nào"
-                  description="Hãy trải nghiệm các sản phẩm của Coolmate để bắt đầu hành trình mua sắm của bạn!"
-                  actionText="Mua sắm ngay"
-                  actionLink="/"
-                />
-              ) : (
-                filteredOrders.map((order) => (
-                  <div key={order.id} className="order-card">
-                    <div className="order-card-header">
-                      <div className="order-card-meta">
-                        <button 
-                          className="order-id-link"
-                          onClick={() => openOrderDetail(order)}
-                        >
-                          Mã đơn: #{order.code || order.id}
-                        </button>
-                        <span className="order-date">{new Date(order.createdAt).toLocaleDateString('vi-VN')}</span>
-                      </div>
-                      <span className={`order-status-badge status-${order.status}`}>
-                        {tCommon.status[order.status]}
-                      </span>
-                    </div>
-                    <div className="order-card-items">
-                      {order.items.slice(0, 2).map((item, idx) => (
-                        <div key={idx} className="order-item">
-                          <Link to={`/product/${encodeURIComponent(item.id)}`} className="order-item-img">
-                            <img src={item.image} alt={item.name} />
-                          </Link>
-                          <div className="order-item-info">
-                            <p className="order-item-name">{item.name}</p>
-                            {item.color && <p className="order-item-variant">Màu: {item.color}</p>}
-                            {item.size && <p className="order-item-variant">Size: {item.size}</p>}
-                            <p className="order-item-qty">x{item.quantity}</p>
-                          </div>
-                          <span className="order-item-price">{item.price.toLocaleString('vi-VN')}đ</span>
-                        </div>
-                      ))}
-                      {order.items.length > 2 && (
-                        <p className="order-more-items">+{order.items.length - 2} sản phẩm khác</p>
-                      )}
-                    </div>
-                    <div className="order-card-footer">
-                      <div className="order-total">
-                        <span>Tổng cộng:</span>
-                        <span className="order-total-price">{order.total.toLocaleString('vi-VN')}đ</span>
-                      </div>
-                      <div className="order-actions">
-                        {order.status === 'pending' && (
-                          <button 
-                            className="order-action-btn order-btn-danger"
-                            onClick={() => setPendingCancelOrderId(order.id)}
-                          >
-                            Hủy đơn hàng
-                          </button>
-                        )}
-                        <button 
-                          className="order-action-btn order-btn-outline"
-                          onClick={() => openOrderDetail(order)}
-                        >
-                          Xem chi tiết
-                        </button>
-                        {order.status === 'delivered' && (
-                          <button className="order-action-btn order-btn-primary">Đánh giá</button>
-                        )}
-                        {order.status === 'shipping' && (
-                          <button className="order-action-btn order-btn-primary">Theo dõi đơn</button>
-                        )}
-                        {order.status === 'cancelled' && (
-                          <button className="order-action-btn order-btn-outline">Mua lại</button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-              );
-            })()}
-          </div>
-        );
-      case 'vouchers':
-        return (
-          <div className="tab-pane">
-            <div className="profile-content-header">
-              <h2 className="profile-content-title">Ví voucher của tôi</h2>
-            </div>
-            <div className={`voucher-list ${vouchers.length === 0 ? 'voucher-list-empty' : ''}`}>
-              {vouchers.length === 0 ? (
-                <EmptyState 
-                  icon={<Ticket size={80} strokeWidth={1} />}
-                  title="Ví voucher trống"
-                  description="Săn ngay những mã giảm giá hấp dẫn để mua sắm tiết kiệm hơn tại Coolmate."
-                  actionText="Săn Voucher"
-                  actionLink="/"
-                />
-              ) : (
-                pagedVouchers.map((voucher, index) => {
-                  const voucherMeta = getVoucherMeta(voucher);
-                  const isMarketplaceOwner = isMarketplaceVoucher(voucher);
-                  const ownerLabel = isMarketplaceOwner ? 'Toàn sàn' : (voucher.storeName || 'Nhà bán hàng');
-                  return (
-                    <div
-                      key={voucher.customerVoucherId || `${voucher.code}-${voucher.storeId ?? 'global'}-${voucher.expiresAt ?? 'na'}-${(voucherPage - 1) * VOUCHERS_PER_PAGE + index}`}
-                      className="voucher-card"
-                    >
-                      <span className={`voucher-owner-badge ${isMarketplaceOwner ? 'marketplace' : 'vendor'}`}>
-                        {ownerLabel}
-                      </span>
-                      <div className="voucher-stripe"></div>
-                      <div className="voucher-body">
-                        <div className="voucher-top">
-                          <span className="voucher-code">{voucher.code}</span>
-                          <span className={`voucher-remain voucher-remain-${voucherMeta.tone}`}>{voucherMeta.text}</span>
-                        </div>
-                        <p className="voucher-desc">{voucher.description}</p>
-                        <div className="voucher-bottom">
-                          <span className="voucher-expiry">HSD: {new Date(voucher.expiresAt).toLocaleDateString('vi-VN')}</span>
-                          <button className="voucher-condition-btn">Điều kiện</button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            {vouchers.length > VOUCHERS_PER_PAGE ? (
-              <div className="voucher-pagination">
-                <span className="voucher-pagination-meta">
-                  Hiển thị {(voucherPage - 1) * VOUCHERS_PER_PAGE + 1}-{Math.min(voucherPage * VOUCHERS_PER_PAGE, vouchers.length)} trên {vouchers.length} voucher
-                </span>
-                <div className="voucher-pagination-actions">
-                  <button
-                    type="button"
-                    className="voucher-page-btn"
-                    onClick={() => setVoucherPage((current) => Math.max(1, current - 1))}
-                    disabled={voucherPage === 1}
-                  >
-                    Trước
-                  </button>
-                  <span className="voucher-page-indicator">
-                    {voucherPage}/{totalVoucherPages}
-                  </span>
-                  <button
-                    type="button"
-                    className="voucher-page-btn"
-                    onClick={() => setVoucherPage((current) => Math.min(totalVoucherPages, current + 1))}
-                    disabled={voucherPage === totalVoucherPages}
-                  >
-                    Sau
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        );
-      case 'addresses':
-        return (
-          <div className="tab-pane">
-            <div className="address-header">
-              <h2 className="profile-content-title">Địa chỉ của tôi</h2>
-              <button className="address-add-btn" onClick={handleAddAddress}>
-                <span>+</span> THÊM ĐỊA CHỈ MỚI
-              </button>
-            </div>
-            
-            <div className="address-book-content">
-              {addressesLoading ? <p className="account-meta">Đang tải danh sách địa chỉ...</p> : null}
-              {addressesError ? <p className="account-meta">{addressesError}</p> : null}
-              
-              {!addressesLoading && savedAddresses.length === 0 ? (
-                <EmptyState 
-                  icon={<MapPin size={80} strokeWidth={1} />}
-                  title="Sổ địa chỉ trống"
-                  description="Bạn chưa có địa chỉ nào được lưu. Thêm địa chỉ để quá trình đặt hàng nhanh chóng hơn."
-                />
-              ) : !addressesLoading ? (
-                <div className="address-list">
-                  {savedAddresses.map((addr) => (
-                    <div key={addr.id} className="address-card">
-                      <div className="address-card-info">
-                        <div className="address-card-top">
-                          <span className="address-card-name">{addr.fullName}</span>
-                          <span className="address-card-divider">|</span>
-                          <span className="address-card-phone">{addr.phone}</span>
-                          {addr.isDefault && <span className="address-default-badge">Mặc định</span>}
-                        </div>
-                        <p className="address-card-detail">{addr.detail}</p>
-                        <p className="address-card-region">{addr.ward}, {addr.district}, {addr.province}</p>
-                      </div>
-                      <div className="address-card-actions">
-                        <button 
-                          className="address-card-edit" 
-                          onClick={() => handleEditAddress(addr)}
-                          aria-label="Chỉnh sửa địa chỉ"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button 
-                          className="address-card-delete" 
-                          onClick={() => setPendingDeleteAddressId(addr.id)}
-                          aria-label="Xóa địa chỉ"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        );
-      case 'reviews':
-        return (
-          <div className="tab-pane">
-            <div className="profile-content-header">
-              <h2 className="profile-content-title">Đánh giá & Phản hồi</h2>
-            </div>
-
-            {/* Review Filter Tabs */}
-            <div className="order-filter-tabs">
-              <button 
-                className={`order-filter-btn ${reviewFilter === 'pending' ? 'active' : ''}`}
-                onClick={() => setReviewFilter('pending')}
-              >
-                Chờ đánh giá ({pendingReviews.length})
-              </button>
-              <button 
-                className={`order-filter-btn ${reviewFilter === 'completed' ? 'active' : ''}`}
-                onClick={() => setReviewFilter('completed')}
-              >
-                Đã đánh giá ({completedReviews.length})
-              </button>
-            </div>
-
-            {reviewsLoading ? (
-              <div className="review-empty">
-                <p>Đang tải danh sách đánh giá...</p>
-              </div>
-            ) : null}
-
-            {!reviewsLoading && reviewsError ? (
-              <div className="review-empty-state">
-                <EmptyState
-                  icon={<MessageSquare size={80} strokeWidth={1} />}
-                  title="Khong the tai danh gia"
-                  description={reviewsError}
-                />
-              </div>
-            ) : null}
-
-            {reviewFilter === 'pending' && (
-              <div className="review-section">
-                {!reviewsLoading && !reviewsError && pendingReviews.length > 0 ? (
-                  <div className="review-pending-list">
-                    {pendingReviews.map((product) => (
-                      <div key={product.productId} className="review-pending-card">
-                        <div className="review-pending-product">
-                          <Link to={`/product/${encodeURIComponent(product.productId)}`} className="review-product-img">
-                            <img src={product.productImage} alt={product.productName} />
-                          </Link>
-                            <div className="review-product-info">
-                            <p className="review-product-name">{product.productName}</p>
-                            <p className="review-product-variant">{product.variant}</p>
-                            <p className="review-product-order">Đơn hàng: #{getOrderDisplayCode(product.orderId, product.orderCode)}</p>
-                          </div>
-                        </div>
-                        <button 
-                          className="review-write-btn"
-                          onClick={() => handleOpenReviewModal(product)}
-                        >
-                          Viết đánh giá
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : !reviewsLoading && !reviewsError ? (
-                  <div className="review-empty-state">
-                    <MessageSquare className="review-empty-icon" size={26} strokeWidth={1.8} />
-                    <p>Không có sản phẩm nào chờ đánh giá</p>
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {reviewFilter === 'completed' && (
-              <div className="review-section">
-                {!reviewsLoading && !reviewsError && completedReviews.length > 0 ? (
-                  <div className="review-completed-list">
-                    {completedReviews.map((review) => (
-                      <div key={review.id} className="review-completed-card">
-                        <div className="review-completed-header">
-                          <div className="review-pending-product">
-                            <Link to={`/product/${encodeURIComponent(review.productId)}`} className="review-product-img">
-                              <img
-                                src={review.productImage || 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=80&h=80&fit=crop'}
-                                alt={review.productName}
-                              />
-                            </Link>
-                            <div className="review-product-info">
-                              <p className="review-product-name">{review.productName}</p>
-                              <p className="review-product-variant">Đơn hàng: #{getOrderDisplayCode(review.orderId, review.orderCode)}</p>
-                            </div>
-                          </div>
-                          <span className="review-date">{new Date(review.createdAt).toLocaleDateString('vi-VN')}</span>
-                        </div>
-                        <div className="review-stars">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <span key={i} className={`review-star ${i < review.rating ? 'filled' : ''}`}>★</span>
-                          ))}
-                        </div>
-                        <p className="review-text">{review.content}</p>
-                        {review.shopReply ? (
-                          <div className="review-reply">
-                            <div className="review-reply-header">
-                              <span className="review-reply-badge">Phản hồi từ shop</span>
-                            </div>
-                            <p className="review-reply-text">{review.shopReply.content}</p>
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : !reviewsLoading && !reviewsError ? (
-                  <div className="review-empty-state">
-                    <Star className="review-empty-icon" size={26} strokeWidth={1.8} />
-                    <p>Bạn chưa có đánh giá nào</p>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </div>
-        );
-      case 'notifications':
-        return (
-          <div className="tab-pane">
-            <div className="profile-content-header notify-header">
-              <h2 className="profile-content-title">Thông báo</h2>
-              {notifications.length > 0 && (
-                <button 
-                  className="mark-all-read-text-btn"
-                  onClick={() => {
-                    markAllAsRead();
-                    addToast(CLIENT_TOAST_MESSAGES.notifications.markedAllRead, 'success');
-                  }}
-                  disabled={unreadCount === 0}
-                >
-                  Đánh dấu tất cả đã đọc
-                </button>
-              )}
-            </div>
-
-            {notifications.length === 0 ? (
-              <div className="notifications-empty">
-                <Bell size={64} strokeWidth={1} />
-                <p>Không có thông báo nào</p>
-              </div>
-            ) : (
-              <div className="notifications-list">
-                {displayedNotifications.map((notif) => (
-                  <div 
-                    key={notif.id} 
-                    className={`notification-card ${!notif.read ? 'unread' : ''}`}
-                    onClick={() => {
-                      if (!notif.read) {
-                        markAsRead(notif.id);
-                      }
-                      if (notif.link) {
-                        navigate(notif.link);
-                      }
-                    }}
-                  >
-                    <div className={`notification-icon notification-icon-${notif.type}`}>
-                      {notif.type === 'order' && <Package size={20} />}
-                      {notif.type === 'promotion' && <Tag size={20} />}
-                      {notif.type === 'review' && <Star size={20} />}
-                      {notif.type === 'system' && <Info size={20} />}
-                    </div>
-                    <div className="notification-content">
-                      <p className="notification-title">
-                        {notif.title}
-                        <span className="notification-time">
-                          {notificationService.formatTimeAgo(notif.createdAt)}
-                        </span>
-                      </p>
-                      <p className="notification-message">{notif.message}</p>
-                    </div>
-                    <button 
-                      className="notification-delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteNotification(notif.id);
-                        addToast(CLIENT_TOAST_MESSAGES.notifications.deleted, 'info');
-                      }}
-                      aria-label="Xóa thông báo"
-                    >
-                      <Trash size={16} aria-hidden="true" />
-                    </button>
-                    {!notif.read && <span className="notification-dot" />}
-                  </div>
-                ))}
-
-                {!showAllNotifications && hasMoreNotifications && (
-                  <div className="notifications-show-all-wrap">
-                    <button
-                      type="button"
-                      className="notifications-show-all-btn"
-                      onClick={() => setShowAllNotifications(true)}
-                    >
-                      Xem tất cả
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      default:
-        return null;
+  const handleNotificationClick = useCallback((notification: Notification) => {
+    if (!notification.read) {
+      markAsRead(notification.id);
     }
-  };
+    if (notification.link) {
+      navigate(notification.link);
+    }
+  }, [markAsRead, navigate]);
+
+  const handleDeleteNotification = useCallback((notificationId: string) => {
+    deleteNotification(notificationId);
+    addToast(CLIENT_TOAST_MESSAGES.notifications.deleted, 'info');
+  }, [addToast, deleteNotification]);
 
   return (
     <div className="profile-page">
@@ -1385,281 +867,103 @@ const Profile = () => {
                 </div>
               </div>
             ) : (
-              renderContent() || <div className="p-8 text-center text-red-500">Error rendering tab: {activeTab}</div>
+              <ProfileTabContent
+                activeTab={activeTab}
+                user={user}
+                profileLoading={profileLoading}
+                profileError={profileError}
+                orderFilter={orderFilter}
+                onOrderFilterChange={setOrderFilter}
+                orders={orders}
+                ordersLoading={ordersLoading}
+                ordersError={ordersError}
+                orderStatusLabelMap={tCommon.status as Record<string, string>}
+                onOpenOrderDetail={openOrderDetail}
+                onRequestCancelOrder={setPendingCancelOrderId}
+                vouchers={vouchers}
+                pagedVouchers={pagedVouchers}
+                voucherPage={voucherPage}
+                totalVoucherPages={totalVoucherPages}
+                vouchersPerPage={VOUCHERS_PER_PAGE}
+                onVoucherPageChange={setVoucherPage}
+                getVoucherMeta={getVoucherMeta}
+                isMarketplaceVoucher={isMarketplaceVoucher}
+                addressesLoading={addressesLoading}
+                addressesError={addressesError}
+                savedAddresses={savedAddresses}
+                onAddAddress={handleAddAddress}
+                onEditAddress={handleEditAddress}
+                onRequestDeleteAddress={setPendingDeleteAddressId}
+                reviewFilter={reviewFilter}
+                onReviewFilterChange={setReviewFilter}
+                pendingReviews={pendingReviews}
+                completedReviews={completedReviews}
+                reviewsLoading={reviewsLoading}
+                reviewsError={reviewsError}
+                getOrderDisplayCode={getOrderDisplayCode}
+                onOpenReviewModal={handleOpenReviewModal}
+                notifications={notifications}
+                displayedNotifications={displayedNotifications}
+                unreadCount={unreadCount}
+                showAllNotifications={showAllNotifications}
+                hasMoreNotifications={hasMoreNotifications}
+                onShowAllNotifications={setShowAllNotifications}
+                onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+                onNotificationClick={handleNotificationClick}
+                onDeleteNotification={handleDeleteNotification}
+                onOpenAccountModal={() => setIsAccountModalOpen(true)}
+                onOpenPasswordModal={() => setIsPasswordModalOpen(true)}
+              />
             )}
           </main>
         </div>
       </div>
 
-      {/* Account Update Modal */}
-      {isAccountModalOpen && (
-        <div className="profile-modal-overlay" onClick={() => setIsAccountModalOpen(false)}>
-          <div className="profile-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="profile-modal-header">
-              <div>
-                <p className="profile-modal-eyebrow">Hồ sơ cá nhân</p>
-                <h2>Cập nhật thông tin</h2>
-              </div>
-              <button className="profile-modal-close" onClick={() => setIsAccountModalOpen(false)} aria-label="Đóng">
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div className="profile-modal-body">
-              <form className="profile-modal-form" onSubmit={handleAccountSubmit}>
-                {/* Name Input */}
-                <div className="modal-input-group">
-                  <span className="modal-floating-label">Họ và tên</span>
-                  <User className="modal-input-icon" size={18} aria-hidden="true" />
-                  <input
-                    type="text"
-                    className="modal-input"
-                    value={accountName}
-                    onChange={(e) => setAccountName(e.target.value)}
-                    autoComplete="name"
-                    name="name"
-                    required
-                  />
-                </div>
-                
-                {/* Phone Input */}
-                <div className="modal-input-group">
-                  <span className="modal-floating-label">Số điện thoại</span>
-                  <div className="modal-input-icon">
-                    <img src="https://flagcdn.com/w20/vn.png" alt="VN Flag" className="w-5 h-auto rounded-sm" />
-                  </div>
-                  <input
-                    type="text"
-                    className="modal-input"
-                    value={accountPhone}
-                    onChange={(e) => setAccountPhone(e.target.value)}
-                  />
-                </div>
+      <ProfileAccountModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        onSubmit={handleAccountSubmit}
+        accountName={accountName}
+        onAccountNameChange={setAccountName}
+        accountPhone={accountPhone}
+        onAccountPhoneChange={setAccountPhone}
+        accountGender={accountGender}
+        onAccountGenderChange={setAccountGender}
+        accountDateOfBirth={accountDateOfBirth}
+        onAccountDateOfBirthChange={setAccountDateOfBirth}
+        height={height}
+        onHeightChange={setHeight}
+        weight={weight}
+        onWeightChange={setWeight}
+        isSavingProfile={isSavingProfile}
+      />
 
-                <div className="modal-flex-row gap-6 items-center">
-                  <label className="modal-radio-label">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="MALE"
-                      checked={accountGender === 'MALE'}
-                      onChange={() => setAccountGender('MALE')}
-                    />
-                    <span className="radio-custom"></span>
-                    Nam
-                  </label>
-                  <label className="modal-radio-label">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="FEMALE"
-                      checked={accountGender === 'FEMALE'}
-                      onChange={() => setAccountGender('FEMALE')}
-                    />
-                    <span className="radio-custom"></span>
-                    Nữ
-                  </label>
-                  <label className="modal-radio-label">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="OTHER"
-                      checked={accountGender === 'OTHER'}
-                      onChange={() => setAccountGender('OTHER')}
-                    />
-                    <span className="radio-custom"></span>
-                    Khác
-                  </label>
-                </div>
+      <ProfilePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={closePasswordModal}
+        onSubmit={handlePasswordSubmit}
+        currentPassword={currentPassword}
+        onCurrentPasswordChange={setCurrentPassword}
+        newPassword={newPassword}
+        onNewPasswordChange={setNewPassword}
+        confirmPassword={confirmPassword}
+        onConfirmPasswordChange={setConfirmPassword}
+        showOldPassword={showOldPassword}
+        onToggleShowOldPassword={() => setShowOldPassword((value) => !value)}
+        showNewPassword={showNewPassword}
+        onToggleShowNewPassword={() => setShowNewPassword((value) => !value)}
+        showConfirmPassword={showConfirmPassword}
+        onToggleShowConfirmPassword={() => setShowConfirmPassword((value) => !value)}
+        isChangingPassword={isChangingPassword}
+      />
 
-                <div className="modal-input-group">
-                  <span className="modal-floating-label">Ngày sinh</span>
-                  <input
-                    type="date"
-                    className="modal-input"
-                    style={{ paddingLeft: '16px' }}
-                    value={accountDateOfBirth}
-                    onChange={(e) => setAccountDateOfBirth(e.target.value)}
-                  />
-                </div>
-                
-                {/* Height Slider */}
-                <div className="modal-slider-group">
-                  <span className="modal-slider-label">Chiều cao</span>
-                  <input 
-                    type="range" 
-                    min="100" 
-                    max="190" 
-                    value={height} 
-                    onChange={(e) => setHeight(e.target.value)}
-                    className="modal-slider mx-4" 
-                    style={{ '--val': `${((Number(height) - 100) / (190 - 100)) * 100}%` } as React.CSSProperties}
-                  />
-                  <span className="modal-slider-val text-co-black font-bold">{height}cm</span>
-                </div>
-                
-                {/* Weight Slider */}
-                <div className="modal-slider-group">
-                  <span className="modal-slider-label">Cân nặng</span>
-                  <input 
-                    type="range" 
-                    min="30" 
-                    max="90" 
-                    value={weight} 
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="modal-slider mx-4" 
-                    style={{ '--val': `${((Number(weight) - 30) / (90 - 30)) * 100}%` } as React.CSSProperties}
-                  />
-                  <span className="modal-slider-val text-co-black font-bold">{weight}kg</span>
-                </div>
-                
-                <button type="submit" className="modal-submit-btn">
-                  {isSavingProfile ? 'ĐANG CẬP NHẬT...' : 'CẬP NHẬT THÔNG TIN'}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Password Update Modal */}
-      {isPasswordModalOpen && (
-        <div className="profile-modal-overlay" onClick={closePasswordModal}>
-          <div className="profile-modal modal-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="profile-modal-header">
-              <div>
-                <p className="profile-modal-eyebrow">Bảo mật</p>
-                <h2>Đổi mật khẩu</h2>
-              </div>
-              <button className="profile-modal-close" onClick={closePasswordModal} aria-label="Đóng">
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div className="profile-modal-body">
-              <form className="profile-modal-form" onSubmit={handlePasswordSubmit}>
-                {/* Old Password */}
-                <div className="modal-input-group">
-                  <span className="modal-floating-label">Mật khẩu cũ</span>
-                  <Lock className="modal-input-icon text-gray-400" size={18} />
-                  <input 
-                    type={showOldPassword ? "text" : "password"}
-                    className="modal-input pr-10" 
-                    placeholder="Mật khẩu cũ"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    autoComplete="current-password"
-                  />
-                  <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} className="profile-modal-icon-btn" aria-label={showOldPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}>
-                    {showOldPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
-                  </button>
-                </div>
-
-                {/* New Password */}
-                <div className="modal-input-group">
-                  <span className="modal-floating-label hidden-if-empty">Mật khẩu mới</span>
-                  <Lock className="modal-input-icon text-gray-300" size={18} />
-                  <input 
-                    type={showNewPassword ? "text" : "password"}
-                    className="modal-input pr-10 text-gray-400" 
-                    placeholder="Mật khẩu mới"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="profile-modal-icon-btn" aria-label={showNewPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}>
-                    {showNewPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
-                  </button>
-                </div>
-
-                {/* Confirm Password */}
-                <div className="modal-input-group">
-                  <span className="modal-floating-label hidden-if-empty">Nhập lại mật khẩu</span>
-                  <Lock className="modal-input-icon text-gray-300" size={18} />
-                  <input 
-                    type={showConfirmPassword ? "text" : "password"}
-                    className="modal-input pr-10 text-gray-400" 
-                    placeholder="Nhập lại mật khẩu"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="profile-modal-icon-btn" aria-label={showConfirmPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}>
-                    {showConfirmPassword ? <EyeOff className="text-black" size={18} /> : <Eye className="text-black" size={18} />}
-                  </button>
-                </div>
-
-                <button type="submit" className="modal-submit-btn">
-                  {isChangingPassword ? 'ĐANG CẬP NHẬT...' : 'CẬP NHẬT MẬT KHẨU'}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isFollowingModalOpen && (
-        <div className="profile-modal-overlay" onClick={closeFollowingModal}>
-          <div className="profile-modal modal-sm profile-following-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="profile-modal-header">
-              <div>
-                <p className="profile-modal-eyebrow">Theo dõi</p>
-                <h2>Shop bạn đang theo dõi</h2>
-              </div>
-              <button className="profile-modal-close" onClick={closeFollowingModal} aria-label="Đóng">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="profile-modal-body">
-              {followingStoresLoading ? (
-                <p className="account-meta">Đang tải danh sách shop...</p>
-              ) : null}
-              {!followingStoresLoading && followingStoresError ? (
-                <p className="account-meta">{followingStoresError}</p>
-              ) : null}
-              {!followingStoresLoading && !followingStoresError && followingStores.length === 0 ? (
-                <div className="profile-following-empty">
-                  <Store size={28} />
-                  <p>Bạn chưa theo dõi shop nào</p>
-                </div>
-              ) : null}
-              {!followingStoresLoading && !followingStoresError && followingStores.length > 0 ? (
-                <div className="profile-following-list">
-                  {followingStores.map((storeItem) => (
-                    <Link
-                      key={storeItem.storeId}
-                      to={storeItem.storeSlug ? `/store/${encodeURIComponent(storeItem.storeSlug)}` : '#'}
-                      className="profile-following-item"
-                      onClick={closeFollowingModal}
-                    >
-                      <div className="profile-following-logo">
-                        {storeItem.storeLogo ? (
-                          <img src={storeItem.storeLogo} alt={storeItem.storeName} loading="lazy" />
-                        ) : (
-                          <span>{(storeItem.storeName.charAt(0) || 'S').toUpperCase()}</span>
-                        )}
-                      </div>
-                      <div className="profile-following-content">
-                        <p className="profile-following-name">{storeItem.storeName}</p>
-                        <p className="profile-following-meta">
-                          {storeItem.followerCount.toLocaleString('vi-VN')} người theo dõi
-                        </p>
-                        <p className="profile-following-meta">
-                          Theo dõi từ{' '}
-                          {storeItem.followedAt
-                            ? new Date(storeItem.followedAt).toLocaleDateString('vi-VN')
-                            : 'gần đây'}
-                        </p>
-                      </div>
-                      <ChevronRight size={16} />
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      )}
+      <ProfileFollowingModal
+        isOpen={isFollowingModalOpen}
+        onClose={closeFollowingModal}
+        followingStoresLoading={followingStoresLoading}
+        followingStoresError={followingStoresError}
+        followingStores={followingStores}
+      />
 
       {/* Address Modal */}
       <AddressModal
@@ -1709,3 +1013,4 @@ const Profile = () => {
 };
 
 export default Profile;
+

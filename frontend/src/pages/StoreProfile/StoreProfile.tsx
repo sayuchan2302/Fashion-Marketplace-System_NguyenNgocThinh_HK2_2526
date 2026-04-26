@@ -1,5 +1,4 @@
 import {
-  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -7,11 +6,9 @@ import {
   useRef,
   useState,
   useTransition,
-  type ComponentProps,
-  type ReactNode,
 } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BadgeCheck, ChevronLeft, Mail, MapPin, MessageCircle, Phone, ShoppingBag, Star, TicketPercent, Users } from 'lucide-react';
+import { BadgeCheck, ChevronLeft, Mail, MapPin, MessageCircle, Phone, ShoppingBag, Star, Users } from 'lucide-react';
 import { storeService, type StoreProduct, type StoreProfile } from '../../services/storeService';
 import { couponService, type Coupon } from '../../services/couponService';
 import { customerVoucherService } from '../../services/customerVoucherService';
@@ -20,11 +17,18 @@ import { storeFollowService } from '../../services/storeFollowService';
 import { ApiError, hasBackendJwt } from '../../services/apiClient';
 import { useCart } from '../../contexts/CartContext';
 import { useToast } from '../../contexts/ToastContext';
-import ProductCard from '../../components/ProductCard/ProductCard';
+import {
+  BrowseTabContent,
+  CategoriesTabContent,
+  ProductsTabContent,
+  ReviewsTabContent,
+  StorefrontTabPanel,
+  type PaginationToken,
+  type QuickAddItem,
+} from './components/StoreProfileTabSections';
 import './StoreProfile.css';
 
 type StoreTab = 'browse' | 'products' | 'categories' | 'reviews';
-type PaginationToken = number | 'ellipsis-left' | 'ellipsis-right';
 type PanelHeightMap = Record<StoreTab, number>;
 type IdleCapableWindow = Window & typeof globalThis & {
   requestIdleCallback?: (callback: IdleRequestCallback) => number;
@@ -47,10 +51,10 @@ const EMPTY_PANEL_HEIGHTS: PanelHeightMap = {
 
 const PLACEHOLDER_BANNER =
   'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1600&h=600&fit=crop';
-const PRODUCTS_PAGE_SIZE = 24;
+const PRODUCTS_PAGE_SIZE = 25;
+const MAX_PRODUCT_SNAPSHOT_PAGES = 5;
 const CATEGORY_PREFETCH_DELAY_MS = 180;
 
-const formatCurrency = (value: number) => `${Math.max(0, Number(value || 0)).toLocaleString('vi-VN')}đ`;
 const formatPercent = (value?: number) => `${Math.max(0, Math.min(100, Math.round(Number(value || 0))))}%`;
 
 const formatShortNumber = (value: number) => {
@@ -60,16 +64,18 @@ const formatShortNumber = (value: number) => {
   return safe.toLocaleString('vi-VN');
 };
 
-const getProductLink = (product: StoreProduct) => product.slug || product.sku || String(product.id);
-
-const loadAllStoreProducts = async (storeId: string, pageSize = 60): Promise<StoreProduct[]> => {
+const loadAllStoreProducts = async (
+  storeId: string,
+  pageSize = 60,
+  maxPages = MAX_PRODUCT_SNAPSHOT_PAGES,
+): Promise<StoreProduct[]> => {
   const firstPage = await storeService.getStoreProducts(storeId, 1, pageSize);
   const totalPages = Math.max(1, Number(firstPage.totalPages || 1));
   const rows = [...(firstPage.products || [])];
 
   if (totalPages <= 1) return rows;
 
-  const maxPagesToFetch = Math.min(totalPages, 5);
+  const maxPagesToFetch = Math.min(totalPages, Math.max(1, Number(maxPages || 1)));
   const remainingCalls: Array<Promise<Awaited<ReturnType<typeof storeService.getStoreProducts>>>> = [];
 
   for (let page = 2; page <= maxPagesToFetch; page += 1) {
@@ -107,331 +113,6 @@ const buildPaginationTokens = (page: number, totalPages: number): PaginationToke
 
   return [1, 'ellipsis-left', page - 1, page, page + 1, 'ellipsis-right', totalPages];
 };
-
-type QuickAddItem = Parameters<NonNullable<ComponentProps<typeof ProductCard>['onQuickAdd']>>[0];
-
-interface StoreProductCardProps {
-  product: StoreProduct;
-  storeName: string;
-  onQuickAdd?: (item: QuickAddItem) => void;
-}
-
-interface StorefrontProductGridProps {
-  rows: StoreProduct[];
-  storeName: string;
-  onQuickAdd?: (item: QuickAddItem) => void;
-  emptyMessage?: string;
-}
-
-interface BrowseTabContentProps {
-  vouchers: Coupon[];
-  isAuthenticated: boolean;
-  claimedVoucherIds: Set<string>;
-  claimingVoucherId: string | null;
-  onClaimVoucher: (voucher: Coupon) => void;
-  storeName: string;
-  bannerUrl: string;
-  topSellingProducts: StoreProduct[];
-  onQuickAdd?: (item: QuickAddItem) => void;
-}
-
-interface ProductsTabContentProps {
-  productTotal: number;
-  productPage: number;
-  productTotalPages: number;
-  productPageItems: StoreProduct[];
-  productPageLoading: boolean;
-  paginationTokens: PaginationToken[];
-  storeName: string;
-  onQuickAdd?: (item: QuickAddItem) => void;
-  onPageChange: (nextPage: number) => void;
-}
-
-interface CategoriesTabContentProps {
-  categoryLoading: boolean;
-  groupedByCategory: Array<{ name: string; rows: StoreProduct[] }>;
-}
-
-interface ReviewsTabContentProps {
-  reviews: Review[];
-}
-
-interface StorefrontTabPanelProps {
-  active: boolean;
-  panelRef: (node: HTMLDivElement | null) => void;
-  children: ReactNode;
-}
-
-const StoreProductCard = memo(({ product, storeName, onQuickAdd }: StoreProductCardProps) => (
-  <ProductCard
-    id={getProductLink(product)}
-    sku={product.sku}
-    name={product.name}
-    price={product.price}
-    originalPrice={product.originalPrice}
-    image={product.image}
-    badge={product.badge}
-    colors={product.colors}
-    sizes={product.sizes}
-    variants={product.variants}
-    backendId={product.backendId}
-    storeId={product.storeId}
-    storeName={product.storeName || storeName}
-    storeSlug={product.storeSlug}
-    isOfficialStore={product.isOfficialStore}
-    onQuickAdd={onQuickAdd}
-  />
-));
-StoreProductCard.displayName = 'StoreProductCard';
-
-const StorefrontProductGrid = memo(({
-  rows,
-  storeName,
-  onQuickAdd,
-  emptyMessage = 'Hiện chưa có sản phẩm công khai.',
-}: StorefrontProductGridProps) => {
-  if (rows.length === 0) {
-    return <p className="storefront-empty">{emptyMessage}</p>;
-  }
-
-  return (
-    <div className="storefront-grid">
-      {rows.map((product) => (
-        <StoreProductCard
-          key={`${product.id}-${product.sku}`}
-          product={product}
-          storeName={storeName}
-          onQuickAdd={onQuickAdd}
-        />
-      ))}
-    </div>
-  );
-});
-StorefrontProductGrid.displayName = 'StorefrontProductGrid';
-
-const BrowseTabContent = memo(({
-  vouchers,
-  isAuthenticated,
-  claimedVoucherIds,
-  claimingVoucherId,
-  onClaimVoucher,
-  storeName,
-  bannerUrl,
-  topSellingProducts,
-  onQuickAdd,
-}: BrowseTabContentProps) => (
-  <>
-    <div className="storefront-panel">
-      <h2>Voucher cửa hàng</h2>
-      {vouchers.length === 0 ? (
-        <p className="storefront-empty">Hiện chưa có voucher công khai cho gian hàng này.</p>
-      ) : (
-        <div className="storefront-voucher-list">
-          {vouchers.slice(0, 10).map((voucher) => {
-            const voucherId = String(voucher.id || '').trim();
-            const isClaimed = voucherId ? claimedVoucherIds.has(voucherId) : false;
-            const isClaiming = voucherId !== '' && claimingVoucherId === voucherId;
-            const claimLabel = !isAuthenticated
-              ? 'Đăng nhập để nhận'
-              : isClaiming
-                ? 'Đang nhận...'
-                : isClaimed
-                  ? 'Đã nhận'
-                  : 'Nhận';
-
-            return (
-              <article key={voucher.id || voucher.code} className="storefront-voucher">
-                <div className="storefront-voucher-cut storefront-voucher-cut-left" />
-                <div className="storefront-voucher-cut storefront-voucher-cut-right" />
-                <div className="storefront-voucher-content">
-                  <div>
-                    <p className="storefront-voucher-code">{voucher.code}</p>
-                    <p className="storefront-voucher-text">
-                      {voucher.type === 'percent'
-                        ? `Giảm ${voucher.value}%`
-                        : `Giảm ${formatCurrency(voucher.value)}`}
-                    </p>
-                    <p className="storefront-voucher-meta">
-                      Đơn tối thiểu {formatCurrency(voucher.minOrderValue || 0)}
-                    </p>
-                  </div>
-                  <TicketPercent size={18} />
-                </div>
-                <div className="storefront-voucher-actions">
-                  <button
-                    type="button"
-                    className={`storefront-voucher-claim ${isClaimed ? 'is-claimed' : ''}`}
-                    disabled={isClaiming || isClaimed || !voucherId}
-                    onClick={() => onClaimVoucher(voucher)}
-                  >
-                    {claimLabel}
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </div>
-
-    <div className="storefront-panel storefront-campaign">
-      <img
-        src={bannerUrl}
-        alt={storeName}
-        className="storefront-campaign-image"
-        loading="lazy"
-      />
-      <div className="storefront-campaign-overlay" />
-      <div className="storefront-campaign-content">
-        <p>Campaign</p>
-        <h3>Ưu đãi nổi bật tại {storeName}</h3>
-        <span>Mua sắm an tâm với chính sách bảo vệ từ sàn.</span>
-      </div>
-    </div>
-
-    <div className="storefront-panel">
-      <div className="storefront-panel-head">
-        <h2>Sản phẩm được quan tâm</h2>
-        <span>{topSellingProducts.length} sản phẩm</span>
-      </div>
-      <StorefrontProductGrid rows={topSellingProducts} storeName={storeName} onQuickAdd={onQuickAdd} />
-    </div>
-  </>
-));
-BrowseTabContent.displayName = 'BrowseTabContent';
-
-const ProductsTabContent = memo(({
-  productTotal,
-  productPage,
-  productTotalPages,
-  productPageItems,
-  productPageLoading,
-  paginationTokens,
-  storeName,
-  onQuickAdd,
-  onPageChange,
-}: ProductsTabContentProps) => (
-  <div className="storefront-panel">
-    <div className="storefront-panel-head">
-      <h2>Tất cả sản phẩm</h2>
-      <span>{productTotal} sản phẩm</span>
-    </div>
-    <StorefrontProductGrid rows={productPageItems} storeName={storeName} onQuickAdd={onQuickAdd} />
-    <p className="storefront-page-summary">
-      Trang {productPage}/{productTotalPages} - {productTotal} sản phẩm
-      {productPageLoading ? ' - Đang tải...' : ''}
-    </p>
-    {productTotalPages > 1 ? (
-      <div className="storefront-pagination">
-        <button
-          type="button"
-          className="storefront-page-btn"
-          onClick={() => onPageChange(Math.max(1, productPage - 1))}
-          disabled={productPageLoading || productPage === 1}
-        >
-          Trước
-        </button>
-        <div className="storefront-page-list" aria-label="Pagination">
-          {paginationTokens.map((token) => (
-            typeof token === 'number' ? (
-              <button
-                key={token}
-                type="button"
-                className={`storefront-page-btn ${productPage === token ? 'is-active' : ''}`}
-                onClick={() => onPageChange(token)}
-                disabled={productPageLoading}
-                aria-current={productPage === token ? 'page' : undefined}
-              >
-                {token}
-              </button>
-            ) : (
-              <span key={token} className="storefront-page-ellipsis" aria-hidden="true">
-                ...
-              </span>
-            )
-          ))}
-        </div>
-        <button
-          type="button"
-          className="storefront-page-btn"
-          onClick={() => onPageChange(Math.min(productTotalPages, productPage + 1))}
-          disabled={productPageLoading || productPage === productTotalPages}
-        >
-          Sau
-        </button>
-      </div>
-    ) : null}
-  </div>
-));
-ProductsTabContent.displayName = 'ProductsTabContent';
-
-const CategoriesTabContent = memo(({
-  categoryLoading,
-  groupedByCategory,
-}: CategoriesTabContentProps) => (
-  <div className="storefront-panel">
-    <div className="storefront-panel-head">
-      <h2>Danh mục của cửa hàng</h2>
-      <span>{groupedByCategory.length} danh mục</span>
-    </div>
-    {categoryLoading ? (
-      <p className="storefront-empty">Đang tải danh mục...</p>
-    ) : groupedByCategory.length === 0 ? (
-      <p className="storefront-empty">Hiện chưa có danh mục có sản phẩm.</p>
-    ) : (
-      <div className="storefront-category-list">
-        {groupedByCategory.map((group) => (
-          <div key={group.name} className="storefront-category-item">
-            <p className="storefront-category-name">{group.name}</p>
-            <span className="storefront-category-count">{group.rows.length} sản phẩm</span>
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-));
-CategoriesTabContent.displayName = 'CategoriesTabContent';
-
-const ReviewsTabContent = memo(({ reviews }: ReviewsTabContentProps) => (
-  <div className="storefront-panel">
-    <div className="storefront-panel-head">
-      <h2>Đánh giá khách hàng</h2>
-      <span>{reviews.length} đánh giá</span>
-    </div>
-
-    {reviews.length === 0 ? (
-      <p className="storefront-empty">Cửa hàng chưa có đánh giá công khai.</p>
-    ) : (
-      <div className="storefront-review-list">
-        {reviews.slice(0, 20).map((review) => (
-          <article key={review.id} className="storefront-review-item">
-            <div className="storefront-review-head">
-              <p>{review.productName}</p>
-              <span>{new Date(review.createdAt).toLocaleDateString('vi-VN')}</span>
-            </div>
-            <div className="storefront-review-stars">
-              {Array.from({ length: 5 }).map((_, idx) => (
-                <Star key={`${review.id}-${idx}`} size={14} fill={idx < review.rating ? 'currentColor' : 'none'} />
-              ))}
-            </div>
-            <p className="storefront-review-content">{review.content}</p>
-          </article>
-        ))}
-      </div>
-    )}
-  </div>
-));
-ReviewsTabContent.displayName = 'ReviewsTabContent';
-
-const StorefrontTabPanel = ({ active, panelRef, children }: StorefrontTabPanelProps) => (
-  <div
-    ref={panelRef}
-    className={`storefront-tab-panel ${active ? 'is-active' : ''}`}
-    aria-hidden={!active}
-  >
-    {children}
-  </div>
-);
 
 const StoreProfilePage = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -475,6 +156,31 @@ const StoreProfilePage = () => {
     panelNodesRef.current[tab] = node;
   }, []);
 
+  const resetStorefrontUiState = useCallback(() => {
+    setActiveTab('browse');
+    setProductPage(1);
+    setProductTotal(0);
+    setProductTotalPages(1);
+    setProductPageLoading(false);
+    setFeaturedProducts([]);
+    setProductPageItems([]);
+    setCategoryProducts(null);
+    setCategoryLoading(false);
+    setClaimedVoucherIds(new Set<string>());
+    setClaimingVoucherId(null);
+    setPanelHeights(EMPTY_PANEL_HEIGHTS);
+    setStageMinHeight(0);
+    setLoading(true);
+  }, []);
+
+  const applyStoreUnavailableState = useCallback(() => {
+    setVouchers([]);
+    setClaimedVoucherIds(new Set<string>());
+    setReviews([]);
+    setFollowerCount(0);
+    setIsFollowing(false);
+  }, []);
+
   const handleQuickAdd = useCallback((item: QuickAddItem) => {
     addToCart({
       id: String(item.id),
@@ -515,20 +221,7 @@ const StoreProfilePage = () => {
     const isCurrentRequest = () => !cancelled && storeRequestRef.current === requestId;
 
     const fetchData = async () => {
-      setActiveTab('browse');
-      setProductPage(1);
-      setProductTotal(0);
-      setProductTotalPages(1);
-      setProductPageLoading(false);
-      setFeaturedProducts([]);
-      setProductPageItems([]);
-      setCategoryProducts(null);
-      setCategoryLoading(false);
-      setClaimedVoucherIds(new Set<string>());
-      setClaimingVoucherId(null);
-      setPanelHeights(EMPTY_PANEL_HEIGHTS);
-      setStageMinHeight(0);
-      setLoading(true);
+      resetStorefrontUiState();
 
       try {
         const storeRow = await storeService.getStoreBySlug(slug);
@@ -536,11 +229,7 @@ const StoreProfilePage = () => {
 
         setStore(storeRow);
         if (!storeRow) {
-          setVouchers([]);
-          setClaimedVoucherIds(new Set<string>());
-          setReviews([]);
-          setFollowerCount(0);
-          setIsFollowing(false);
+          applyStoreUnavailableState();
           return;
         }
 
@@ -594,7 +283,7 @@ const StoreProfilePage = () => {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [applyStoreUnavailableState, resetStorefrontUiState, slug]);
 
   const ensureCategorySnapshot = useCallback(async () => {
     if (!store?.id || categoryProducts !== null || categoryFetchInFlightRef.current) return;

@@ -1,5 +1,5 @@
 ﻿import './Vendor.css';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { ImagePlus, Save, ShieldCheck, Upload } from 'lucide-react';
 import VendorLayout from './VendorLayout';
 import { vendorPortalService, type VendorSettingsData } from '../../services/vendorPortalService';
@@ -38,72 +38,6 @@ const resolveStorefrontStatus = (store: StoreProfile | null) => {
   return { label: 'Tạm offline', detail: 'Gian hàng công khai đang ở trạng thái không hoạt động.' };
 };
 
-const resolveApprovalStatus = (store: StoreProfile | null) => {
-  if (!store) {
-    return {
-      label: 'Không xác định',
-      detail: 'Chưa lấy được thông tin phê duyệt của gian hàng công khai.',
-      tone: 'neutral' as const,
-    };
-  }
-
-  if (store.approvalStatus === 'APPROVED') {
-    return {
-      label: 'Đã duyệt',
-      detail: 'Store đã được admin duyệt.',
-      tone: 'success' as const,
-    };
-  }
-
-  if (store.approvalStatus === 'REJECTED') {
-    return {
-      label: 'Từ chối',
-      detail: store.rejectionReason
-        ? `Store bị từ chối: ${store.rejectionReason}`
-        : 'Store bị từ chối và cần cập nhật hồ sơ trước khi gửi lại.',
-      tone: 'error' as const,
-    };
-  }
-
-  return {
-    label: 'Chờ duyệt',
-    detail: 'Store đang chờ admin phê duyệt để được hiển thị công khai.',
-    tone: 'warning' as const,
-  };
-};
-
-const resolveOperationalStatus = (store: StoreProfile | null) => {
-  if (!store) {
-    return {
-      label: 'Không xác định',
-      detail: 'Chưa lấy được trạng thái vận hành của gian hàng công khai.',
-      tone: 'neutral' as const,
-    };
-  }
-
-  if (store.status === 'ACTIVE') {
-    return {
-      label: 'Đang hoạt động',
-      detail: 'Store đang vận hành bình thường.',
-      tone: 'success' as const,
-    };
-  }
-
-  if (store.status === 'SUSPENDED') {
-    return {
-      label: 'Tạm khóa',
-      detail: 'Store đang bị tạm khóa bởi quản trị viên.',
-      tone: 'error' as const,
-    };
-  }
-
-  return {
-    label: 'Tạm offline',
-    detail: 'Store đang tạm offline và chưa hiển thị công khai.',
-    tone: 'warning' as const,
-  };
-};
-
 const VendorStorefront = () => {
   const { addToast } = useToast();
   const [settings, setSettings] = useState<VendorSettingsData>(defaultSettings);
@@ -115,6 +49,16 @@ const VendorStorefront = () => {
   const [uploadingAsset, setUploadingAsset] = useState<'logo' | 'banner' | null>(null);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
+
+  const updateStoreInfoField = useCallback((field: keyof VendorSettingsData['storeInfo'], value: string) => {
+    setSettings((current) => ({
+      ...current,
+      storeInfo: {
+        ...current.storeInfo,
+        [field]: value,
+      },
+    }));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -199,13 +143,7 @@ const VendorStorefront = () => {
     try {
       setUploadingAsset(field);
       const imageUrl = await storeService.uploadStoreImage(file);
-      setSettings((current) => ({
-        ...current,
-        storeInfo: {
-          ...current.storeInfo,
-          [field]: imageUrl,
-        },
-      }));
+      updateStoreInfoField(field, imageUrl);
       addToast(field === 'logo' ? 'Đã tải logo gian hàng.' : 'Đã tải banner gian hàng.', 'success');
     } catch (err: unknown) {
       addToast(getUiErrorMessage(err, 'Không thể tải ảnh gian hàng lên'), 'error');
@@ -215,8 +153,6 @@ const VendorStorefront = () => {
   };
 
   const storefrontStatus = resolveStorefrontStatus(storeMeta);
-  resolveApprovalStatus(storeMeta);
-  resolveOperationalStatus(storeMeta);
   const storefrontPath = settings.storeInfo.slug ? `/store/${settings.storeInfo.slug}` : '/store/:slug';
 
   const storefrontChecklist = useMemo(() => {
@@ -381,9 +317,7 @@ const VendorStorefront = () => {
                     <span>Tên gian hàng</span>
                     <input
                       value={settings.storeInfo.name}
-                      onChange={(e) =>
-                        setSettings((current) => ({ ...current, storeInfo: { ...current.storeInfo, name: e.target.value } }))
-                      }
+                      onChange={(e) => updateStoreInfoField('name', e.target.value)}
                     />
                   </label>
                   <div className="form-field storefront-upload-block">
@@ -419,12 +353,7 @@ const VendorStorefront = () => {
                     <textarea
                       rows={5}
                       value={settings.storeInfo.description}
-                      onChange={(e) =>
-                        setSettings((current) => ({
-                          ...current,
-                          storeInfo: { ...current.storeInfo, description: e.target.value },
-                        }))
-                      }
+                      onChange={(e) => updateStoreInfoField('description', e.target.value)}
                     />
                   </label>
                 </div>
@@ -439,33 +368,21 @@ const VendorStorefront = () => {
                     <span>Email liên hệ</span>
                     <input
                       value={settings.storeInfo.contactEmail}
-                      onChange={(e) =>
-                        setSettings((current) => ({
-                          ...current,
-                          storeInfo: { ...current.storeInfo, contactEmail: e.target.value },
-                        }))
-                      }
+                      onChange={(e) => updateStoreInfoField('contactEmail', e.target.value)}
                     />
                   </label>
                   <label className="form-field">
                     <span>Số điện thoại</span>
                     <input
                       value={settings.storeInfo.phone}
-                      onChange={(e) =>
-                        setSettings((current) => ({ ...current, storeInfo: { ...current.storeInfo, phone: e.target.value } }))
-                      }
+                      onChange={(e) => updateStoreInfoField('phone', e.target.value)}
                     />
                   </label>
                   <label className="form-field full">
                     <span>Địa chỉ hiển thị công khai</span>
                     <input
                       value={settings.storeInfo.address}
-                      onChange={(e) =>
-                        setSettings((current) => ({
-                          ...current,
-                          storeInfo: { ...current.storeInfo, address: e.target.value },
-                        }))
-                      }
+                      onChange={(e) => updateStoreInfoField('address', e.target.value)}
                     />
                   </label>
                 </div>

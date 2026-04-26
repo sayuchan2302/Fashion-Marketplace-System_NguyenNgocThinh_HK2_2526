@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal, ChevronRight, Clock, Trash2, X, Search as SearchIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,16 +28,32 @@ const Search = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [productResults, setProductResults] = useState<Product[]>([]);
   const [storeResults, setStoreResults] = useState<MarketplaceStoreCard[]>([]);
+  const [history, setHistory] = useState<string[]>(() => searchService.getRecentSearches());
   const view = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
-  const history = searchService.getRecentSearches();
+
+  const clearSearchResults = useCallback(() => {
+    setProductResults([]);
+    setStoreResults([]);
+  }, []);
+
+  const refreshHistory = useCallback(() => {
+    setHistory(searchService.getRecentSearches());
+  }, []);
+
+  const updateSearchParams = useCallback((nextQuery: string, nextScope: SearchScope) => {
+    const normalizedQuery = nextQuery.trim();
+    const params = new URLSearchParams();
+    if (normalizedQuery) params.set('q', normalizedQuery);
+    params.set('scope', nextScope);
+    setSearchParams(params);
+  }, [setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
 
     const fetchResults = async () => {
       if (!query.trim()) {
-        setProductResults([]);
-        setStoreResults([]);
+        clearSearchResults();
         return;
       }
 
@@ -58,8 +74,7 @@ const Search = () => {
         }
       } catch {
         if (!cancelled) {
-          setProductResults([]);
-          setStoreResults([]);
+          clearSearchResults();
         }
       } finally {
         if (!cancelled) {
@@ -72,7 +87,7 @@ const Search = () => {
     return () => {
       cancelled = true;
     };
-  }, [query, scope]);
+  }, [clearSearchResults, query, scope]);
 
   const filteredResults = useMemo(() => {
     if (!query || scope !== 'products') return [];
@@ -109,27 +124,22 @@ const Search = () => {
 
   const clearHistory = () => {
     searchService.clearHistory();
-    window.location.reload();
+    refreshHistory();
   };
 
   const removeHistoryItem = (keyword: string) => {
     searchService.removeFromHistory(keyword);
-    window.location.reload();
+    refreshHistory();
   };
 
   const handleKeywordClick = (keyword: string) => {
     searchService.addToHistory(keyword);
-    const params = new URLSearchParams();
-    params.set('q', keyword);
-    params.set('scope', scope);
-    setSearchParams(params);
+    refreshHistory();
+    updateSearchParams(keyword, scope);
   };
 
   const handleScopeChange = (nextScope: SearchScope) => {
-    const params = new URLSearchParams(searchParams);
-    params.set('scope', nextScope);
-    if (query.trim()) params.set('q', query.trim());
-    setSearchParams(params);
+    updateSearchParams(query, nextScope);
   };
 
   const hasNoResults = scope === 'stores'
