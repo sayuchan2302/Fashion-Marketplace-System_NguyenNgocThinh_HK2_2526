@@ -8,7 +8,11 @@ import EmptySearchState from '../../components/EmptySearchState/EmptySearchState
 import { searchService } from '../../services/searchService';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { useClientViewState } from '../../hooks/useClientViewState';
-import { marketplaceService, type MarketplaceStoreCard } from '../../services/marketplaceService';
+import {
+  marketplaceService,
+  type MarketplaceStoreCard,
+  type MarketplaceFlashSaleItem,
+} from '../../services/marketplaceService';
 import type { Product } from '../../types';
 import {
   collectFilterFacets,
@@ -20,10 +24,50 @@ import './Search.css';
 const t = CLIENT_TEXT.search;
 type SearchScope = 'products' | 'stores';
 
+const mapFlashSaleItemsToProducts = (items: MarketplaceFlashSaleItem[]): Product[] =>
+  (items || []).map((item) => {
+    const availableStock = Math.max(0, Number(item.totalStock || 0) - Number(item.soldCount || 0));
+    const variants = (item.variants || [])
+      .filter((variant) => String(variant.size || '').trim().length > 0)
+      .map((variant, index) => ({
+        id: String(variant.backendId || `${String(item.id)}-v${index + 1}`),
+        backendId: variant.backendId,
+        size: String(variant.size || '').trim(),
+        color: String(variant.color || '').trim(),
+        colorHex: variant.colorHex,
+        sku: String(variant.backendId || `${String(item.id)}-v${index + 1}`),
+        price: Number(item.price || 0),
+        stock: availableStock,
+      }));
+
+    return {
+      id: item.id,
+      sku: String(item.backendProductId || item.id),
+      name: item.name,
+      category: 'Flash Sale',
+      price: Number(item.price || 0),
+      originalPrice: item.originalPrice,
+      image: item.image,
+      badge: item.badge || 'FLASH SALE',
+      colors: item.colors || [],
+      sizes: item.sizes || [],
+      stock: availableStock,
+      status: 'ACTIVE',
+      statusType: availableStock <= 0 ? 'out' : availableStock < 10 ? 'low' : 'active',
+      variants: variants.length > 0 ? variants : undefined,
+      backendId: item.backendProductId,
+      storeId: item.storeId,
+      storeName: item.storeName,
+      storeSlug: item.storeSlug,
+      isOfficialStore: Boolean(item.isOfficialStore),
+    };
+  });
+
 const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const scope: SearchScope = searchParams.get('scope') === 'stores' ? 'stores' : 'products';
+  const isFlashSaleMode = searchParams.get('flashSale') === '1';
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [productResults, setProductResults] = useState<Product[]>([]);
@@ -43,7 +87,9 @@ const Search = () => {
   const updateSearchParams = useCallback((nextQuery: string, nextScope: SearchScope) => {
     const normalizedQuery = nextQuery.trim();
     const params = new URLSearchParams();
-    if (normalizedQuery) params.set('q', normalizedQuery);
+    if (normalizedQuery) {
+      params.set('q', normalizedQuery);
+    }
     params.set('scope', nextScope);
     setSearchParams(params);
   }, [setSearchParams]);
@@ -52,6 +98,26 @@ const Search = () => {
     let cancelled = false;
 
     const fetchResults = async () => {
+      if (isFlashSaleMode) {
+        setIsSearching(true);
+        try {
+          const flashSale = await marketplaceService.getActiveFlashSale();
+          if (!cancelled) {
+            setProductResults(mapFlashSaleItemsToProducts(flashSale.items));
+            setStoreResults([]);
+          }
+        } catch {
+          if (!cancelled) {
+            clearSearchResults();
+          }
+        } finally {
+          if (!cancelled) {
+            setIsSearching(false);
+          }
+        }
+        return;
+      }
+
       if (!query.trim()) {
         clearSearchResults();
         return;
@@ -87,10 +153,17 @@ const Search = () => {
     return () => {
       cancelled = true;
     };
-  }, [clearSearchResults, query, scope]);
+  }, [clearSearchResults, isFlashSaleMode, query, scope]);
 
   const filteredResults = useMemo(() => {
-    if (!query || scope !== 'products') return [];
+    const source = isFlashSaleMode ? productResults : (query && scope === 'products' ? productResults : []);
+    if (!isFlashSaleMode && !query) {
+      return [];
+    }
+    if (!isFlashSaleMode && scope !== 'products') {
+      return [];
+    }
+
     const filterState: ProductFilterState = {
       priceRanges: view.priceRanges,
       sizes: view.sizes,
@@ -99,8 +172,9 @@ const Search = () => {
       fits: view.fits,
       materials: view.materials,
     };
-    return filterProducts(productResults, filterState);
+    return filterProducts(source, filterState);
   }, [
+    isFlashSaleMode,
     query,
     scope,
     productResults,
@@ -142,9 +216,19 @@ const Search = () => {
     updateSearchParams(query, nextScope);
   };
 
-  const hasNoResults = scope === 'stores'
-    ? storeResults.length === 0
-    : filteredResults.length === 0;
+  const showLanding = !query && !isFlashSaleMode;
+  const hasNoResults = isFlashSaleMode
+    ? filteredResults.length === 0
+    : scope === 'stores'
+      ? storeResults.length === 0
+      : filteredResults.length === 0;
+
+  const headerTitle = isFlashSaleMode ? 'Flash Sale' : t.page.resultsFor(query);
+  const headerCount = isFlashSaleMode
+    ? `(${t.page.productCount(filteredResults.length)})`
+    : scope === 'stores'
+      ? `(${storeResults.length} cửa hàng)`
+      : `(${t.page.productCount(filteredResults.length)})`;
 
   return (
     <div className="search-page">
@@ -153,14 +237,16 @@ const Search = () => {
           <nav className="breadcrumbs">
             <Link to="/" className="breadcrumb-link">{CLIENT_TEXT.common.breadcrumb.home}</Link>
             <ChevronRight size={14} className="breadcrumb-separator" />
-            <span className="breadcrumb-current">{CLIENT_TEXT.common.actions.search}</span>
+            <span className="breadcrumb-current">
+              {isFlashSaleMode ? 'Flash Sale' : CLIENT_TEXT.common.actions.search}
+            </span>
           </nav>
         </div>
       </div>
 
       <div className="search-page-container container">
         <AnimatePresence mode="wait">
-          {!query ? (
+          {showLanding ? (
             <motion.div
               key="landing"
               className="search-landing"
@@ -237,34 +323,36 @@ const Search = () => {
               transition={{ duration: 0.3 }}
             >
               <div className="plp-header">
-                <h1 className="plp-title">{t.page.resultsFor(query)}</h1>
-                <span className="plp-count">
-                  {scope === 'stores'
-                    ? `(${storeResults.length} cửa hàng)`
-                    : `(${t.page.productCount(filteredResults.length)})`}
-                </span>
+                <h1 className="plp-title">{headerTitle}</h1>
+                <span className="plp-count">{headerCount}</span>
               </div>
 
-              <div className="search-scope-switch">
-                <button
-                  className={scope === 'products' ? 'active' : ''}
-                  onClick={() => handleScopeChange('products')}
-                >
-                  Sản phẩm
-                </button>
-                <button
-                  className={scope === 'stores' ? 'active' : ''}
-                  onClick={() => handleScopeChange('stores')}
-                >
-                  Cửa hàng
-                </button>
-              </div>
+              {!isFlashSaleMode && (
+                <div className="search-scope-switch">
+                  <button
+                    className={scope === 'products' ? 'active' : ''}
+                    onClick={() => handleScopeChange('products')}
+                  >
+                    Sản phẩm
+                  </button>
+                  <button
+                    className={scope === 'stores' ? 'active' : ''}
+                    onClick={() => handleScopeChange('stores')}
+                  >
+                    Cửa hàng
+                  </button>
+                </div>
+              )}
 
               {isSearching ? (
-                <div className="search-loading-state">Đang tìm kiếm...</div>
+                <div className="search-loading-state">
+                  {isFlashSaleMode ? 'Đang tải sản phẩm Flash Sale...' : 'Đang tìm kiếm...'}
+                </div>
               ) : hasNoResults ? (
-                scope === 'products'
-                  ? <EmptySearchState query={query} />
+                (scope === 'products' || isFlashSaleMode)
+                  ? (isFlashSaleMode
+                      ? <div className="store-empty-state"><p>Hiện chưa có sản phẩm Flash Sale đang hoạt động.</p></div>
+                      : <EmptySearchState query={query} />)
                   : <div className="store-empty-state"><p>Không tìm thấy cửa hàng phù hợp cho "{query}".</p></div>
               ) : scope === 'stores' ? (
                 <div className="store-results-grid">

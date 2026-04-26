@@ -55,7 +55,7 @@ const toTimeParts = (seconds: number) => {
 
 const FlashSaleSection = ({
   items = [],
-  viewAllLink = '/search?scope=products&sort=discount',
+  viewAllLink = '/search?scope=products&flashSale=1',
   className = '',
   endAt,
   serverTime,
