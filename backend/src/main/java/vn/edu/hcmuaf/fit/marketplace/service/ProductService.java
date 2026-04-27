@@ -605,7 +605,7 @@ public class ProductService {
     @Transactional
     public void delete(UUID id) {
         Product product = findByIdIncludingInactive(id);
-        product.setStatus(ProductStatus.INACTIVE);
+        product.setStatus(ProductStatus.ARCHIVED);
         productRepository.save(product);
     }
 
@@ -618,7 +618,7 @@ public class ProductService {
         Product product = productRepository.findByIdAndStoreId(id, storeId)
                 .orElseThrow(() -> new ForbiddenException("Product not found or you don't have permission to delete it"));
         
-        product.setStatus(ProductStatus.INACTIVE);
+        product.setStatus(ProductStatus.ARCHIVED);
         productRepository.save(product);
     }
 
