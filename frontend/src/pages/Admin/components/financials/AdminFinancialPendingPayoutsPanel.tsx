@@ -1,0 +1,125 @@
+import { motion } from 'framer-motion';
+import { CheckCircle2, Eye, X } from 'lucide-react';
+import { AdminStateBlock } from '../../AdminStateBlocks';
+import type { PayoutRequest } from '../../../../services/walletService';
+import { PAGE_SIZE, formatCurrency, toStoreRef } from './adminFinancialPresentation';
+
+type Props = {
+  payouts: PayoutRequest[];
+  payoutPage: number;
+  payoutTotalPages: number;
+  onPageChange: (page: number) => void;
+  onOpenDetail: (payout: PayoutRequest) => void;
+  onApprove: (payout: PayoutRequest) => Promise<void>;
+  onPrepareReject: (payout: PayoutRequest) => void;
+};
+
+const AdminFinancialPendingPayoutsPanel = ({
+  payouts,
+  payoutPage,
+  payoutTotalPages,
+  onPageChange,
+  onOpenDetail,
+  onApprove,
+  onPrepareReject,
+}: Props) => {
+  if (payouts.length === 0) {
+    return (
+      <AdminStateBlock
+        type="empty"
+        title="Không có yêu cầu rút tiền chờ duyệt"
+        description="Tất cả yêu cầu đã được xử lý hoặc chưa có yêu cầu mới."
+      />
+    );
+  }
+
+  return (
+    <>
+      <div className="admin-table" role="table" aria-label="Bảng yêu cầu rút tiền">
+        <div className="admin-table-row financials admin-table-head" role="row">
+          <div role="columnheader">STT</div>
+          <div role="columnheader">Store</div>
+          <div role="columnheader">Số tiền</div>
+          <div role="columnheader">Ngân hàng</div>
+          <div role="columnheader">STK</div>
+          <div role="columnheader">Ngày yêu cầu</div>
+          <div role="columnheader">Hành động</div>
+        </div>
+
+        {payouts.map((payout, index) => (
+          <motion.div
+            key={payout.id}
+            className="admin-table-row financials"
+            role="row"
+            whileHover={{ y: -1 }}
+          >
+            <div role="cell" className="admin-mono">
+              {(payoutPage - 1) * PAGE_SIZE + index + 1}
+            </div>
+            <div role="cell">
+              <div className="admin-bold">{payout.storeName}</div>
+              <small className="admin-muted">{toStoreRef({ storeSlug: payout.storeSlug })}</small>
+            </div>
+            <div role="cell" className="admin-bold">
+              {formatCurrency(payout.amount)}
+            </div>
+            <div role="cell">{payout.bankName}</div>
+            <div role="cell" className="admin-muted">{payout.bankAccountNumber}</div>
+            <div role="cell" className="admin-muted">
+              {new Date(payout.createdAt).toLocaleString('vi-VN')}
+            </div>
+            <div role="cell" className="financial-actions">
+              <button className="admin-icon-btn subtle" title="Xem chi tiết" onClick={() => onOpenDetail(payout)}>
+                <Eye size={16} />
+              </button>
+              <button className="admin-icon-btn subtle" title="Duyệt" onClick={() => void onApprove(payout)}>
+                <CheckCircle2 size={16} />
+              </button>
+              <button
+                className="admin-icon-btn subtle danger-icon"
+                title="Từ chối"
+                onClick={() => onPrepareReject(payout)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="table-footer">
+        <span className="table-footer-meta">Trang {payoutPage}/{payoutTotalPages}</span>
+        <div className="pagination">
+          <button
+            className="page-btn"
+            disabled={payoutPage === 1}
+            onClick={() => onPageChange(Math.max(payoutPage - 1, 1))}
+          >
+            Trước
+          </button>
+          {Array.from({ length: Math.min(payoutTotalPages, 5) }).map((_, index) => {
+            const pageNumber = index + 1;
+            return (
+              <button
+                key={pageNumber}
+                className={`page-btn ${payoutPage === pageNumber ? 'active' : ''}`}
+                onClick={() => onPageChange(pageNumber)}
+              >
+                {pageNumber}
+              </button>
+            );
+          })}
+          <button
+            className="page-btn"
+            disabled={payoutPage === payoutTotalPages}
+            onClick={() => onPageChange(Math.min(payoutPage + 1, payoutTotalPages))}
+          >
+            Sau
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default AdminFinancialPendingPayoutsPanel;

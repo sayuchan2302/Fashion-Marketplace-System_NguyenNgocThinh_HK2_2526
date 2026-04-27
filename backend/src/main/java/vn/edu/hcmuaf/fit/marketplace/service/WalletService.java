@@ -309,10 +309,23 @@ public class WalletService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Payout amount must be greater than zero");
         }
+        if (bankAccountName == null || bankAccountName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Bank account holder is required");
+        }
+        if (bankAccountNumber == null || bankAccountNumber.trim().isEmpty()) {
+            throw new IllegalArgumentException("Bank account number is required");
+        }
+        if (bankName == null || bankName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Bank name is required");
+        }
 
         VendorWallet wallet = getOrCreateWallet(storeId);
         BigDecimal pendingAmount = payoutRequestRepository.sumPendingAmountByStoreId(storeId);
         BigDecimal spendableBase = wallet.getAvailableBalance().add(wallet.getReservedBalance());
+
+        if (pendingAmount.compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("Store already has a pending payout request");
+        }
 
         if (wallet.getAvailableBalance().compareTo(amount) < 0) {
             throw new IllegalArgumentException("Insufficient available balance. Available: " + wallet.getAvailableBalance());
@@ -329,9 +342,9 @@ public class WalletService {
         PayoutRequest request = PayoutRequest.builder()
                 .storeId(storeId)
                 .amount(amount)
-                .bankAccountName(bankAccountName)
-                .bankAccountNumber(bankAccountNumber)
-                .bankName(bankName)
+                .bankAccountName(bankAccountName.trim())
+                .bankAccountNumber(bankAccountNumber.trim())
+                .bankName(bankName.trim())
                 .status(PayoutRequest.PayoutStatus.PENDING)
                 .build();
 

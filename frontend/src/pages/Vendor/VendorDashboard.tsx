@@ -225,7 +225,7 @@ const VendorDashboard = () => {
     { label: 'Thêm sản phẩm', icon: <Plus size={18} />, to: '/vendor/products?action=add' },
     { label: 'Xử lý đơn hàng', icon: <ShoppingCart size={18} />, to: '/vendor/orders' },
     { label: 'Trang trí gian hàng', icon: <Store size={18} />, to: '/vendor/storefront' },
-    { label: 'Xem đối soát', icon: <BarChart3 size={18} />, to: '/vendor/dashboard#analytics' },
+    { label: 'Rút tiền & đối soát', icon: <BarChart3 size={18} />, to: '/vendor/finance' },
   ];
 
   const handleConfirmOrder = async (order: VendorOrderSummary) => {

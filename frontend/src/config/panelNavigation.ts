@@ -20,6 +20,7 @@ export const vendorPanelNav: PanelNavItem[] = [
   { label: 'Sản phẩm', to: '/vendor/products' },
   { label: 'Đơn hàng', to: '/vendor/orders' },
   { label: 'Hoàn trả', to: '/vendor/returns' },
+  { label: 'Tài chính', to: '/vendor/finance' },
   { label: 'Voucher cửa hàng', to: '/vendor/promotions' },
   { label: 'Đánh giá và phản hồi', to: '/vendor/reviews' },
 ];

@@ -14,6 +14,7 @@ const VendorStorefront = lazy(() => import('./VendorStorefront'));
 const VendorPromotions = lazy(() => import('./VendorPromotions'));
 const VendorReviews = lazy(() => import('./VendorReviews'));
 const VendorReturnDashboard = lazy(() => import('./VendorReturnDashboard'));
+const VendorFinance = lazy(() => import('./VendorFinance'));
 
 const defaultShellState: AdminShellState = {
   title: 'Tổng quan',
@@ -112,6 +113,7 @@ const VendorWorkspace = () => {
               <Route path="orders" element={<VendorOrders />} />
               <Route path="orders/:id" element={<VendorOrderDetail />} />
               <Route path="returns" element={<VendorReturnDashboard />} />
+              <Route path="finance" element={<VendorFinance />} />
               <Route path="products" element={<VendorProducts />} />
               <Route path="storefront" element={<VendorStorefront />} />
               <Route path="promotions" element={<VendorPromotions />} />

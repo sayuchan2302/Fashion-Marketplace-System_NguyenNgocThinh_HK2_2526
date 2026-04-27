@@ -329,7 +329,21 @@ class WalletServiceTest {
                 () -> walletService.createPayoutRequest(storeId, new BigDecimal("300000"), "A", "123", "VCB")
         );
 
-        assertEquals("Insufficient available balance after pending payouts", ex.getMessage());
+        assertEquals("Store already has a pending payout request", ex.getMessage());
+        verify(payoutRequestRepository, never()).save(any(PayoutRequest.class));
+    }
+
+    @Test
+    void createPayoutRequestRejectsBlankBankFields() {
+        UUID storeId = UUID.randomUUID();
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> walletService.createPayoutRequest(storeId, new BigDecimal("100000"), " ", "123", "VCB")
+        );
+
+        assertEquals("Bank account holder is required", ex.getMessage());
+        verify(vendorWalletRepository, never()).findByStoreIdForUpdate(any());
         verify(payoutRequestRepository, never()).save(any(PayoutRequest.class));
     }
 

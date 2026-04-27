@@ -4,4 +4,5 @@ export { default as VendorOrders } from './VendorOrders';
 export { default as VendorOrderDetail } from './VendorOrderDetail';
 export { default as VendorProducts } from './VendorProducts';
 export { default as VendorAnalytics } from './VendorAnalytics';
+export { default as VendorFinance } from './VendorFinance';
 export { VENDOR_DICTIONARY } from './vendorDictionary';
