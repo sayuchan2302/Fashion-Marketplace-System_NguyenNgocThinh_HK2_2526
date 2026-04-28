@@ -65,8 +65,13 @@ class SearchServiceLogicTests(unittest.TestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertEqual(context.exception.metrics_status, "invalid_content_type")
 
-    def test_validate_image_upload_accepts_valid_jpeg_with_image_content_type(self) -> None:
-        validate_image_upload("image/jpeg", self._build_jpeg_payload())
+    def test_valid_jpeg_with_image_content_type_passes_validation_and_decoding(self) -> None:
+        payload = self._build_jpeg_payload()
+
+        validate_image_upload("image/jpeg", payload)
+        decoded = decode_search_image(payload)
+
+        self.assertEqual(decoded.mode, "RGB")
 
     def test_validate_image_upload_rejects_empty_payload(self) -> None:
         with self.assertRaises(SearchValidationError) as context:
@@ -83,14 +88,22 @@ class SearchServiceLogicTests(unittest.TestCase):
         self.assertEqual(context.exception.status_code, 413)
         self.assertEqual(context.exception.metrics_status, "oversized_payload")
 
-    def test_validate_image_upload_accepts_valid_jpeg_with_octet_stream(self) -> None:
-        validate_image_upload("application/octet-stream", self._build_jpeg_payload())
+    def test_valid_jpeg_with_octet_stream_passes_validation_and_decoding(self) -> None:
+        payload = self._build_jpeg_payload()
 
-    def test_validate_image_upload_accepts_valid_jpeg_with_missing_or_blank_content_type(self) -> None:
+        validate_image_upload("application/octet-stream", payload)
+        decoded = decode_search_image(payload)
+
+        self.assertEqual(decoded.mode, "RGB")
+
+    def test_valid_jpeg_with_missing_or_blank_content_type_passes_validation_and_decoding(self) -> None:
         payload = self._build_jpeg_payload()
 
         validate_image_upload(None, payload)
         validate_image_upload("   ", payload)
+        decoded = decode_search_image(payload)
+
+        self.assertEqual(decoded.mode, "RGB")
 
     def test_validate_image_upload_rejects_text_plain_content_type(self) -> None:
         with self.assertRaises(SearchValidationError) as context:
@@ -127,20 +140,33 @@ class SearchServiceLogicTests(unittest.TestCase):
 
         self.assertEqual(decoded.size, (24, 12))
 
-    def test_decode_search_image_accepts_valid_octet_stream_payload(self) -> None:
-        payload = self._build_jpeg_payload(color="yellow")
-        validate_image_upload("application/octet-stream", payload)
+    def test_octet_stream_text_payload_passes_validation_but_fails_decode(self) -> None:
+        validate_image_upload("application/octet-stream", b"hello world")
 
-        decoded = decode_search_image(payload)
-
-        self.assertEqual(decoded.mode, "RGB")
-
-    def test_validate_image_upload_rejects_text_payload_when_octet_stream(self) -> None:
         with self.assertRaises(SearchValidationError) as context:
-            validate_image_upload("application/octet-stream", b"hello world")
+            decode_search_image(b"hello world")
 
         self.assertEqual(context.exception.status_code, 400)
         self.assertEqual(context.exception.metrics_status, "decode_error")
+
+    def test_search_bytes_rejects_oversized_payload_before_decode(self) -> None:
+        service = ImageSearchService(clip_service=object())  # type: ignore[arg-type]
+
+        with patch("app.search_service.settings.max_upload_size_bytes", 4), patch(
+            "app.search_service.decode_search_image"
+        ) as decode_mock:
+            with self.assertRaises(SearchValidationError) as context:
+                service.search_bytes(
+                    content_type="application/octet-stream",
+                    payload=b"12345",
+                    limit=5,
+                    category_slug=None,
+                    store_slug=None,
+                )
+
+        self.assertEqual(context.exception.status_code, 413)
+        self.assertEqual(context.exception.metrics_status, "oversized_payload")
+        decode_mock.assert_not_called()
 
     def test_group_search_candidates_prefers_higher_ranking_score(self) -> None:
         product_id = uuid4()
