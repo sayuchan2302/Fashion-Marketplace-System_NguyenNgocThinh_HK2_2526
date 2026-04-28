@@ -1,4 +1,7 @@
 let pendingImageSearchFile: File | null = null;
+const clearPendingImageSearchFile = () => {
+  pendingImageSearchFile = null;
+};
 
 export const extractImageFileFromClipboard = (clipboardData: DataTransfer | null): File | null => {
   if (!clipboardData) {
@@ -27,9 +30,12 @@ export const imageSearchSession = {
   hasPendingFile() {
     return pendingImageSearchFile !== null;
   },
+  clearPendingFile() {
+    clearPendingImageSearchFile();
+  },
   consumePendingFile() {
     const file = pendingImageSearchFile;
-    pendingImageSearchFile = null;
+    clearPendingImageSearchFile();
     return file;
   },
 };

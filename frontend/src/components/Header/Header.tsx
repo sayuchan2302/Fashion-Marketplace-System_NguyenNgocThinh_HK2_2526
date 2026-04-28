@@ -18,15 +18,10 @@ import {
 import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_TOAST_MESSAGES } from '../../utils/clientMessages';
 import { resolveAvatarSrc } from '../../utils/avatar';
-import { extractImageFileFromClipboard, imageSearchSession } from '../../utils/imageSearchSession';
+import { useHeaderImageSearch } from '../../hooks/useHeaderImageSearch';
 import './Header.css';
 
 type SearchScope = 'products' | 'stores';
-
-interface ImageSearchDraft {
-  file: File;
-  previewUrl: string;
-}
 
 const FALLBACK_HEADER_CATEGORY_TREE: MarketplaceHeaderCategoryRoot[] = [
   {
@@ -156,36 +151,6 @@ const Header = () => {
   const { unreadCount } = useNotifications();
   const [searchScope, setSearchScope] = useState<SearchScope>('products');
   const [categoryTree, setCategoryTree] = useState<MarketplaceHeaderCategoryRoot[]>(FALLBACK_HEADER_CATEGORY_TREE);
-  const imageInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [isImageSearchModalOpen, setIsImageSearchModalOpen] = useState(false);
-  const [imageSearchDraft, setImageSearchDraft] = useState<ImageSearchDraft | null>(null);
-  const imageSearchContext = React.useMemo(() => {
-    const decodePathSegment = (value: string): string => {
-      try {
-        return decodeURIComponent(value).trim().toLowerCase();
-      } catch {
-        return value.trim().toLowerCase();
-      }
-    };
-
-    const pathname = location.pathname || '';
-    const categoryMatch = pathname.match(/^\/category\/([^/?#]+)/i);
-    if (categoryMatch?.[1]) {
-      const categorySlug = decodePathSegment(categoryMatch[1]);
-      if (categorySlug && categorySlug !== 'all' && categorySlug !== 'sale' && categorySlug !== 'new') {
-        return { categorySlug, storeSlug: '' };
-      }
-      return { categorySlug: '', storeSlug: '' };
-    }
-
-    const storeMatch = pathname.match(/^\/store\/([^/?#]+)/i);
-    if (storeMatch?.[1]) {
-      const storeSlug = decodePathSegment(storeMatch[1]);
-      return { categorySlug: '', storeSlug };
-    }
-
-    return { categorySlug: '', storeSlug: '' };
-  }, [location.pathname]);
 
   const toggleMobileSubMenu = (menuId: string) => {
     setExpandedMobileMenu((prev) => (prev === menuId ? null : menuId));
@@ -223,69 +188,6 @@ const Header = () => {
     };
   }, []);
 
-  const clearImageSearchDraft = React.useCallback(() => {
-    setImageSearchDraft((current) => {
-      if (current?.previewUrl) {
-        URL.revokeObjectURL(current.previewUrl);
-      }
-      return null;
-    });
-  }, []);
-
-  const setImageSearchDraftFile = React.useCallback((file: File) => {
-    const previewUrl = URL.createObjectURL(file);
-    setImageSearchDraft((current) => {
-      if (current?.previewUrl) {
-        URL.revokeObjectURL(current.previewUrl);
-      }
-      return { file, previewUrl };
-    });
-  }, []);
-
-  const closeImageSearchModal = React.useCallback(() => {
-    setIsImageSearchModalOpen(false);
-    clearImageSearchDraft();
-  }, [clearImageSearchDraft]);
-
-  React.useEffect(() => {
-    if (!isImageSearchModalOpen) {
-      document.body.classList.remove('header-image-modal-open');
-      return undefined;
-    }
-
-    document.body.classList.add('header-image-modal-open');
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeImageSearchModal();
-      }
-    };
-
-    const handlePaste = (event: ClipboardEvent) => {
-      const file = extractImageFileFromClipboard(event.clipboardData ?? null);
-      if (!file) {
-        return;
-      }
-
-      event.preventDefault();
-      setImageSearchDraftFile(file);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('paste', handlePaste);
-
-    return () => {
-      document.body.classList.remove('header-image-modal-open');
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('paste', handlePaste);
-    };
-  }, [closeImageSearchModal, isImageSearchModalOpen, setImageSearchDraftFile]);
-
-  React.useEffect(() => () => {
-    document.body.classList.remove('header-image-modal-open');
-    clearImageSearchDraft();
-  }, [clearImageSearchDraft]);
-
   const handleSearchSubmit = (query: string, scope: SearchScope = searchScope) => {
     if (query.trim()) {
       searchService.addToHistory(query);
@@ -298,58 +200,24 @@ const Header = () => {
     }
   };
 
-  const triggerImageSearch = () => {
-    setIsSearchDropdownOpen(false);
-    closeMobileMenu();
-    setIsImageSearchModalOpen(true);
-  };
-
-  const triggerImagePicker = () => {
-    imageInputRef.current?.click();
-  };
-
-  const handleImageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) {
-      return;
-    }
-
-    setImageSearchDraftFile(file);
-  };
-
-  const handleModalPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
-    const file = extractImageFileFromClipboard(event.clipboardData);
-    if (!file) {
-      return;
-    }
-
-    event.preventDefault();
-    setImageSearchDraftFile(file);
-  };
-
-  const handleImageSearchConfirm = () => {
-    if (!imageSearchDraft) {
-      return;
-    }
-
-    imageSearchSession.setPendingFile(imageSearchDraft.file);
-    setSearchScope('products');
-    setIsSearchDropdownOpen(false);
-    setIsImageSearchModalOpen(false);
-    clearImageSearchDraft();
-
-    const params = new URLSearchParams();
-    params.set('scope', 'products');
-    params.set('imageSearch', `${Date.now()}`);
-    if (imageSearchContext.categorySlug) {
-      params.set('imageCategory', imageSearchContext.categorySlug);
-    }
-    if (imageSearchContext.storeSlug) {
-      params.set('imageStore', imageSearchContext.storeSlug);
-    }
-    navigate(`/search?${params.toString()}`);
-  };
+  const {
+    imageInputRef,
+    isImageSearchModalOpen,
+    imageSearchDraft,
+    openImageSearchModal,
+    closeImageSearchModal,
+    triggerImagePicker,
+    handleImageInputChange,
+    handleModalPaste,
+    handleImageSearchConfirm,
+  } = useHeaderImageSearch({
+    pathname: location.pathname,
+    navigate,
+    closeMobileMenu,
+    closeSearchDropdown: () => setIsSearchDropdownOpen(false),
+    setSearchScope: (scope) => setSearchScope(scope),
+    addToast,
+  });
 
   const toCategoryLink = (slug?: string) => {
     const normalized = (slug || '').trim();
@@ -452,7 +320,7 @@ const Header = () => {
             <button
               type="button"
               className="search-image-btn"
-              onClick={triggerImageSearch}
+              onClick={openImageSearchModal}
               aria-label="Tìm kiếm bằng hình ảnh"
               title="Tìm kiếm bằng hình ảnh"
             >
@@ -604,7 +472,7 @@ const Header = () => {
           <button
             type="button"
             className="mobile-search-image-btn"
-            onClick={triggerImageSearch}
+            onClick={openImageSearchModal}
             aria-label="Tìm kiếm bằng hình ảnh"
           >
             <Camera size={18} />
