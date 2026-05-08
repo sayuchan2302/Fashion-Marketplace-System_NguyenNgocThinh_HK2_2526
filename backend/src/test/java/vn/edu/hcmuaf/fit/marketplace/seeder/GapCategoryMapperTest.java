@@ -66,6 +66,21 @@ class GapCategoryMapperTest {
     }
 
     @Test
+    void vietnameseVoMapsToTat() {
+        GapCategoryMapper.MappingResult result = mapper.map(styleRow(
+                20L,
+                "Men",
+                "Accessories",
+                "Fashion Accessories",
+                "Accessories",
+                "Vớ dáng thể thao Quarter Crew"
+        ));
+
+        assertEquals("tat", result.chosenLeafSlug());
+        assertEquals("descriptive_text:socks", result.winningRule());
+    }
+
+    @Test
     void sunglassesMapToKinhMat() {
         GapCategoryMapper.MappingResult result = mapper.map(styleRow(
                 4L,

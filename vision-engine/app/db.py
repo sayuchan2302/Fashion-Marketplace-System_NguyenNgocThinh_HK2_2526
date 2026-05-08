@@ -10,8 +10,11 @@ from psycopg_pool import ConnectionPool
 from .config import settings
 
 
-BOOTSTRAP_SQL = f"""
+EXTENSION_SQL = """
 CREATE EXTENSION IF NOT EXISTS vector;
+"""
+
+BOOTSTRAP_SQL = f"""
 CREATE SCHEMA IF NOT EXISTS vision;
 
 CREATE TABLE IF NOT EXISTS vision.product_image_embeddings (
@@ -138,7 +141,12 @@ def get_connection():
 
 def bootstrap_database() -> None:
     with psycopg.connect(settings.vision_database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(EXTENSION_SQL)
+        conn.commit()
+
         register_vector(conn)
+
         with conn.cursor() as cur:
             cur.execute(BOOTSTRAP_SQL)
         conn.commit()

@@ -10,6 +10,7 @@ import vn.edu.hcmuaf.fit.marketplace.repository.AdminAuditLogRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.UserRepository;
 import vn.edu.hcmuaf.fit.marketplace.service.AdminAuditLogService;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -60,7 +61,26 @@ class BotScenarioServiceTest {
         RuntimeException error = assertThrows(RuntimeException.class,
                 () -> botScenarioService.saveDraft(invalidPayload, "admin@fashion.local"));
 
-        assertTrue(error.getMessage().contains("quickActions must include exactly"));
+        assertTrue(error.getMessage().contains("quickActions must include required keys"));
+    }
+
+    @Test
+    void saveDraft_allowsAdditionalQuickActionsForExistingActions() throws Exception {
+        BotScenarioPayload payload = basePayload();
+        List<BotScenarioQuickAction> quickActions = new ArrayList<>(payload.getQuickActions());
+        quickActions.add(BotScenarioQuickAction.builder()
+                .key(BotScenarioActionKey.PRODUCT_FAQ)
+                .label("Phi giao hang")
+                .build());
+        payload.setQuickActions(quickActions);
+
+        botScenarioService.saveDraft(payload, "admin@fashion.local");
+
+        ArgumentCaptor<BotScenarioRevision> captor = ArgumentCaptor.forClass(BotScenarioRevision.class);
+        verify(revisionRepository).save(captor.capture());
+        BotScenarioPayload savedPayload = objectMapper.readValue(captor.getValue().getPayloadJson(), BotScenarioPayload.class);
+        assertEquals(4, savedPayload.getQuickActions().size());
+        assertEquals("Phi giao hang", savedPayload.getQuickActions().get(3).getLabel());
     }
 
     @Test

@@ -131,6 +131,8 @@ class ImageSearchService:
             return _CategoryDecision(query_category_slug=None)
 
         if classification.score >= settings.image_search_auto_category_hard_threshold:
+            if not self.search_repository.has_active_category(classification.category_slug):
+                return self._soft_category_decision(classification)
             return _CategoryDecision.from_classification(
                 classification,
                 query_category_slug=classification.category_slug,
@@ -139,15 +141,18 @@ class ImageSearchService:
             )
 
         if classification.score >= settings.image_search_auto_category_soft_threshold:
-            return _CategoryDecision.from_classification(
-                classification,
-                query_category_slug=None,
-                filter_applied="soft",
-                soft_boost_category_slug=classification.category_slug,
-                soft_boost_amount=settings.image_search_auto_category_soft_boost,
-            )
+            return self._soft_category_decision(classification)
 
         return _CategoryDecision.from_classification(classification, query_category_slug=None)
+
+    def _soft_category_decision(self, classification: CategoryClassification) -> "_CategoryDecision":
+        return _CategoryDecision.from_classification(
+            classification,
+            query_category_slug=None,
+            filter_applied="soft",
+            soft_boost_category_slug=classification.category_slug,
+            soft_boost_amount=settings.image_search_auto_category_soft_boost,
+        )
 
 
 @dataclass(frozen=True, slots=True)

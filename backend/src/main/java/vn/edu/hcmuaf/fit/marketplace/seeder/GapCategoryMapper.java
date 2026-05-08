@@ -1,5 +1,6 @@
 package vn.edu.hcmuaf.fit.marketplace.seeder;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -7,6 +8,9 @@ import java.util.Locale;
 import java.util.Set;
 
 final class GapCategoryMapper {
+
+    private static final String[] SOCK_TOKENS = { "sock", "socks", "vo",
+            "tat" };
 
     MappingResult map(GapProductImportRunner.StyleRow row) {
         LinkedHashSet<String> rawCandidateSlugs = new LinkedHashSet<>();
@@ -418,7 +422,7 @@ final class GapCategoryMapper {
                 return match("khan", fieldName + ":scarf", confidence,
                         fieldName);
             }
-            if (containsAnyToken(source, "sock", "socks")) {
+            if (containsAnyToken(source, SOCK_TOKENS)) {
                 return match("tat", fieldName + ":socks", confidence,
                         fieldName);
             }
@@ -459,7 +463,7 @@ final class GapCategoryMapper {
         if (containsAnyToken(source, "scarf", "scarves", "stole", "stoles")) {
             return match("khan", fieldName + ":scarf", confidence, fieldName);
         }
-        if (containsAnyToken(source, "sock", "socks")) {
+        if (containsAnyToken(source, SOCK_TOKENS)) {
             return match("tat", fieldName + ":socks", confidence, fieldName);
         }
         if (containsAnyToken(source, "sunglass", "sunglasses", "eyewear",
@@ -539,7 +543,11 @@ final class GapCategoryMapper {
         if (normalized.isBlank()) {
             return "";
         }
-        return normalized.replaceAll("[^\\p{Alnum}]+", " ").trim()
+        String ascii = Normalizer.normalize(normalized, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D');
+        return ascii.replaceAll("[^\\p{Alnum}]+", " ").trim()
                 .replaceAll("\\s+", " ");
     }
 

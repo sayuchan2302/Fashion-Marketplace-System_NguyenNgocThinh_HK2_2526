@@ -281,15 +281,16 @@ public class MarketplaceBot extends ActivityHandler {
                     .thenCompose(ignore -> sendMainMenu(turnContext, scenario.getSizeAdviceContinuePrompt(), scenario));
         }
 
-        if (matchesQuickAction(scenario, BotScenarioActionKey.ORDER_LOOKUP, input)) {
+        Optional<BotScenarioActionKey> matchedQuickAction = findMatchedQuickAction(scenario, input);
+        if (matchedQuickAction.filter(BotScenarioActionKey.ORDER_LOOKUP::equals).isPresent()) {
             state.step = ConversationStep.AWAIT_ORDER_CODE;
             return sendText(turnContext, scenario.getAskOrderCodePrompt());
         }
-        if (matchesQuickAction(scenario, BotScenarioActionKey.SIZE_ADVICE, input)) {
+        if (matchedQuickAction.filter(BotScenarioActionKey.SIZE_ADVICE::equals).isPresent()) {
             state.step = ConversationStep.AWAIT_HEIGHT;
             return sendText(turnContext, scenario.getAskHeightPrompt());
         }
-        if (matchesQuickAction(scenario, BotScenarioActionKey.PRODUCT_FAQ, input)) {
+        if (matchedQuickAction.filter(BotScenarioActionKey.PRODUCT_FAQ::equals).isPresent()) {
             String answer = supportChatService.answerProductFaq(turnContext.getActivity().getText());
             return sendText(turnContext, answer)
                     .thenCompose(ignore -> sendMainMenu(turnContext, scenario.getProductFaqContinuePrompt(), scenario));
@@ -332,14 +333,15 @@ public class MarketplaceBot extends ActivityHandler {
         return sendActivity(turnContext, reply);
     }
 
-    private boolean matchesQuickAction(BotScenarioPayload scenario, BotScenarioActionKey key, String normalizedInput) {
+    private Optional<BotScenarioActionKey> findMatchedQuickAction(BotScenarioPayload scenario, String normalizedInput) {
         if (scenario.getQuickActions() == null || normalizedInput == null) {
-            return false;
+            return Optional.empty();
         }
         return scenario.getQuickActions().stream()
-                .filter(action -> action != null && key.equals(action.getKey()))
-                .map(action -> normalize(action.getLabel()))
-                .anyMatch(normalizedInput::equals);
+                .filter(action -> action != null && action.getKey() != null)
+                .filter(action -> normalizedInput.equals(normalize(action.getLabel())))
+                .map(action -> action.getKey())
+                .findFirst();
     }
 
     private CompletableFuture<Void> sendText(TurnContext turnContext, String text) {

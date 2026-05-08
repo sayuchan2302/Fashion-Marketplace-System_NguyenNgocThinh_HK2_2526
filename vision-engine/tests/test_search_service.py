@@ -53,6 +53,7 @@ class SearchServiceCompatibilityTests(unittest.TestCase):
         repository = Mock(spec=SearchRepository)
         repository.query_similar_images_with_views.return_value = (rows or [], 3.5)
         repository.should_apply_soft_category_boost.return_value = False
+        repository.has_active_category.return_value = True
         repository.load_index_info.return_value = {
             "active_image_count": 1,
             "active_product_count": 1,
@@ -204,6 +205,38 @@ class SearchServiceCompatibilityTests(unittest.TestCase):
         self.assertEqual(result.inferred_category, "tat")
         self.assertEqual(result.inferred_category_score, 0.31)
         self.assertEqual(result.category_filter_applied, "hard")
+
+    def test_high_confidence_auto_category_falls_back_to_soft_when_category_is_not_indexed(self) -> None:
+        pants_id = uuid4()
+        socks_id = uuid4()
+        clip_service = Mock()
+        clip_service.encode_images.return_value = [[1.0, 0.0]]
+        repository = self._build_repository(
+            [
+                self._build_row(pants_id, category_slug="women-quan-tay", score=0.82),
+                self._build_row(socks_id, category_slug="tat", score=0.78),
+            ]
+        )
+        repository.has_active_category.return_value = False
+        classifier = Mock()
+        classifier.classify.return_value = CategoryClassification(category_slug="tat", score=0.31)
+        service = ImageSearchService(clip_service=clip_service, search_repository=repository, category_classifier=classifier)
+
+        with patch("app.search_service.settings.image_search_auto_category_enabled", True):
+            result = service.search_bytes(
+                content_type="image/png",
+                payload=self._build_png_payload(),
+                limit=5,
+                category_slug=None,
+                store_slug=None,
+            )
+
+        repository.has_active_category.assert_called_once_with("tat")
+        call_kwargs = repository.query_similar_images_with_views.call_args.kwargs
+        self.assertIsNone(call_kwargs["category_slug"])
+        self.assertFalse(call_kwargs["force_hard_category_filter"])
+        self.assertEqual(result.candidates[0].backend_product_id, socks_id)
+        self.assertEqual(result.category_filter_applied, "soft")
 
     def test_medium_confidence_auto_category_applies_soft_boost(self) -> None:
         pants_id = uuid4()

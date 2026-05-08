@@ -67,6 +67,7 @@ type ConversationFlow = {
 };
 
 const QUICK_ACTION_ORDER: BotScenarioActionKey[] = ['ORDER_LOOKUP', 'SIZE_ADVICE', 'PRODUCT_FAQ'];
+const DEFAULT_EXTRA_QUICK_ACTION: BotScenarioActionKey = 'PRODUCT_FAQ';
 
 const QUICK_ACTION_LABEL: Record<BotScenarioActionKey, string> = {
   ORDER_LOOKUP: 'Tra cứu đơn hàng',
@@ -157,15 +158,42 @@ const parsePositiveInt = (value: string) => {
 };
 
 const sortQuickActions = (payload: BotScenarioPayload): BotScenarioPayload => {
-  const byKey = new Map(payload.quickActions.map((item) => [item.key, item]));
+  const usedIndexes = new Set<number>();
+  const requiredActions = QUICK_ACTION_ORDER.map((key) => {
+    const existingIndex = payload.quickActions.findIndex((item, index) => item.key === key && !usedIndexes.has(index));
+    if (existingIndex >= 0) {
+      usedIndexes.add(existingIndex);
+      return payload.quickActions[existingIndex];
+    }
+    return { key, label: QUICK_ACTION_LABEL[key] };
+  });
+  const extraActions = payload.quickActions.filter((_, index) => !usedIndexes.has(index));
   return {
     ...payload,
-    quickActions: QUICK_ACTION_ORDER.map((key) => byKey.get(key) ?? { key, label: QUICK_ACTION_LABEL[key] }),
+    quickActions: [...requiredActions, ...extraActions],
   };
 };
 
 const getActionLabel = (payload: BotScenarioPayload, key: BotScenarioActionKey) =>
   payload.quickActions.find((item) => item.key === key)?.label || QUICK_ACTION_LABEL[key];
+
+const getRequiredQuickActionIndexes = (payload: BotScenarioPayload) => {
+  const indexes = new Set<number>();
+  QUICK_ACTION_ORDER.forEach((key) => {
+    const index = payload.quickActions.findIndex((item, itemIndex) => item.key === key && !indexes.has(itemIndex));
+    if (index >= 0) {
+      indexes.add(index);
+    }
+  });
+  return indexes;
+};
+
+const getExtraQuickActionEntries = (payload: BotScenarioPayload) => {
+  const requiredIndexes = getRequiredQuickActionIndexes(payload);
+  return payload.quickActions
+    .map((action, index) => ({ action, index }))
+    .filter((entry) => !requiredIndexes.has(entry.index));
+};
 
 const createBotMessage = (text: string, actions?: BotScenarioQuickAction[]): DraftSimulatorMessage => ({
   id: createMessageId(),
@@ -221,6 +249,7 @@ const getScenarioIssues = (payload: BotScenarioPayload | null) => {
       emptyFields: REQUIRED_PROMPT_FIELDS,
       duplicateQuickActionLabels: [] as string[],
       missingActions: QUICK_ACTION_ORDER,
+      emptyQuickActionLabels: 0,
     };
   }
 
@@ -228,8 +257,13 @@ const getScenarioIssues = (payload: BotScenarioPayload | null) => {
   const missingActions = QUICK_ACTION_ORDER.filter((key) => !payload.quickActions.some((action) => action.key === key && action.label.trim()));
   const seenLabels = new Map<string, string>();
   const duplicateQuickActionLabels: string[] = [];
+  let emptyQuickActionLabels = 0;
 
   payload.quickActions.forEach((action) => {
+    if (!action.label.trim()) {
+      emptyQuickActionLabels += 1;
+      return;
+    }
     const normalizedLabel = normalizeSearch(action.label);
     if (!normalizedLabel) return;
     if (seenLabels.has(normalizedLabel)) {
@@ -239,7 +273,7 @@ const getScenarioIssues = (payload: BotScenarioPayload | null) => {
     seenLabels.set(normalizedLabel, action.label);
   });
 
-  return { emptyFields, duplicateQuickActionLabels, missingActions };
+  return { emptyFields, duplicateQuickActionLabels, missingActions, emptyQuickActionLabels };
 };
 
 const AdminBotAI = () => {
@@ -285,12 +319,22 @@ const AdminBotAI = () => {
 
   useEffect(() => {
     if (!draft) return;
+    if (activeTab === 'test') {
+      setSimulatorMessages([createMenuMessage(draft.welcomePrompt, draft)]);
+      setSimulatorInput('');
+      setSimulatorStep('menu');
+      setPendingOrderCode('');
+      setPendingHeight(null);
+      return;
+    }
     setSimulatorMessages((current) => (current.length ? current : [createMenuMessage(draft.welcomePrompt, draft)]));
-  }, [draft]);
+  }, [activeTab, draft]);
 
   const scenarioIssues = useMemo(() => getScenarioIssues(draft), [draft]);
+  const extraQuickActionEntries = useMemo(() => (draft ? getExtraQuickActionEntries(draft) : []), [draft]);
   const publishReady =
     scenarioIssues.emptyFields.length === 0 &&
+    scenarioIssues.emptyQuickActionLabels === 0 &&
     scenarioIssues.duplicateQuickActionLabels.length === 0 &&
     scenarioIssues.missingActions.length === 0;
 
@@ -320,9 +364,49 @@ const AdminBotAI = () => {
   const updateQuickActionLabel = (key: BotScenarioActionKey, label: string) => {
     setDraft((current) => {
       if (!current) return current;
+      let updated = false;
       return {
         ...current,
-        quickActions: current.quickActions.map((item) => (item.key === key ? { ...item, label } : item)),
+        quickActions: current.quickActions.map((item) => {
+          if (updated || item.key !== key) return item;
+          updated = true;
+          return { ...item, label };
+        }),
+      };
+    });
+  };
+
+  const addExtraQuickAction = () => {
+    setDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        quickActions: [
+          ...current.quickActions,
+          { key: DEFAULT_EXTRA_QUICK_ACTION, label: '' },
+        ],
+      };
+    });
+  };
+
+  const updateQuickActionAt = (index: number, value: BotScenarioQuickAction) => {
+    setDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        quickActions: current.quickActions.map((item, itemIndex) => (itemIndex === index ? value : item)),
+      };
+    });
+  };
+
+  const removeQuickActionAt = (index: number) => {
+    setDraft((current) => {
+      if (!current) return current;
+      const requiredIndexes = getRequiredQuickActionIndexes(current);
+      if (requiredIndexes.has(index)) return current;
+      return {
+        ...current,
+        quickActions: current.quickActions.filter((_, itemIndex) => itemIndex !== index),
       };
     });
   };
@@ -356,8 +440,17 @@ const AdminBotAI = () => {
       setSimulatorStep('awaitHeight');
     }
     if (actionKey === 'PRODUCT_FAQ') {
-      nextMessages.push(createBotMessage('Nhập câu hỏi hoặc keyword FAQ để kiểm tra câu trả lời nháp.'));
-      setSimulatorStep('faqQuestion');
+      const matchedFaq = findFaqMatch(label, faqItems);
+      if (matchedFaq) {
+        nextMessages.push(
+          createBotMessage(matchedFaq.body),
+          createMenuMessage(draft.productFaqContinuePrompt, draft),
+        );
+        setSimulatorStep('menu');
+      } else {
+        nextMessages.push(createBotMessage('Nhập câu hỏi hoặc keyword FAQ để kiểm tra câu trả lời nháp.'));
+        setSimulatorStep('faqQuestion');
+      }
     }
     setSimulatorMessages((current) => [...current, ...nextMessages]);
   };
@@ -582,7 +675,11 @@ const AdminBotAI = () => {
       </div>
       <div className={`bot-ai-checklist-row ${scenarioIssues.missingActions.length ? 'warning' : 'ready'}`}>
         {scenarioIssues.missingActions.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
-        <span>{scenarioIssues.missingActions.length ? 'Thiếu quick action' : 'Đủ 3 quick action'}</span>
+        <span>{scenarioIssues.missingActions.length ? 'Thiếu quick action bắt buộc' : 'Đủ action bắt buộc'}</span>
+      </div>
+      <div className={`bot-ai-checklist-row ${scenarioIssues.emptyQuickActionLabels ? 'warning' : 'ready'}`}>
+        {scenarioIssues.emptyQuickActionLabels ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+        <span>{scenarioIssues.emptyQuickActionLabels ? `${scenarioIssues.emptyQuickActionLabels} quick prompt chưa có nội dung` : 'Quick prompt đã có nội dung'}</span>
       </div>
       <div className={`bot-ai-checklist-row ${scenarioIssues.duplicateQuickActionLabels.length ? 'warning' : 'ready'}`}>
         {scenarioIssues.duplicateQuickActionLabels.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
@@ -626,6 +723,50 @@ const AdminBotAI = () => {
             </label>
           </section>
 
+          <section className="bot-ai-section">
+            <div className="bot-ai-section-head">
+              <div>
+                <h3><Plus size={16} /> Quick prompt bổ sung</h3>
+                <p className="admin-muted small">Thêm nhiều nút nhanh vào menu; mỗi nút sẽ trỏ về một luồng xử lý có sẵn.</p>
+              </div>
+              <button type="button" className="admin-primary-btn dark" onClick={addExtraQuickAction}>
+                <Plus size={16} /> Thêm prompt
+              </button>
+            </div>
+            <div className="bot-ai-quick-action-list">
+              {extraQuickActionEntries.length === 0 ? (
+                <p className="admin-muted small">Chưa có quick prompt bổ sung.</p>
+              ) : (
+                extraQuickActionEntries.map(({ action, index }) => (
+                  <div className="bot-ai-quick-action-row" key={`${action.key}-${index}`}>
+                    <label>
+                      Luồng
+                      <select
+                        value={action.key}
+                        onChange={(event) => updateQuickActionAt(index, { ...action, key: event.target.value as BotScenarioActionKey })}
+                      >
+                        {FLOW_GROUPS.map((flow) => (
+                          <option key={flow.actionKey} value={flow.actionKey}>{flow.title}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Nội dung nút
+                      <input
+                        value={action.label}
+                        onChange={(event) => updateQuickActionAt(index, { ...action, label: event.target.value })}
+                        placeholder="Ví dụ: Phí vận chuyển?"
+                      />
+                    </label>
+                    <button type="button" className="admin-icon-btn subtle danger-icon" onClick={() => removeQuickActionAt(index)} title="Xóa quick prompt">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+
           <div className="bot-ai-flow-board">
             {FLOW_GROUPS.map((flow) => {
               const FlowIcon = flow.icon;
@@ -662,8 +803,8 @@ const AdminBotAI = () => {
             <p>{snapshot?.published.welcomePrompt}</p>
             <p className="bot-ai-preview-title">Quick actions</p>
             <div className="bot-ai-keyword-wrap">
-              {snapshot?.published.quickActions.map((action) => (
-                <span key={action.key} className="admin-pill neutral">{action.label}</span>
+              {snapshot?.published.quickActions.map((action, index) => (
+                <span key={`${action.key}-${index}`} className="admin-pill neutral">{action.label}</span>
               ))}
             </div>
             <p className="bot-ai-preview-title">Unknown</p>
@@ -699,8 +840,8 @@ const AdminBotAI = () => {
                 <p>{message.text}</p>
                 {message.actions?.length ? (
                   <div className="bot-ai-message-actions">
-                    {message.actions.map((action) => (
-                      <button type="button" key={action.key} onClick={() => startSimulatorAction(action.key, action.label)}>
+                    {message.actions.map((action, index) => (
+                      <button type="button" key={`${action.key}-${index}`} onClick={() => startSimulatorAction(action.key, action.label)}>
                         {action.label}
                       </button>
                     ))}

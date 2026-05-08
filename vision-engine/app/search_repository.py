@@ -57,6 +57,26 @@ class SearchRepository:
     def should_apply_soft_category_boost(self, category_slug: str | None) -> bool:
         return normalize_slug(category_slug) is not None and settings.image_search_category_filter_mode.lower() == "soft"
 
+    def has_active_category(self, category_slug: str | None) -> bool:
+        normalized_category_slug = normalize_slug(category_slug)
+        if normalized_category_slug is None:
+            return False
+
+        sql = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM vision.product_image_embeddings
+                WHERE is_active = true
+                  AND category_slug = %s
+                LIMIT 1
+            )
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, (normalized_category_slug,))
+                row = cur.fetchone()
+        return bool(row and row[0])
+
     def query_similar_images_with_views(
         self,
         *,

@@ -16,11 +16,13 @@ import vn.edu.hcmuaf.fit.marketplace.repository.UserRepository;
 import vn.edu.hcmuaf.fit.marketplace.service.AdminAuditLogService;
 
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -253,28 +255,32 @@ public class BotScenarioService {
             throw badRequest("quickActions is required");
         }
 
-        Map<BotScenarioActionKey, String> labelsByKey = new EnumMap<>(BotScenarioActionKey.class);
+        Set<BotScenarioActionKey> requiredKeysPresent = EnumSet.noneOf(BotScenarioActionKey.class);
+        Set<String> labelsSeen = new HashSet<>();
+        List<BotScenarioQuickAction> normalizedActions = new ArrayList<>();
         for (BotScenarioQuickAction action : quickActions) {
             if (action == null || action.getKey() == null) {
                 throw badRequest("quickActions contains invalid key");
             }
             String label = normalizeLegacyViText(requireNonBlank(action.getLabel(), "quickActions." + action.getKey() + ".label"));
-            if (labelsByKey.put(action.getKey(), label) != null) {
-                throw badRequest("Duplicate quick action key: " + action.getKey());
+            String duplicateKey = label.toLowerCase(Locale.ROOT);
+            if (!labelsSeen.add(duplicateKey)) {
+                throw badRequest("Duplicate quick action label: " + label);
             }
+            if (REQUIRED_ACTION_KEYS.contains(action.getKey())) {
+                requiredKeysPresent.add(action.getKey());
+            }
+            normalizedActions.add(BotScenarioQuickAction.builder()
+                    .key(action.getKey())
+                    .label(label)
+                    .build());
         }
 
-        if (labelsByKey.size() != REQUIRED_ACTION_KEYS.size()) {
-            throw badRequest("quickActions must include exactly " + REQUIRED_ACTION_KEYS.size() + " keys");
+        if (!requiredKeysPresent.containsAll(REQUIRED_ACTION_KEYS)) {
+            throw badRequest("quickActions must include required keys: " + REQUIRED_ACTION_KEYS);
         }
 
-        return REQUIRED_ACTION_KEYS.stream()
-                .map(key -> BotScenarioQuickAction.builder()
-                        .key(key)
-                        .label(labelsByKey.get(key))
-                        .build())
-                .sorted(Comparator.comparingInt(action -> REQUIRED_ACTION_KEYS.indexOf(action.getKey())))
-                .toList();
+        return normalizedActions;
     }
 
     private String requireNonBlank(String value, String fieldName) {

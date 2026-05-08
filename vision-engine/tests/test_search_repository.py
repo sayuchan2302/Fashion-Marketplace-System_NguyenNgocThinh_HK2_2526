@@ -104,6 +104,26 @@ class SearchRepositoryTests(unittest.TestCase):
             ("SELECT set_config('hnsw.ef_search', %s, true)", ("120",)),
         )
 
+    def test_has_active_category_normalizes_slug_and_queries_index(self) -> None:
+        fake_cursor = self._FakeCursor([], one=(True,))
+        repository = SearchRepository()
+
+        with patch("app.search_repository.get_connection", return_value=nullcontext(self._FakeConnection(fake_cursor))):
+            exists = repository.has_active_category(" TAT ")
+
+        self.assertTrue(exists)
+        self.assertIn("category_slug = %s", fake_cursor.executed_sql)
+        self.assertEqual(fake_cursor.executed_params, ("tat",))
+
+    def test_has_active_category_skips_blank_slug(self) -> None:
+        repository = SearchRepository()
+
+        with patch("app.search_repository.get_connection") as get_connection_mock:
+            exists = repository.has_active_category(" ")
+
+        self.assertFalse(exists)
+        get_connection_mock.assert_not_called()
+
     def test_query_similar_images_with_views_prefers_foreground_consensus(self) -> None:
         repository = SearchRepository()
         product_a = uuid4()

@@ -5295,6 +5295,7 @@ textarea:focus-visible {
 }
 
 .bot-ai-section input,
+.bot-ai-section select,
 .bot-ai-section textarea,
 .bot-ai-action-label input,
 .bot-ai-step textarea,
@@ -5320,6 +5321,7 @@ textarea:focus-visible {
 }
 
 .bot-ai-section input:focus,
+.bot-ai-section select:focus,
 .bot-ai-section textarea:focus,
 .bot-ai-action-label input:focus,
 .bot-ai-step textarea:focus,
@@ -5422,6 +5424,26 @@ textarea:focus-visible {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.bot-ai-quick-action-list {
+  display: grid;
+  gap: 8px;
+}
+
+.bot-ai-quick-action-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.6fr) minmax(220px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  border: 1px solid var(--co-gray-200);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.bot-ai-quick-action-row .admin-icon-btn {
+  margin-bottom: 1px;
 }
 
 .bot-ai-checklist {
@@ -5651,7 +5673,8 @@ textarea:focus-visible {
 @media (max-width: 720px) {
   .bot-ai-head,
   .bot-ai-faq-toolbar,
-  .bot-ai-chat-input {
+  .bot-ai-chat-input,
+  .bot-ai-quick-action-row {
     display: grid;
     grid-template-columns: 1fr;
   }
