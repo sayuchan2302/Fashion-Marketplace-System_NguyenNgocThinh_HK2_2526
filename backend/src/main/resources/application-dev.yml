@@ -1,11 +1,11 @@
 spring:
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: ${JPA_DDL_AUTO:update}
 
 app:
   seed:
-    enabled: true
+    enabled: ${APP_SEED_ENABLED:false}
 
 logging:
   level:

@@ -10,7 +10,7 @@ spring:
       enabled: false
 
   datasource:
-    url: ${DB_URL}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/marketplace_db}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -59,11 +59,11 @@ app:
   seed:
     enabled: ${APP_SEED_ENABLED:false}
     gap:
-      enabled: ${APP_SEED_GAP_ENABLED:true}
+      enabled: ${APP_SEED_GAP_ENABLED:false}
       target-count: ${APP_SEED_GAP_TARGET_COUNT:1000}
       styles-path: ${APP_SEED_GAP_STYLES_PATH:backend/src/main/resources/product/styles.csv}
       images-path: ${APP_SEED_GAP_IMAGES_PATH:backend/src/main/resources/product/images.csv}
-      clean-before-import: ${APP_SEED_GAP_CLEAN_BEFORE_IMPORT:true}
+      clean-before-import: ${APP_SEED_GAP_CLEAN_BEFORE_IMPORT:false}
       report-enabled: ${APP_SEED_GAP_REPORT_ENABLED:false}
       report-output-dir: ${APP_SEED_GAP_REPORT_OUTPUT_DIR:backend/target/gap-coverage}
   chatbot:

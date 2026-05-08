@@ -1,19 +1,21 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 import sys
 from datetime import UTC, datetime
 import unittest
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 from PIL import Image
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.catalog_sync import CatalogSyncError, CatalogSyncInProgressError, CatalogSyncService  # noqa: E402
-from app.models import VisionCatalogPage  # noqa: E402
+from app.catalog_sync import CatalogSyncError, CatalogSyncInProgressError, CatalogSyncService, settings  # noqa: E402
+from app.models import VisionCatalogItem, VisionCatalogPage  # noqa: E402
 
 
 class CatalogSyncServiceTests(unittest.TestCase):
@@ -72,6 +74,100 @@ class CatalogSyncServiceTests(unittest.TestCase):
         self.assertEqual(response.synced_rows, 0)
         self.assertEqual(response.failed_rows, 0)
         self.assertEqual(response.index_version, "index-version")
+
+    def test_run_full_sync_reuses_embedding_by_image_url_after_backend_reset(self) -> None:
+        clip_service = Mock()
+        service = CatalogSyncService(clip_service=clip_service)
+        item = VisionCatalogItem(
+            backend_product_id=uuid4(),
+            product_slug="reset-product",
+            store_id=uuid4(),
+            store_slug="store",
+            category_slug="men-ao",
+            image_url="https://example.com/product.jpg",
+            source_updated_at=datetime(2026, 5, 8, tzinfo=UTC),
+        )
+        page = VisionCatalogPage(items=[item], totalProducts=1, page=0, size=100, totalPages=1, generatedAt=None)
+        existing_rows = {
+            service._image_reuse_key(item.image_url): {
+                "source_updated_at": datetime(2026, 5, 1, tzinfo=UTC),
+                "model_name": settings.openclip_model_name,
+                "model_pretrained": settings.openclip_pretrained,
+                "embedding": [0.1, 0.2],
+            }
+        }
+
+        with patch.object(service, "_resolve_updated_since_cursor", return_value=None):
+            with patch.object(service, "_fetch_catalog_page", return_value=page):
+                with patch.object(service, "_load_existing_rows", return_value=existing_rows):
+                    with patch.object(service, "_download_image") as download_image:
+                        with patch.object(service, "_upsert_reusable_rows", return_value=1) as upsert_reusable:
+                            with patch.object(service, "_deactivate_stale_rows", return_value=0):
+                                with patch.object(service, "_resolve_index_version", return_value="index-version"):
+                                    response = service.run_full_sync()
+
+        download_image.assert_not_called()
+        clip_service.encode_images.assert_not_called()
+        upsert_reusable.assert_called_once()
+        self.assertEqual(response.skipped_unchanged, 1)
+        self.assertEqual(response.embeddings_inserted, 0)
+        self.assertEqual(response.embeddings_updated, 0)
+
+    def test_upsert_reusable_rows_writes_new_product_id_with_existing_embedding(self) -> None:
+        service = CatalogSyncService(clip_service=Mock())
+        item = VisionCatalogItem(
+            backend_product_id=uuid4(),
+            product_slug="reset-product",
+            store_id=uuid4(),
+            store_slug="store",
+            category_slug="men-ao",
+            image_url="https://example.com/product.jpg",
+            image_index=2,
+            is_primary=True,
+            available_stock=7,
+            source_updated_at=datetime(2026, 5, 8, tzinfo=UTC),
+        )
+        existing = {
+            "source_updated_at": datetime(2026, 5, 1, tzinfo=UTC),
+            "model_name": settings.openclip_model_name,
+            "model_pretrained": settings.openclip_pretrained,
+            "embedding": [0.1, 0.2],
+        }
+        captured: dict[str, object] = {}
+
+        class FakeCursor:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def executemany(self, sql, rows):
+                captured["sql"] = sql
+                captured["rows"] = rows
+
+        class FakeConnection:
+            def cursor(self):
+                return FakeCursor()
+
+            def commit(self):
+                captured["committed"] = True
+
+        @contextmanager
+        def fake_get_connection():
+            yield FakeConnection()
+
+        with patch("app.catalog_sync.get_connection", fake_get_connection):
+            count = service._upsert_reusable_rows([(item, existing)], "sync-token")
+
+        rows = captured["rows"]
+        self.assertEqual(count, 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows[0]), 16)
+        self.assertEqual(rows[0][1], item.backend_product_id)
+        self.assertEqual(rows[0][6], item.image_url)
+        self.assertEqual(rows[0][11], existing["embedding"])
+        self.assertTrue(captured["committed"])
 
     def test_run_full_sync_rejects_parallel_execution(self) -> None:
         service = CatalogSyncService(clip_service=Mock())

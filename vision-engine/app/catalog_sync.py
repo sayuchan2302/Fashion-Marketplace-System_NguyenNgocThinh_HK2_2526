@@ -92,13 +92,14 @@ class CatalogSyncService:
 
                 images_processed += len(batch)
                 existing_rows = self._load_existing_rows(batch)
-                reusable_items: list[VisionCatalogItem] = []
+                reusable_items: list[tuple[VisionCatalogItem, dict[str, object]]] = []
                 images: list[Image.Image] = []
                 batch_items: list[VisionCatalogItem] = []
 
                 for item in batch:
-                    if self._can_reuse_embedding(item, existing_rows.get(self._catalog_key(item))):
-                        reusable_items.append(item)
+                    existing_row = self._resolve_existing_row(item, existing_rows)
+                    if self._can_reuse_embedding(item, existing_row):
+                        reusable_items.append((item, existing_row))
                         continue
 
                     try:
@@ -126,7 +127,10 @@ class CatalogSyncService:
                         )
 
                 if reusable_items:
-                    skipped_unchanged += self._refresh_reusable_rows(reusable_items, sync_token)
+                    skipped_unchanged += self._upsert_reusable_rows(
+                        reusable_items,
+                        sync_token,
+                    )
 
                 if batch_items:
                     vectors = self.clip_service.encode_images(images)
@@ -281,6 +285,18 @@ class CatalogSyncService:
     def _catalog_key(self, item: VisionCatalogItem) -> tuple[str, str]:
         return str(item.backend_product_id), item.image_url
 
+    def _image_reuse_key(self, image_url: str) -> tuple[str, str]:
+        return "__image_url__", image_url
+
+    def _resolve_existing_row(
+        self,
+        item: VisionCatalogItem,
+        existing_rows: dict[tuple[str, str], dict[str, object]],
+    ) -> dict[str, object] | None:
+        return existing_rows.get(self._catalog_key(item)) or existing_rows.get(
+            self._image_reuse_key(item.image_url)
+        )
+
     def _load_existing_rows(self, items: list[VisionCatalogItem]) -> dict[tuple[str, str], dict[str, object]]:
         if not items:
             return {}
@@ -296,7 +312,8 @@ class CatalogSyncService:
                 image_url,
                 source_updated_at,
                 model_name,
-                model_pretrained
+                model_pretrained,
+                embedding
             FROM vision.product_image_embeddings
             WHERE (backend_product_id, image_url) IN ({placeholders})
         """
@@ -308,12 +325,53 @@ class CatalogSyncService:
         existing: dict[tuple[str, str], dict[str, object]] = {}
         for row in rows:
             key = str(row[0]), str(row[1])
-            existing[key] = {
-                "source_updated_at": row[2],
-                "model_name": row[3],
-                "model_pretrained": row[4],
-            }
+            existing[key] = self._existing_row(row)
+
+        image_urls = sorted({item.image_url for item in items if item.image_url})
+        if not image_urls:
+            return existing
+
+        image_placeholders = ",".join(["%s"] * len(image_urls))
+        sql = f"""
+            SELECT DISTINCT ON (image_url)
+                backend_product_id,
+                image_url,
+                source_updated_at,
+                model_name,
+                model_pretrained,
+                embedding
+            FROM vision.product_image_embeddings
+            WHERE image_url IN ({image_placeholders})
+              AND model_name = %s
+              AND model_pretrained = %s
+            ORDER BY image_url, is_active DESC, updated_at DESC
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    sql,
+                    [
+                        *image_urls,
+                        settings.openclip_model_name,
+                        settings.openclip_pretrained,
+                    ],
+                )
+                rows = cur.fetchall()
+
+        for row in rows:
+            existing.setdefault(
+                self._image_reuse_key(str(row[1])),
+                self._existing_row(row),
+            )
         return existing
+
+    def _existing_row(self, row: tuple) -> dict[str, object]:
+        return {
+            "source_updated_at": row[2],
+            "model_name": row[3],
+            "model_pretrained": row[4],
+            "embedding": row[5],
+        }
 
     def _can_reuse_embedding(self, item: VisionCatalogItem, existing: dict[str, object] | None) -> bool:
         if existing is None:
@@ -322,48 +380,75 @@ class CatalogSyncService:
             return False
         if existing.get("model_pretrained") != settings.openclip_pretrained:
             return False
-        return existing.get("source_updated_at") == item.source_updated_at
+        return existing.get("embedding") is not None
 
-    def _refresh_reusable_rows(self, items: list[VisionCatalogItem], sync_token: str) -> int:
+    def _upsert_reusable_rows(
+        self,
+        items: list[tuple[VisionCatalogItem, dict[str, object]]],
+        sync_token: str,
+    ) -> int:
         if not items:
             return 0
 
         sql = """
-            UPDATE vision.product_image_embeddings
-            SET
-                product_slug = %s,
-                store_id = %s,
-                store_slug = %s,
-                category_slug = %s,
-                image_index = %s,
-                is_primary = %s,
-                available_stock = %s,
-                source_updated_at = %s,
+            INSERT INTO vision.product_image_embeddings (
+                id,
+                backend_product_id,
+                product_slug,
+                store_id,
+                store_slug,
+                category_slug,
+                image_url,
+                image_index,
+                is_primary,
+                available_stock,
+                source_updated_at,
+                embedding,
+                is_active,
+                model_name,
+                model_pretrained,
+                sync_token
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            ON CONFLICT (backend_product_id, image_url)
+            DO UPDATE SET
+                product_slug = EXCLUDED.product_slug,
+                store_id = EXCLUDED.store_id,
+                store_slug = EXCLUDED.store_slug,
+                category_slug = EXCLUDED.category_slug,
+                image_index = EXCLUDED.image_index,
+                is_primary = EXCLUDED.is_primary,
+                available_stock = EXCLUDED.available_stock,
+                source_updated_at = EXCLUDED.source_updated_at,
+                embedding = EXCLUDED.embedding,
                 is_active = true,
-                model_name = %s,
-                model_pretrained = %s,
-                sync_token = %s,
+                model_name = EXCLUDED.model_name,
+                model_pretrained = EXCLUDED.model_pretrained,
+                sync_token = EXCLUDED.sync_token,
                 updated_at = now()
-            WHERE backend_product_id = %s
-              AND image_url = %s
         """
         rows = [
             (
+                uuid5(NAMESPACE_URL, f"{item.backend_product_id}:{item.image_url}"),
+                item.backend_product_id,
                 item.product_slug,
                 item.store_id,
                 item.store_slug,
                 item.category_slug,
+                item.image_url,
                 item.image_index,
                 item.is_primary,
                 item.available_stock,
                 item.source_updated_at,
+                existing["embedding"],
+                True,
                 settings.openclip_model_name,
                 settings.openclip_pretrained,
                 sync_token,
-                item.backend_product_id,
-                item.image_url,
             )
-            for item in items
+            for item, existing in items
         ]
 
         with get_connection() as conn:

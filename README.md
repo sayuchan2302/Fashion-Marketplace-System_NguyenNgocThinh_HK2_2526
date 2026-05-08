@@ -1,266 +1,168 @@
-<div align="center">
+# Fashion Marketplace
 
-# 👗 Fashion Marketplace
+Full-stack fashion marketplace with a Spring Boot backend, React frontend, PostgreSQL database, and optional OpenCLIP image search service.
 
-A full-stack e-commerce platform for fashion products with multi-role support.
+## Stack
 
-**Spring Boot** · **React 19** · **TypeScript** · **PostgreSQL**
+- Backend: Java 21, Spring Boot, Spring Security, Spring Data JPA, WebSocket
+- Frontend: React 19, TypeScript, Vite, Tailwind CSS
+- Database: PostgreSQL 16+
+- Image search: FastAPI, OpenCLIP, pgvector
 
-</div>
+## Project Layout
 
----
-
-## Overview
-
-Fashion Marketplace is a multi-vendor e-commerce system with three core roles:
-
-| Role | Capabilities |
-|------|-------------|
-| **Customer** | Browse, search, cart, checkout, order tracking, reviews |
-| **Vendor** | Product & order management, promotions, wallet/payout |
-| **Admin** | User/store moderation, categories, returns, vouchers, dashboard |
-
-## Tech Stack
-
-| Layer | Technologies |
-|-------|-------------|
-| **Backend** | Java 21, Spring Boot 3.2, Spring Security, Spring Data JPA, WebSocket |
-| **Frontend** | React 19, TypeScript, Vite 7, Tailwind CSS 3, Recharts, Framer Motion |
-| **Database** | PostgreSQL 16+ |
-| **Testing** | ESLint, Playwright, Smoke Regression |
-| **CI/CD** | GitHub Actions |
-
-## Project Structure
-
-```
-.
-├── backend/             # Spring Boot REST API
-│   ├── src/main/java/   # Application source
-│   └── src/main/resources/
-├── frontend/            # React + Vite SPA
-│   ├── src/             # Components, pages, hooks
-│   ├── scripts/         # Utility scripts
-│   └── tests/           # Playwright tests
-├── vision-engine/       # FastAPI + OpenCLIP + pgvector image search service
-│   ├── app/             # Search, sync, DB, metrics runtime
-│   ├── scripts/         # Local run, smoke, benchmark utilities
-│   └── tests/           # Python unit tests
-├── crawl/gap/           # GAP dataset crawler
-├── docker-compose.vision.yml
-└── .github/workflows/   # CI pipelines
+```text
+backend/        Spring Boot API
+frontend/       React + Vite app
+vision-engine/  OpenCLIP image search service
+crawl/          Product crawler utilities
 ```
 
-## Getting Started
+## Setup
 
-### Prerequisites
+Requirements:
 
-- **Java** 21
-- **Node.js** 20+
-- **PostgreSQL** 16+
-- **npm** (bundled with Node.js)
+- Java 21
+- Node.js 20+
+- PostgreSQL 16+
 
-### 1. Clone & Install
+Install frontend dependencies:
 
 ```bash
-git clone <repo-url>
-cd <repo-folder>
 npm ci --prefix frontend
 ```
 
-### 2. Database Setup
-
-Create a PostgreSQL database named `fashion-store`:
+Create the database:
 
 ```sql
-CREATE DATABASE "fashion-store";
+CREATE DATABASE marketplace_db;
 ```
 
-### 3. Environment Variables
-
-Copy the example files and fill in your values:
+Copy env files:
 
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
+cp vision-engine/.env.local.example vision-engine/.env
 ```
 
-<details>
-<summary><strong>Backend</strong> — <code>backend/.env</code></summary>
+Stable backend config after initial setup:
 
 ```env
-# Required
-DB_URL=jdbc:postgresql://localhost:5432/fashion-store
+DB_URL=jdbc:postgresql://localhost:5432/marketplace_db
 DB_USERNAME=postgres
 DB_PASSWORD=your_password
+JPA_DDL_AUTO=update
 JWT_SECRET=your_long_random_secret
 
-# Data seeding (optional)
-APP_SEED_ENABLED=true
-APP_SEED_GAP_ENABLED=true
-APP_SEED_GAP_TARGET_COUNT=1000
-APP_SEED_GAP_CLEAN_BEFORE_IMPORT=true
-
-# Azure Bot — set dummy values if disabled
-AZURE_BOT_AUTH_ENABLED=false
-MicrosoftAppId=00000000-0000-0000-0000-000000000000
-MicrosoftAppPassword=dummy-secret
-MicrosoftAppTenantId=00000000-0000-0000-0000-000000000000
+APP_SEED_ENABLED=false
+APP_SEED_GAP_ENABLED=false
+APP_SEED_GAP_CLEAN_BEFORE_IMPORT=false
+APP_VISION_INTERNAL_SECRET=vision-local-test-secret
 ```
 
-</details>
-
-<details>
-<summary><strong>Frontend</strong> — <code>frontend/.env</code></summary>
+Frontend config:
 
 ```env
 VITE_API_URL=http://localhost:8080
 ```
 
-</details>
+Vision config must use the same database and secret:
 
-### 4. Run
-
-**Backend:**
-
-```bash
-# Windows
-backend\mvnw.cmd -f backend/pom.xml spring-boot:run
-
-# macOS / Linux
-chmod +x backend/mvnw
-./backend/mvnw -f backend/pom.xml spring-boot:run
+```env
+VISION_DATABASE_URL=postgresql://postgres:your_password@localhost:5432/marketplace_db
+VISION_INTERNAL_SECRET=vision-local-test-secret
+MARKETPLACE_BASE_URL=http://localhost:8080
 ```
 
-**Frontend:**
+## First Seed And Image Sync
+
+Do this once for local development.
+
+1. Temporarily set in `backend/.env`:
+
+```env
+JPA_DDL_AUTO=create-drop
+APP_SEED_ENABLED=true
+APP_SEED_GAP_ENABLED=true
+APP_SEED_GAP_CLEAN_BEFORE_IMPORT=true
+```
+
+2. Start backend and wait until seed + GAP import finish.
+3. Start `vision-engine`.
+4. Sync OpenCLIP catalog:
+
+```powershell
+Invoke-RestMethod `
+  -Uri http://localhost:8001/v1/admin/sync-catalog `
+  -Method Post `
+  -Headers @{ "X-Vision-Internal-Secret" = "vision-local-test-secret" }
+```
+
+5. Change `backend/.env` back to stable mode:
+
+```env
+JPA_DDL_AUTO=update
+APP_SEED_ENABLED=false
+APP_SEED_GAP_ENABLED=false
+APP_SEED_GAP_CLEAN_BEFORE_IMPORT=false
+```
+
+After this, backend restarts keep product IDs stable. OpenCLIP only needs another sync when product/image data changes.
+
+## Run
+
+Backend:
+
+```bash
+backend\mvnw.cmd -f backend/pom.xml spring-boot:run
+```
+
+Frontend:
 
 ```bash
 npm run dev --prefix frontend
 ```
 
-**Vision engine:**
+Vision engine:
 
-```bash
-# Windows PowerShell
-Copy-Item vision-engine/.env.local.example vision-engine/.env
+```powershell
 ./vision-engine/scripts/install-local.ps1
 ./vision-engine/scripts/run-local.ps1
 ```
 
-### 5. Access
+## URLs
 
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:5173 |
 | Backend API | http://localhost:8080 |
+| Swagger | http://localhost:8080/swagger-ui.html |
 | Vision engine | http://localhost:8001 |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
-| Health Check | http://localhost:8080/actuator/health |
 
-## Vision Engine Config
-
-Key image-search variables:
-
-| Variable | Purpose |
-|----------|---------|
-| `VISION_INTERNAL_SECRET` | Shared internal auth between backend and `vision-engine` |
-| `VISION_DATABASE_URL` | PostgreSQL / pgvector connection for embeddings |
-| `MARKETPLACE_BASE_URL` | Spring Boot base URL used for catalog sync |
-| `OPENCLIP_MODEL_NAME` / `OPENCLIP_PRETRAINED` | OpenCLIP model selection |
-| `IMAGE_SEARCH_MIN_CONFIDENCE_SCORE` | Minimum top-score gate |
-| `IMAGE_SEARCH_RELATIVE_SCORE_FLOOR` | Relative floor against top score |
-| `IMAGE_SEARCH_ABSOLUTE_SCORE_FLOOR` | Absolute similarity floor |
-| `MAX_UPLOAD_SIZE_BYTES` | Search upload payload cap |
-| `MAX_IMAGE_PIXELS` | Decoded pixel safety cap |
-| `SEARCH_HNSW_EF_SEARCH` | pgvector HNSW recall/speed tuning |
-| `DB_POOL_MIN_SIZE` / `DB_POOL_MAX_SIZE` | Vision DB pool sizing |
-
-## API Reference
-
-| Area | Endpoint |
-|------|----------|
-| Auth | `/api/auth/*` |
-| Marketplace | `/api/public/marketplace/*` |
-| Products | `/api/products/*` |
-| Categories | `/api/categories/*` |
-| Stores | `/api/stores/*` |
-| Orders | `/api/orders/*` |
-| Returns | `/api/returns/*` |
-| Reviews | `/api/reviews/*` |
-| Vouchers | `/api/vouchers/*` |
-| Wallets | `/api/wallets/*` |
-| Admin | `/api/admin/*` |
-
-> Full API documentation available at `/swagger-ui.html` when the backend is running.
-
-## Data Seeding
-
-The backend includes an automatic data seeding pipeline:
-
-- **Base seeder** — creates default users, categories, and sample data on startup.
-- **GAP importer** — imports products from GAP CSV datasets (`styles.csv`, `images.csv`).
-
-Both run on startup based on environment flags. See [Configuration](#configuration) below.
-
-<details>
-<summary><strong>GAP Dataset Crawler</strong></summary>
+## Checks
 
 ```bash
-node crawl/gap/crawl-gap-products.mjs --target-count 1000 --headless true
+npm run lint --prefix frontend
+npm run build --prefix frontend
+npm run smoke --prefix frontend
 ```
 
-See [`crawl/gap/README.md`](crawl/gap/README.md) for full documentation.
-
-</details>
-
-## Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `APP_SEED_ENABLED` | Enable base data seeding | `true` |
-| `APP_SEED_GAP_ENABLED` | Enable GAP CSV import | `true` |
-| `APP_SEED_GAP_TARGET_COUNT` | Products to import | `1000` |
-| `APP_SEED_GAP_CLEAN_BEFORE_IMPORT` | Clean previous import batch | `true` |
-| `JWT_SECRET` | JWT signing secret | — |
-| `AZURE_BOT_AUTH_ENABLED` | Enable Azure Bot auth | `false` |
-| `APP_CHATBOT_AI_FALLBACK_ENABLED` | Enable AI chatbot fallback | `false` |
-
-## Quality Gates
+Backend compile:
 
 ```bash
-npm run lint   --prefix frontend   # Lint + UTF-8 check
-npm run build  --prefix frontend   # Type check + production build
-npm run smoke  --prefix frontend   # Playwright smoke tests
+backend\mvnw.cmd -f backend/pom.xml -DskipTests compile
 ```
 
-**CI Pipeline** (`.github/workflows/frontend-quality-gate.yml`):
-- Backend startup + health check
-- Frontend lint & build
-- Playwright smoke regression
+Vision test:
 
-<details>
-<summary><strong>Required CI Secrets</strong></summary>
+```powershell
+$env:PYTHONDONTWRITEBYTECODE='1'
+vision-engine/.venv/Scripts/python.exe vision-engine/tests/test_catalog_sync.py
+```
 
-| Secret | Purpose |
-|--------|---------|
-| `CI_JWT_SECRET` | JWT token for CI environment |
-| `SMOKE_ADMIN_EMAIL` | Admin test account email |
-| `SMOKE_ADMIN_PASSWORD` | Admin test account password |
-| `SMOKE_VENDOR_EMAIL` | Vendor test account email |
-| `SMOKE_VENDOR_PASSWORD` | Vendor test account password |
+## Notes
 
-</details>
-
-## Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| `Permission denied` on `./backend/mvnw` | Run `chmod +x backend/mvnw` |
-| PostgreSQL auth error in CI | Ensure `POSTGRES_PASSWORD` matches `DB_PASSWORD` |
-| Azure Bot config binding error | Set dummy `MicrosoftApp*` values when `AZURE_BOT_AUTH_ENABLED=false` |
-| Mojibake / encoding issues | Run `npm run check:utf8 --prefix frontend` |
-
----
-
-<div align="center">
-<sub>Academic project — built for study and demonstration purposes.</sub>
-</div>
+- Do not keep `create-drop` enabled after OpenCLIP sync unless you want to reset products and sync again.
+- If image search returns empty results after product changes, run the OpenCLIP sync command again.
+- Full API docs are available in Swagger while backend is running.
