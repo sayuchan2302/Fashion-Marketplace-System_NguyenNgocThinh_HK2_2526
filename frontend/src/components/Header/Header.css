@@ -19,32 +19,15 @@
 .header-logo a {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  line-height: 0;
 }
 
-.logo-icon {
-  transform: rotate(45deg);
-  /* Optional stylistic rotation */
-}
-
-.logo-text {
-  font-size: 1.6rem;
-  font-weight: 900;
-  color: var(--co-black);
-  display: flex;
-  align-items: center;
-  letter-spacing: -0.5px;
-}
-
-.logo-mate {
-  display: inline-block;
-  background-color: var(--co-black);
-  color: var(--co-white);
-  padding: 0 4px;
-  border-radius: 4px;
-  margin-left: 2px;
-  font-size: 1.4rem;
-  line-height: 1.1;
+.logo-image {
+  display: block;
+  width: 200px;
+  height: auto;
+  max-height: 50px;
+  object-fit: contain;
 }
 
 /* Nav */
@@ -1263,6 +1246,8 @@ body.header-image-modal-open {
 
   .mobile-quick-links a:hover { color: var(--co-blue); }
 
-  /* Adjust logo on mobile */
-  .logo-text { font-size: 1.3rem; }
+  .logo-image {
+    width: 148px;
+    max-height: 38px;
+  }
 }

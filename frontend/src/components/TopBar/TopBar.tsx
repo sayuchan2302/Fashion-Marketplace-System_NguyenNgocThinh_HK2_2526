@@ -6,7 +6,7 @@ const TopBar = () => {
     <div className="topbar">
       <div className="topbar-content container">
         <Link to="/vendor/register" className="topbar-item topbar-item-primary">
-          {'B\u00e1n h\u00e0ng c\u00f9ng COOLMATE Marketplace'}
+          {'B\u00e1n h\u00e0ng c\u00f9ng Ph\u1ed1 M\u1eb7c Marketplace'}
         </Link>
 
         <nav className="topbar-right">

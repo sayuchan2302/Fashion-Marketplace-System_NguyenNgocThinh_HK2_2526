@@ -7,7 +7,7 @@ const Footer = () => {
     <footer className="footer">
       <div className="container footer-container">
         <div className="footer-column">
-          <h3 className="footer-title">COOLMATE LẮNG NGHE BẠN!</h3>
+          <h3 className="footer-title">PHỐ MẶC LẮNG NGHE BẠN!</h3>
           <p className="footer-text">
             Chúng tôi luôn trân trọng và mong đợi nhận được mọi ý kiến đóng góp từ khách hàng để có thể
             nâng cấp trải nghiệm dịch vụ và sản phẩm tốt hơn nữa.
@@ -19,7 +19,7 @@ const Footer = () => {
             </div>
             <div className="contact-item">
               <Mail size={20} />
-              <span>Email: Cool@coolmate.me</span>
+              <span>Email: support@phomac.vn</span>
             </div>
           </div>
           <div className="social-links">
@@ -43,9 +43,9 @@ const Footer = () => {
         </div>
 
         <div className="footer-column">
-          <h3 className="footer-title">VỀ COOLMATE</h3>
+          <h3 className="footer-title">VỀ PHỐ MẶC</h3>
           <ul className="footer-links">
-            <li><Link to="/about">Câu chuyện Coolmate</Link></li>
+            <li><Link to="/about">Câu chuyện Phố Mặc</Link></li>
             <li><Link to="/vendor/register">Trở thành người bán</Link></li>
             <li><Link to="/contact">Liên hệ</Link></li>
             <li><Link to="/size-guide">Bảng size</Link></li>
@@ -86,7 +86,7 @@ const Footer = () => {
 
       <div className="footer-bottom">
         <div className="container bottom-content">
-          <p className="copyright-text">&copy; 2024 COOLMATE. All rights reserved. (Clone for academic purposes)</p>
+          <p className="copyright-text">&copy; 2024 PHỐ MẶC. All rights reserved. (Clone for academic purposes)</p>
           <div className="payment-methods">
             <span className="payment-icon">MoMo</span>
             <span className="payment-icon">VNPay</span>

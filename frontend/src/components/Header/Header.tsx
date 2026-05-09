@@ -240,12 +240,13 @@ const Header = () => {
       <div className="header-container container">
         <div className="header-logo">
           <Link to="/">
-            <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="logo-icon">
-              <path fillRule="evenodd" clipRule="evenodd" d="M16 0H24V16H40V24H24V40H16V24H0V16H16V0Z" fill="black" />
-            </svg>
-            <span className="logo-text">
-              COOL<span className="logo-mate">MATE</span>
-            </span>
+            <img
+              src="/brand/pho-mac-logo.png"
+              alt="Phố Mặc"
+              className="logo-image"
+              width={200}
+              height={50}
+            />
           </Link>
         </div>
 
