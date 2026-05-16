@@ -77,3 +77,13 @@ export const getReasonToastMessage = (reason?: string | null): string | null => 
   }
 };
 
+export const getReasonToast = (
+  reason?: string | null,
+): { message: string; type: 'success' | 'error' | 'info' } | null => {
+  if ((reason || '').toLowerCase() === 'password-reset-success') {
+    return { message: 'Dat lai mat khau thanh cong. Vui long dang nhap lai.', type: 'success' };
+  }
+
+  const message = getReasonToastMessage(reason);
+  return message ? { message, type: 'error' } : null;
+};

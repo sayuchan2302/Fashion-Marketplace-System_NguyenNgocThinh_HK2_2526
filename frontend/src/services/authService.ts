@@ -312,11 +312,38 @@ export const authService = {
   async forgot(email: string): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 300));
     if (!email) throw new Error('Vui long nhap email');
+    if (!API_BASE) {
+      throw new Error('VITE_API_URL is empty. Please configure backend API URL.');
+    }
+
+    const response = await fetch(buildApiUrl('/api/auth/forgot-password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseBackendError(response));
+    }
   },
 
-  async reset(newPassword: string): Promise<void> {
+  async reset(token: string, newPassword: string): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 300));
+    if (!token) throw new Error('Link dat lai mat khau khong hop le');
     if (!newPassword) throw new Error('Vui long nhap mat khau moi');
+    if (!API_BASE) {
+      throw new Error('VITE_API_URL is empty. Please configure backend API URL.');
+    }
+
+    const response = await fetch(buildApiUrl('/api/auth/reset-password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseBackendError(response));
+    }
   },
 
   logout(reason?: string) {

@@ -24,7 +24,7 @@ const ForgotPassword = () => {
     try {
       setLoading(true);
       await authService.forgot(email.trim());
-      addToast('Đã gửi hướng dẫn đặt lại mật khẩu (mock)', 'success');
+      addToast('Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.', 'success');
     } catch (errorValue: unknown) {
       addToast(getUiErrorMessage(errorValue, 'Gửi yêu cầu thất bại'), 'error');
     } finally {

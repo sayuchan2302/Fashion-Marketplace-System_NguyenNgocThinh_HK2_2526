@@ -4,7 +4,7 @@ import { Loader2, ShieldCheck } from 'lucide-react';
 import './Auth.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { getReasonToastMessage, getUiErrorMessage } from '../../utils/errorMessage';
+import { getReasonToast, getUiErrorMessage } from '../../utils/errorMessage';
 
 const handledReasonKeys = new Set<string>();
 
@@ -39,9 +39,9 @@ const Login = () => {
     }
     handledReasonKeys.add(reasonKey);
 
-    const reasonMessage = getReasonToastMessage(reason);
-    if (reasonMessage) {
-      addToast(reasonMessage, 'error');
+    const reasonToast = getReasonToast(reason);
+    if (reasonToast) {
+      addToast(reasonToast.message, reasonToast.type);
     }
 
     params.delete('reason');
