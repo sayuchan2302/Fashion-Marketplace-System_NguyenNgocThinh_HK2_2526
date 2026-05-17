@@ -57,6 +57,9 @@ class AuthServiceGoogleLoginTest {
     @Mock
     private GoogleIdTokenVerifier googleIdTokenVerifier;
 
+    @Mock
+    private FacebookIdTokenVerifier facebookIdTokenVerifier;
+
     private AuthService service;
 
     @BeforeEach
@@ -69,7 +72,8 @@ class AuthServiceGoogleLoginTest {
                 authenticationManager,
                 userDetailsService,
                 storeRepository,
-                googleIdTokenVerifier
+                googleIdTokenVerifier,
+                facebookIdTokenVerifier
         );
     }
 

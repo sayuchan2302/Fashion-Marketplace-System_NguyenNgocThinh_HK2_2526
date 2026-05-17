@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import vn.edu.hcmuaf.fit.marketplace.dto.request.FacebookLoginRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.ForgotPasswordRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.GoogleLoginRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.LoginRequest;
@@ -41,6 +42,11 @@ public class AuthController {
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
         return ResponseEntity.ok(authService.loginWithGoogle(request));
+    }
+
+    @PostMapping("/facebook")
+    public ResponseEntity<AuthResponse> facebookLogin(@Valid @RequestBody FacebookLoginRequest request) {
+        return ResponseEntity.ok(authService.loginWithFacebook(request));
     }
 
     @PostMapping("/refresh")

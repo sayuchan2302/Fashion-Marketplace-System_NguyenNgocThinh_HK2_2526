@@ -10,6 +10,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
+  loginWithFacebook: (accessToken: string) => Promise<void>;
   refreshSession: (next: AuthResponse) => void;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: (reason?: string) => void;
@@ -68,6 +69,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(res);
   }, []);
 
+  const loginWithFacebook = useCallback(async (accessToken: string) => {
+    const res = await authService.loginWithFacebook(accessToken);
+    setSession(res);
+  }, []);
+
   const refreshSession = useCallback((next: AuthResponse) => {
     setSession(next);
   }, []);
@@ -90,11 +96,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isAuthenticated: Boolean(session?.token),
       login,
       loginWithGoogle,
+      loginWithFacebook,
       refreshSession,
       register,
       logout,
     }),
-    [session, login, loginWithGoogle, refreshSession, register, logout],
+    [session, login, loginWithGoogle, loginWithFacebook, refreshSession, register, logout],
   );
 
   return (

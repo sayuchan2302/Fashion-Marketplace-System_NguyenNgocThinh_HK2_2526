@@ -39,12 +39,14 @@ public class AuthService {
     private final UserDetailsService userDetailsService;
     private final StoreRepository storeRepository;
     private final GoogleIdTokenVerifier googleIdTokenVerifier;
+    private final FacebookIdTokenVerifier facebookIdTokenVerifier;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                        JwtService jwtService, AuthenticationManager authenticationManager,
                        UserDetailsService userDetailsService, StoreRepository storeRepository,
-                       GoogleIdTokenVerifier googleIdTokenVerifier) {
+                       GoogleIdTokenVerifier googleIdTokenVerifier,
+                       FacebookIdTokenVerifier facebookIdTokenVerifier) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -52,6 +54,7 @@ public class AuthService {
         this.userDetailsService = userDetailsService;
         this.storeRepository = storeRepository;
         this.googleIdTokenVerifier = googleIdTokenVerifier;
+        this.facebookIdTokenVerifier = facebookIdTokenVerifier;
     }
 
     @Transactional
@@ -102,6 +105,18 @@ public class AuthService {
     public AuthResponse loginWithGoogle(GoogleLoginRequest request) {
         GoogleUserInfo googleUser = googleIdTokenVerifier.verify(request.getCredential());
         User user = resolveGoogleUser(googleUser);
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is inactive");
+        }
+
+        return issueAuthResponse(user);
+    }
+
+    @Transactional
+    public AuthResponse loginWithFacebook(vn.edu.hcmuaf.fit.marketplace.dto.request.FacebookLoginRequest request) {
+        FacebookUserInfo facebookUser = facebookIdTokenVerifier.verify(request.getAccessToken());
+        User user = resolveFacebookUser(facebookUser);
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is inactive");
@@ -210,6 +225,83 @@ public class AuthService {
             changed = true;
         }
         return changed ? userRepository.save(user) : user;
+    }
+
+    private User resolveFacebookUser(FacebookUserInfo facebookUser) {
+        return userRepository.findByFacebookSubject(facebookUser.subject())
+                .map(user -> resolveLinkedFacebookUser(user, facebookUser))
+                .orElseGet(() -> resolveByFacebookEmail(facebookUser));
+    }
+
+    private User resolveLinkedFacebookUser(User user, FacebookUserInfo facebookUser) {
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is inactive");
+        }
+        userRepository.findByEmailIgnoreCase(facebookUser.email())
+                .filter(other -> !Objects.equals(other.getId(), user.getId()))
+                .ifPresent(other -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Facebook account is linked to another user");
+                });
+        return applyFacebookProfileIfNeeded(user, facebookUser, false);
+    }
+
+    private User resolveByFacebookEmail(FacebookUserInfo facebookUser) {
+        return userRepository.findByEmailIgnoreCase(facebookUser.email())
+                .map(user -> linkExistingFacebookUser(user, facebookUser))
+                .orElseGet(() -> createFacebookUser(facebookUser));
+    }
+
+    private User linkExistingFacebookUser(User user, FacebookUserInfo facebookUser) {
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is inactive");
+        }
+        if (hasText(user.getFacebookSubject()) && !user.getFacebookSubject().equals(facebookUser.subject())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is linked to another Facebook account");
+        }
+
+        boolean changed = !Objects.equals(user.getFacebookSubject(), facebookUser.subject());
+        user.setFacebookSubject(facebookUser.subject());
+        return applyFacebookProfileIfNeeded(user, facebookUser, changed);
+    }
+
+    private User createFacebookUser(FacebookUserInfo facebookUser) {
+        User user = User.builder()
+                .email(facebookUser.email())
+                .facebookSubject(facebookUser.subject())
+                .password(generateRandomPasswordHash())
+                .name(defaultFacebookName(facebookUser))
+                .avatar(null)
+                .role(User.Role.CUSTOMER)
+                .gender(User.Gender.OTHER)
+                .loyaltyPoints(0L)
+                .isActive(true)
+                .build();
+
+        Cart cart = Cart.builder()
+                .user(user)
+                .build();
+        user.setCart(cart);
+
+        return userRepository.save(user);
+    }
+
+    private User applyFacebookProfileIfNeeded(User user, FacebookUserInfo facebookUser, boolean changed) {
+        if (!hasText(user.getName()) && hasText(facebookUser.name())) {
+            user.setName(facebookUser.name());
+            changed = true;
+        }
+        return changed ? userRepository.save(user) : user;
+    }
+
+    private String defaultFacebookName(FacebookUserInfo facebookUser) {
+        if (hasText(facebookUser.name())) {
+            return facebookUser.name();
+        }
+        if (hasText(facebookUser.email())) {
+            int atIndex = facebookUser.email().indexOf('@');
+            return atIndex > 0 ? facebookUser.email().substring(0, atIndex) : facebookUser.email();
+        }
+        return "Facebook User";
     }
 
     private AuthResponse issueAuthResponse(User user) {

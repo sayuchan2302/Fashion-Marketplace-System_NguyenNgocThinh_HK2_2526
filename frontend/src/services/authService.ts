@@ -161,6 +161,33 @@ const loginWithGoogleBackend = async (credential: string): Promise<AuthResponse 
   }
 };
 
+const loginWithFacebookBackend = async (accessToken: string): Promise<AuthResponse | null> => {
+  if (!API_BASE) {
+    throw new Error('VITE_API_URL is empty. Please configure backend API URL.');
+  }
+
+  try {
+    const response = await fetch(buildApiUrl('/api/auth/facebook'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken }),
+    });
+
+    if (!response.ok) {
+      const message = await parseBackendError(response);
+      throw new Error(message);
+    }
+
+    const payload = await parseJsonSafely<BackendAuthResponse>(response);
+    return payload?.token ? mapBackendAuthResponse(payload) : null;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Đăng nhập Facebook thất bại');
+  }
+};
+
 const registerWithBackend = async (name: string, email: string, password: string): Promise<AuthResponse | null> => {
   if (!API_BASE) {
     throw new Error('VITE_API_URL is empty. Please configure backend API URL.');
@@ -327,6 +354,22 @@ export const authService = {
     const backendSession = await loginWithGoogleBackend(credential);
     if (!backendSession) {
       throw new Error('Đăng nhập Google thất bại. Vui lòng thử lại.');
+    }
+    persist(backendSession);
+    if (backendSession.user.role === 'VENDOR' || backendSession.user.role === 'SUPER_ADMIN') {
+      persistAdmin(backendSession);
+    }
+    return backendSession;
+  },
+
+  async loginWithFacebook(accessToken: string): Promise<AuthResponse> {
+    if (!accessToken) {
+      throw new Error('Thiếu mã xác thực Facebook');
+    }
+
+    const backendSession = await loginWithFacebookBackend(accessToken);
+    if (!backendSession) {
+      throw new Error('Đăng nhập Facebook thất bại. Vui lòng thử lại.');
     }
     persist(backendSession);
     if (backendSession.user.role === 'VENDOR' || backendSession.user.role === 'SUPER_ADMIN') {
