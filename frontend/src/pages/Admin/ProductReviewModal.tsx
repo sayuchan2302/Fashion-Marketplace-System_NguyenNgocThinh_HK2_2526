@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Ban, CheckCircle2, X } from 'lucide-react';
 import Drawer from '../../components/Drawer/Drawer';
 import type { AdminModerationProduct } from './adminProductModerationService';
@@ -7,15 +6,12 @@ interface ProductReviewModalProps {
   open: boolean;
   product: AdminModerationProduct | null;
   onClose: () => void;
-  onBlock: (product: AdminModerationProduct, reason: string) => Promise<void> | void;
+  onBlock: (product: AdminModerationProduct) => void;
   onUnblock: (product: AdminModerationProduct) => Promise<void> | void;
   loading?: boolean;
 }
 
 const ProductReviewModal = ({ open, product, onClose, onBlock, onUnblock, loading = false }: ProductReviewModalProps) => {
-  const [reason, setReason] = useState('');
-  const [reasonError, setReasonError] = useState('');
-
   if (!open || !product) return null;
 
   const isBlocked = product.approvalStatus === 'BANNED';
@@ -30,14 +26,8 @@ const ProductReviewModal = ({ open, product, onClose, onBlock, onUnblock, loadin
     maximumFractionDigits: 0,
   }).format(Number.isFinite(product.price) ? product.price : 0);
 
-  const handleBlock = async () => {
-    const normalized = reason.trim();
-    if (!normalized) {
-      setReasonError('Vui lòng nhập lý do chặn sản phẩm.');
-      return;
-    }
-    setReasonError('');
-    await onBlock(product, normalized);
+  const handleBlock = () => {
+    onBlock(product);
   };
 
   return (
@@ -137,15 +127,7 @@ const ProductReviewModal = ({ open, product, onClose, onBlock, onUnblock, loadin
 
         {!isBlocked ? (
           <section className="drawer-section">
-            <h4>Lý do chặn</h4>
-            <textarea
-              className="moderation-reject-reason"
-              rows={4}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder="Nhập lý do vi phạm để gửi thông báo cho vendor..."
-            />
-            {reasonError ? <p className="moderation-error-text">{reasonError}</p> : null}
+            <p className="admin-muted small">Nhấn "Chặn sản phẩm" để nhập lý do chặn chi tiết.</p>
           </section>
         ) : null}
       </div>

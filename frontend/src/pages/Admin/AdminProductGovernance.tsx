@@ -8,6 +8,7 @@ import { AdminStateBlock } from './AdminStateBlocks';
 import { PanelFilterSelect, PanelSearchField, PanelStatsGrid, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 import { useAdminToast } from './useAdminToast';
 import ProductReviewModal from './ProductReviewModal';
+import BanProductReasonModal from './BanProductReasonModal';
 import {
   listModerationProducts,
   toggleProductApproval,
@@ -77,6 +78,7 @@ const AdminProductGovernance = () => {
   });
 
   const [reviewingProduct, setReviewingProduct] = useState<AdminModerationProduct | null>(null);
+  const [banningProduct, setBanningProduct] = useState<AdminModerationProduct | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const view = useAdminViewState({
     storageKey: ADMIN_VIEW_KEYS.productGovernance,
@@ -188,11 +190,20 @@ const AdminProductGovernance = () => {
       }
       await refreshData(`Đã chặn ${product.productCode}.`);
       setReviewingProduct(null);
+      setBanningProduct(null);
     } catch (error: unknown) {
       pushToast(getUiErrorMessage(error, 'Không thể chặn sản phẩm.'));
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleOpenBanReasonModal = (product: AdminModerationProduct) => {
+    setBanningProduct(product);
+  };
+
+  const handleCloseBanReasonModal = () => {
+    setBanningProduct(null);
   };
 
   const changeStatus = (nextStatus: string) => {
@@ -397,16 +408,16 @@ const AdminProductGovernance = () => {
                         >
                           <CheckCircle2 size={16} />
                         </button>
-                      ) : (
-                        <button
-                          className="admin-icon-btn subtle danger-icon moderation-icon-ban"
-                          title="Chặn sản phẩm"
-                          onClick={() => setReviewingProduct(product)}
-                          disabled={actionLoading}
-                        >
-                          <Ban size={16} />
-                        </button>
-                      )}
+                       ) : (
+                         <button
+                           className="admin-icon-btn subtle danger-icon moderation-icon-ban"
+                           title="Chặn sản phẩm"
+                           onClick={() => handleOpenBanReasonModal(product)}
+                           disabled={actionLoading}
+                         >
+                           <Ban size={16} />
+                         </button>
+                       )}
                     </div>
                   </motion.div>
                 ))}
@@ -466,17 +477,17 @@ const AdminProductGovernance = () => {
                         >
                           <CheckCircle2 size={16} />
                         </button>
-                      ) : (
-                        <button
-                          className="admin-icon-btn subtle danger-icon moderation-icon-ban"
-                          title="Chặn sản phẩm"
-                          aria-label="Chặn sản phẩm"
-                          onClick={() => setReviewingProduct(product)}
-                          disabled={actionLoading}
-                        >
-                          <Ban size={16} />
-                        </button>
-                      )}
+                       ) : (
+                         <button
+                           className="admin-icon-btn subtle danger-icon moderation-icon-ban"
+                           title="Chặn sản phẩm"
+                           aria-label="Chặn sản phẩm"
+                           onClick={() => handleOpenBanReasonModal(product)}
+                           disabled={actionLoading}
+                         >
+                           <Ban size={16} />
+                         </button>
+                       )}
                     </div>
                   </article>
                 ))}
@@ -495,20 +506,33 @@ const AdminProductGovernance = () => {
         </div>
       </section>
 
-      <ProductReviewModal
-        key={reviewingProduct?.id || 'no-product'}
-        open={Boolean(reviewingProduct)}
-        product={reviewingProduct}
-        onClose={() => setReviewingProduct(null)}
-        onBlock={handleBlock}
-        onUnblock={handleUnblock}
-        loading={actionLoading}
-      />
+       <ProductReviewModal
+         key={reviewingProduct?.id || 'no-product'}
+         open={Boolean(reviewingProduct)}
+         product={reviewingProduct}
+         onClose={() => setReviewingProduct(null)}
+         onBlock={() => setReviewingProduct(null)}
+         onUnblock={handleUnblock}
+         loading={actionLoading}
+       />
 
-      {toast ? <div className="toast success">{toast}</div> : null}
-    </AdminLayout>
-  );
-};
+       <BanProductReasonModal
+         key={banningProduct?.id || 'no-product-ban'}
+         open={Boolean(banningProduct)}
+         product={banningProduct}
+         onClose={handleCloseBanReasonModal}
+         onConfirm={(reason) => {
+           if (banningProduct) {
+             void handleBlock(banningProduct, reason);
+           }
+         }}
+         loading={actionLoading}
+       />
 
-export default AdminProductGovernance;
+       {toast ? <div className="toast success">{toast}</div> : null}
+     </AdminLayout>
+   );
+ };
+
+ export default AdminProductGovernance;
 
