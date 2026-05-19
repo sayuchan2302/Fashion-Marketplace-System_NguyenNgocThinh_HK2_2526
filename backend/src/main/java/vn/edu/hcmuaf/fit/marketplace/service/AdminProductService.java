@@ -115,6 +115,13 @@ public class AdminProductService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "targetStatus must be APPROVED or BANNED");
         }
 
+        String normalizedReason = reason == null ? "" : reason.trim();
+        if (currentStatus != nextStatus
+                && nextStatus == Product.ApprovalStatus.BANNED
+                && normalizedReason.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ban reason is required");
+        }
+
         if (currentStatus == nextStatus) {
             String storeName = resolveStoreName(product.getStoreId());
             long sales = resolveDeliveredSales(List.of(product)).getOrDefault(product.getId(), 0L);
@@ -128,7 +135,6 @@ public class AdminProductService {
                 ? ProductAuditLog.Action.APPROVED
                 : ProductAuditLog.Action.BANNED;
 
-        String normalizedReason = reason == null ? "" : reason.trim();
         String auditReason = hasText(normalizedReason)
                 ? normalizedReason
                 : "Status transitioned from " + currentStatus + " to " + nextStatus;

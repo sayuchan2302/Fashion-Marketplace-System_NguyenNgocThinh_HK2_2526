@@ -7,6 +7,7 @@ interface VendorProductCategorySectionProps {
   childCategories: VendorProductCategory[];
   leafCategories: VendorProductCategory[];
   categoryError?: string;
+  readOnly?: boolean;
   onParentCategoryChange: (parentCategoryId: string) => void;
   onCategoryChange: (categoryId: string) => void;
 }
@@ -17,6 +18,7 @@ const VendorProductCategorySection = ({
   childCategories,
   leafCategories,
   categoryError,
+  readOnly = false,
   onParentCategoryChange,
   onCategoryChange,
 }: VendorProductCategorySectionProps) => (
@@ -28,6 +30,7 @@ const VendorProductCategorySection = ({
         <select
           value={form.parentCategoryId}
           onChange={(event) => onParentCategoryChange(event.target.value)}
+          disabled={readOnly}
         >
           <option value="">Chọn danh mục cha</option>
           {parentCategories.map((category) => (
@@ -41,7 +44,7 @@ const VendorProductCategorySection = ({
         <select
           value={form.categoryId}
           onChange={(event) => onCategoryChange(event.target.value)}
-          disabled={!form.parentCategoryId}
+          disabled={readOnly || !form.parentCategoryId}
         >
           <option value="">{form.parentCategoryId ? 'Chọn danh mục con' : 'Chọn danh mục cha trước'}</option>
           {childCategories.map((category) => (

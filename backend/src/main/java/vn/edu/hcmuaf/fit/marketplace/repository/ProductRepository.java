@@ -369,13 +369,27 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     /**
      * Count active products by store
      */
-    @Query("SELECT COUNT(p) FROM Product p WHERE p.storeId = :storeId AND p.status = 'ACTIVE'")
+    @Query("""
+            SELECT COUNT(p) FROM Product p
+            WHERE p.storeId = :storeId
+              AND p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
+            """)
     long countActiveByStoreId(@Param("storeId") UUID storeId);
 
     @Query("""
             SELECT COUNT(p) FROM Product p
             WHERE p.storeId = :storeId
               AND p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
+            """)
+    long countVisibleByStoreId(@Param("storeId") UUID storeId);
+
+    @Query("""
+            SELECT COUNT(p) FROM Product p
+            WHERE p.storeId = :storeId
+              AND p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
               AND (
                 SELECT COALESCE(SUM(v.stockQuantity), 0)
                 FROM ProductVariant v
@@ -389,6 +403,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
             SELECT COUNT(p) FROM Product p
             WHERE p.storeId = :storeId
               AND p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
               AND (
                 SELECT COALESCE(SUM(v.stockQuantity), 0)
                 FROM ProductVariant v
@@ -405,14 +420,31 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     long countLowStockByStoreId(@Param("storeId") UUID storeId, @Param("threshold") int threshold);
 
     @Query("""
+            SELECT COUNT(p) FROM Product p
+            WHERE p.storeId = :storeId
+              AND p.status <> 'ARCHIVED'
+              AND p.approvalStatus = 'BANNED'
+            """)
+    long countBannedByStoreId(@Param("storeId") UUID storeId);
+
+    @Query("""
             SELECT p FROM Product p
             LEFT JOIN p.category c
             WHERE p.storeId = :storeId
               AND (
                 :status IS NULL
                 OR (:status = 'DRAFT' AND p.status IN ('DRAFT', 'INACTIVE'))
-                OR p.status = :status
+                OR (
+                  p.status = :status
+                  AND (
+                    :status <> 'ACTIVE'
+                    OR :approvalStatus IS NOT NULL
+                    OR p.approvalStatus = 'APPROVED'
+                    OR p.approvalStatus IS NULL
+                  )
+                )
               )
+              AND (:approvalStatus IS NULL OR p.approvalStatus = :approvalStatus)
               AND (:categoryId IS NULL OR c.id = :categoryId)
               AND (
                 COALESCE(:keyword, '') = ''
@@ -452,6 +484,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     Page<Product> searchVendorProducts(
             @Param("storeId") UUID storeId,
             @Param("status") Product.ProductStatus status,
+            @Param("approvalStatus") Product.ApprovalStatus approvalStatus,
             @Param("keyword") String keyword,
             @Param("categoryId") UUID categoryId,
             @Param("inventoryState") String inventoryState,
@@ -464,6 +497,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
             FROM Product p
             JOIN p.category c
             WHERE p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
             GROUP BY c.id
             ORDER BY COUNT(p) DESC
             """)

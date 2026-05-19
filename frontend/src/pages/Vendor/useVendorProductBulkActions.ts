@@ -25,9 +25,15 @@ export const useVendorProductBulkActions = ({
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null);
 
   const applyVisibility = useCallback(async (ids: string[], visible: boolean) => {
+    const allowedIds = ids.filter((id) => products.some((product) => product.id === id && product.canToggleVisibility && product.status !== 'banned'));
+    if (allowedIds.length === 0) {
+      addToast('Sản phẩm bị chặn chỉ có thể xem, không thể đổi trạng thái hiển thị.', 'info');
+      return;
+    }
+
     setWorking(true);
     try {
-      await Promise.all(ids.map((id) => vendorProductService.setVisibility(id, visible)));
+      await Promise.all(allowedIds.map((id) => vendorProductService.setVisibility(id, visible)));
       clearSelection();
       pushToast(visible ? 'Đã mở hiển thị các sản phẩm đã chọn' : 'Đã ẩn các sản phẩm đã chọn');
       await loadProducts();
@@ -36,11 +42,12 @@ export const useVendorProductBulkActions = ({
     } finally {
       setWorking(false);
     }
-  }, [addToast, clearSelection, loadProducts, pushToast]);
+  }, [addToast, clearSelection, loadProducts, products, pushToast]);
 
   const requestDelete = useCallback((ids: string[]) => {
-    const items = products.filter((product) => ids.includes(product.id));
+    const items = products.filter((product) => ids.includes(product.id) && product.status !== 'banned');
     if (items.length === 0) {
+      addToast('Sản phẩm bị chặn chỉ có thể xem, không thể xóa từ kênh người bán.', 'info');
       return;
     }
 
@@ -54,7 +61,7 @@ export const useVendorProductBulkActions = ({
           : 'Sản phẩm sẽ được đưa về trạng thái lưu trữ (soft delete).',
       confirmLabel: ids.length > 1 ? 'Xóa sản phẩm' : 'Xóa ngay',
     });
-  }, [products]);
+  }, [addToast, products]);
 
   const confirmDelete = useCallback(async () => {
     if (!deleteConfirm) {

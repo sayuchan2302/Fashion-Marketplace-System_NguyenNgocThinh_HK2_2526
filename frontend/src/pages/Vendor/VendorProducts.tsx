@@ -96,8 +96,11 @@ const VendorProducts = () => {
 
   const startIndex = products.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endIndex = Math.min(page * PAGE_SIZE, totalElements);
-  const productIds = useMemo(() => products.map((product) => product.id), [products]);
-  const allSelected = productIds.length > 0 && selection.selected.size === productIds.length;
+  const selectableProductIds = useMemo(
+    () => products.filter((product) => product.status !== 'banned').map((product) => product.id),
+    [products],
+  );
+  const allSelected = selectableProductIds.length > 0 && selection.selected.size === selectableProductIds.length;
   const clearProductSelection = selection.clearSelection;
   const [searchQuery, setSearchQuery] = useState(keyword);
 
@@ -132,13 +135,13 @@ const VendorProducts = () => {
   const tabItems = PRODUCT_TABS.map((tab) => ({
     key: tab.key,
     label: tab.label,
-    count: tab.key === 'all'
-      ? statusCounts.all
-      : tab.key === 'active'
-        ? statusCounts.active
-        : tab.key === 'outOfStock'
-          ? statusCounts.outOfStock
-          : statusCounts.draft,
+    count: {
+      all: statusCounts.all,
+      active: statusCounts.active,
+      outOfStock: statusCounts.outOfStock,
+      draft: statusCounts.draft,
+      banned: statusCounts.banned,
+    }[tab.key],
   }));
   const categoryItems = useMemo(() => {
     const items = [
@@ -221,10 +224,11 @@ const VendorProducts = () => {
             onReload={() => void loadProducts()}
             onResetCurrentView={resetCurrentView}
             onOpenCreateProductDrawer={editor.openCreateDrawer}
-            onToggleSelectAll={(checked) => selection.toggleSelectAll(checked, productIds)}
+            onToggleSelectAll={(checked) => selection.toggleSelectAll(checked, selectableProductIds)}
             isSelected={(id) => selection.selected.has(id)}
             onToggleOne={selection.toggleOne}
             onOpenEditDrawer={editor.openEditDrawer}
+            onOpenViewDrawer={editor.openViewDrawer}
             onToggleVisibility={(id, visible) => void bulkActions.applyVisibility([id], visible)}
             onRequestDelete={bulkActions.requestDelete}
             onPageChange={setPage}
@@ -249,6 +253,7 @@ const VendorProducts = () => {
         variantStockTotal={editor.variantStockTotal}
         saving={editor.saving}
         imageUploading={editor.imageUploading}
+        readOnly={editor.drawerReadOnly}
         productImageInputRef={editor.productImageInputRef}
         onClose={editor.closeDrawer}
         onFormChange={editor.updateProductForm}

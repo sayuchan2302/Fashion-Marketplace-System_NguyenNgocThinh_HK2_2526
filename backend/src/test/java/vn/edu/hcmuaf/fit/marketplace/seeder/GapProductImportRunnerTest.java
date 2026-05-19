@@ -627,7 +627,7 @@ class GapProductImportRunnerTest {
         private final List<UUID> storeIds = new java.util.ArrayList<>();
 
         FakeProductService() {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, null);
         }
 
         @Override

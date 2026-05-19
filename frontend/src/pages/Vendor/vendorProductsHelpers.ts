@@ -18,6 +18,8 @@ export const getVendorProductStatusLabel = (status: VendorProductStatus) => {
     low: 'Sắp hết hàng',
     out: 'Hết hàng',
     draft: 'Ẩn / nháp',
+    banned: 'Bị chặn',
+    review: 'Đang xem xét',
   };
   return map[status];
 };
@@ -28,6 +30,8 @@ export const getVendorProductStatusTone = (status: VendorProductStatus): Product
     low: 'pending',
     out: 'error',
     draft: 'neutral',
+    banned: 'error',
+    review: 'pending',
   };
   return map[status];
 };

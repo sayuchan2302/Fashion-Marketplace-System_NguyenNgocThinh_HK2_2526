@@ -539,7 +539,7 @@ public class StoreService {
         if (includeAggregates) {
             UUID storeId = store.getId();
             long totalProducts = productRepository.countByStoreIdExcludingArchived(storeId);
-            long activeProducts = productRepository.countByStoreIdAndStatus(storeId, Product.ProductStatus.ACTIVE);
+            long activeProducts = productRepository.countActiveByStoreId(storeId);
             long totalReviews = reviewRepository.countByStoreId(storeId);
             long repliedReviews = reviewRepository.countByStoreIdWithReply(storeId);
 
@@ -585,7 +585,7 @@ public class StoreService {
         if (includeAggregates) {
             UUID storeId = store.getId();
             long totalProducts = productRepository.countByStoreIdExcludingArchived(storeId);
-            long activeProducts = productRepository.countByStoreIdAndStatus(storeId, Product.ProductStatus.ACTIVE);
+            long activeProducts = productRepository.countActiveByStoreId(storeId);
             long totalReviews = reviewRepository.countByStoreId(storeId);
             long repliedReviews = reviewRepository.countByStoreIdWithReply(storeId);
 

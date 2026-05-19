@@ -2,11 +2,13 @@ import type { ProductFormState } from '../../vendorProducts.types';
 
 interface VendorProductDescriptionSectionProps {
   form: ProductFormState;
+  readOnly?: boolean;
   onFormChange: (patch: Partial<ProductFormState>) => void;
 }
 
 const VendorProductDescriptionSection = ({
   form,
+  readOnly = false,
   onFormChange,
 }: VendorProductDescriptionSectionProps) => (
   <section className="drawer-section">
@@ -16,6 +18,7 @@ const VendorProductDescriptionSection = ({
       <textarea
         rows={5}
         value={form.description}
+        readOnly={readOnly}
         onChange={(event) => onFormChange({ description: event.target.value })}
         placeholder="Mô tả chất liệu, form dáng, điểm nổi bật và lưu ý sử dụng để khách dễ quyết định mua hàng."
       />
@@ -27,6 +30,7 @@ const VendorProductDescriptionSection = ({
         <textarea
           rows={4}
           value={form.sizeAndFit}
+          readOnly={readOnly}
           onChange={(event) => onFormChange({ sizeAndFit: event.target.value })}
           placeholder="Ví dụ: Form regular fit, tay dài, phù hợp cao 1m60-1m80."
         />
@@ -36,6 +40,7 @@ const VendorProductDescriptionSection = ({
         <textarea
           rows={4}
           value={form.fabricAndCare}
+          readOnly={readOnly}
           onChange={(event) => onFormChange({ fabricAndCare: event.target.value })}
           placeholder="Ví dụ: 100% cotton. Giặt mát, không tẩy, ủi nhiệt độ thấp."
         />

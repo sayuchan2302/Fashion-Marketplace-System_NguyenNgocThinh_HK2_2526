@@ -96,6 +96,7 @@ public class ProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false, name = "approval_status") String approvalStatus,
             @RequestParam(required = false, name = "q") String keyword,
             @RequestParam(required = false, name = "category_id") UUID categoryId,
             @RequestParam(required = false, name = "inventory") String inventoryState) {
@@ -104,12 +105,14 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
 
         Product.ProductStatus parsedStatus = parseProductStatus(status);
+        Product.ApprovalStatus parsedApprovalStatus = parseProductApprovalStatus(approvalStatus);
         ProductService.InventoryState parsedInventory = parseInventoryState(inventoryState);
 
         return ResponseEntity.ok(
                 productService.getVendorProductPage(
                         effectiveStoreId,
                         parsedStatus,
+                        parsedApprovalStatus,
                         keyword,
                         categoryId,
                         parsedInventory,
@@ -192,6 +195,19 @@ public class ProductController {
             return Product.ProductStatus.valueOf(resolved);
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported product status: " + rawStatus);
+        }
+    }
+
+    private Product.ApprovalStatus parseProductApprovalStatus(String rawStatus) {
+        if (rawStatus == null || rawStatus.isBlank() || rawStatus.equalsIgnoreCase("all")) {
+            return null;
+        }
+
+        String normalized = rawStatus.trim().toUpperCase(Locale.ROOT).replace('-', '_');
+        try {
+            return Product.ApprovalStatus.valueOf(normalized);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported product approval status: " + rawStatus);
         }
     }
 

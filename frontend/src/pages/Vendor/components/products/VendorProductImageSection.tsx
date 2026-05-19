@@ -7,6 +7,7 @@ interface VendorProductImageSectionProps {
   imageUploading: boolean;
   imageError?: string;
   maxImages: number;
+  readOnly?: boolean;
   productImageInputRef: RefObject<HTMLInputElement | null>;
   onOpenPicker: () => void;
   onImagesSelected: (event: ChangeEvent<HTMLInputElement>) => Promise<void> | void;
@@ -20,6 +21,7 @@ const VendorProductImageSection = ({
   imageUploading,
   imageError,
   maxImages,
+  readOnly = false,
   productImageInputRef,
   onOpenPicker,
   onImagesSelected,
@@ -34,11 +36,13 @@ const VendorProductImageSection = ({
           type="button"
           className="admin-ghost-btn small vendor-product-upload-btn"
           onClick={onOpenPicker}
-          disabled={imageUploading || images.length >= maxImages}
+          disabled={readOnly || imageUploading || images.length >= maxImages}
         >
           <Upload size={14} />
           <span>
-            {imageUploading
+            {readOnly
+              ? 'Chỉ xem ảnh'
+              : imageUploading
               ? 'Đang tải ảnh...'
               : images.length >= maxImages
                 ? `Đã đủ ${maxImages} ảnh`
@@ -55,6 +59,7 @@ const VendorProductImageSection = ({
         accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
         multiple
         hidden
+        disabled={readOnly}
         onChange={(event) => void onImagesSelected(event)}
       />
       {imageError && <small className="form-field-error">{imageError}</small>}
@@ -70,7 +75,7 @@ const VendorProductImageSection = ({
               <div className="vendor-product-image-actions">
                 {index === 0 ? (
                   <span className="vendor-product-image-primary">Ảnh chính</span>
-                ) : (
+                ) : readOnly ? null : (
                   <button
                     type="button"
                     className="vendor-product-image-link"
@@ -79,14 +84,16 @@ const VendorProductImageSection = ({
                     Đặt ảnh chính
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="admin-icon-btn subtle danger-icon"
-                  aria-label="Xóa ảnh"
-                  onClick={() => onRemoveImage(index)}
-                >
-                  <Trash2 size={14} />
-                </button>
+                {!readOnly ? (
+                  <button
+                    type="button"
+                    className="admin-icon-btn subtle danger-icon"
+                    aria-label="Xóa ảnh"
+                    onClick={() => onRemoveImage(index)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}

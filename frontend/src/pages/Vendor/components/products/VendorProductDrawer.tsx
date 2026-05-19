@@ -25,6 +25,7 @@ interface VendorProductDrawerProps {
   variantStockTotal: number;
   saving: boolean;
   imageUploading: boolean;
+  readOnly?: boolean;
   productImageInputRef: RefObject<HTMLInputElement | null>;
   onClose: () => void;
   onFormChange: (patch: Partial<ProductFormState>) => void;
@@ -51,6 +52,7 @@ const VendorProductDrawer = ({
   variantStockTotal,
   saving,
   imageUploading,
+  readOnly = false,
   productImageInputRef,
   onClose,
   onFormChange,
@@ -67,23 +69,31 @@ const VendorProductDrawer = ({
 }: VendorProductDrawerProps) => (
   <Drawer open={open} onClose={onClose} className="vendor-product-drawer">
     <PanelDrawerHeader
-      eyebrow={form.id ? 'Chỉnh sửa sản phẩm' : 'Tạo sản phẩm mới'}
+      eyebrow={readOnly ? 'Xem sản phẩm bị chặn' : form.id ? 'Chỉnh sửa sản phẩm' : 'Tạo sản phẩm mới'}
       title={form.name || 'Sản phẩm mới'}
-      subtitle="Thông tin hiển thị, danh mục, ảnh và biến thể bán hàng của SKU."
+      subtitle={readOnly ? 'Sản phẩm đang bị quản trị viên chặn nên người bán chỉ có thể xem thông tin.' : 'Thông tin hiển thị, danh mục, ảnh và biến thể bán hàng của SKU.'}
       onClose={onClose}
       closeLabel="Đóng biểu mẫu sản phẩm"
     />
 
     <div className="drawer-body">
+      {readOnly && form.status === 'banned' ? (
+        <div className="vendor-product-blocked-alert" role="status">
+          <strong>Sản phẩm đã bị chặn bởi quản trị viên</strong>
+          <p>{form.moderationReason || 'Chưa có lý do cụ thể. Vui lòng liên hệ hỗ trợ để được kiểm tra.'}</p>
+        </div>
+      ) : null}
+
       <PanelDrawerSection title="Thông tin sản phẩm">
         <div className="form-grid">
-          <VendorProductBasicsSection form={form} nameError={formErrors.name} onFormChange={onFormChange} />
+          <VendorProductBasicsSection form={form} nameError={formErrors.name} readOnly={readOnly} onFormChange={onFormChange} />
           <VendorProductCategorySection
             form={form}
             parentCategories={parentCategories}
             childCategories={childCategories}
             leafCategories={leafCategories}
             categoryError={formErrors.categoryId}
+            readOnly={readOnly}
             onParentCategoryChange={onParentCategoryChange}
             onCategoryChange={onCategoryChange}
           />
@@ -93,6 +103,7 @@ const VendorProductDrawer = ({
             imageUploading={imageUploading}
             imageError={formErrors.image}
             maxImages={MAX_PRODUCT_IMAGES}
+            readOnly={readOnly}
             productImageInputRef={productImageInputRef}
             onOpenPicker={onOpenProductImagePicker}
             onImagesSelected={onProductImagesSelected}
@@ -108,23 +119,26 @@ const VendorProductDrawer = ({
         productSalePrice={form.salePrice}
         variantStockTotal={variantStockTotal}
         variantsError={formErrors.variants}
+        readOnly={readOnly}
         onAddVariantRow={onAddVariantRow}
         onUpdateVariantRow={onUpdateVariantRow}
         onRemoveVariantRow={onRemoveVariantRow}
       />
 
-      <VendorProductDescriptionSection form={form} onFormChange={onFormChange} />
+      <VendorProductDescriptionSection form={form} readOnly={readOnly} onFormChange={onFormChange} />
     </div>
 
     <PanelDrawerFooter>
-      <button className="admin-ghost-btn" onClick={onClose} disabled={saving}>Hủy</button>
-      <button
-        className="admin-primary-btn vendor-admin-primary"
-        onClick={() => void onSave()}
-        disabled={saving || leafCategories.length === 0}
-      >
-        {saving ? 'Đang lưu...' : form.id ? 'Lưu cập nhật' : 'Tạo sản phẩm'}
-      </button>
+      <button className="admin-ghost-btn" onClick={onClose} disabled={saving}>{readOnly ? 'Đóng' : 'Hủy'}</button>
+      {!readOnly ? (
+        <button
+          className="admin-primary-btn vendor-admin-primary"
+          onClick={() => void onSave()}
+          disabled={saving || leafCategories.length === 0}
+        >
+          {saving ? 'Đang lưu...' : form.id ? 'Lưu cập nhật' : 'Tạo sản phẩm'}
+        </button>
+      ) : null}
     </PanelDrawerFooter>
   </Drawer>
 );

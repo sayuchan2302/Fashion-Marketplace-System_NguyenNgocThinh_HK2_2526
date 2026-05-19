@@ -22,6 +22,8 @@ interface BackendVendorProduct {
   material?: string;
   careInstructions?: string;
   status?: string;
+  approvalStatus?: string;
+  moderationReason?: string;
   visible?: boolean;
   fit?: string;
   gender?: string;
@@ -62,6 +64,7 @@ interface BackendVendorProductPage {
     draft?: number;
     outOfStock?: number;
     lowStock?: number;
+    banned?: number;
   };
 }
 
@@ -95,7 +98,7 @@ interface BackendProductRequest {
   }>;
 }
 
-export type VendorProductStatus = 'active' | 'low' | 'out' | 'draft';
+export type VendorProductStatus = 'active' | 'low' | 'out' | 'draft' | 'banned' | 'review';
 
 export interface VendorProductRecord {
   id: string;
@@ -118,7 +121,10 @@ export interface VendorProductRecord {
   sold: number;
   grossRevenue: number;
   status: VendorProductStatus;
+  approvalStatus?: string;
+  moderationReason?: string;
   visible: boolean;
+  canToggleVisibility: boolean;
   image: string;
   images: string[];
   description: string;
@@ -192,11 +198,12 @@ export interface VendorProductPageResult {
     draft: number;
     outOfStock: number;
     lowStock: number;
+    banned: number;
   };
 }
 
 export interface VendorProductQuery {
-  status?: 'all' | 'active' | 'draft' | 'outOfStock';
+  status?: 'all' | 'active' | 'draft' | 'outOfStock' | 'banned';
   page?: number;
   size?: number;
   keyword?: string;
@@ -220,7 +227,24 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
-const toVendorStatus = (backendStatus: string | undefined, stock: number): VendorProductStatus => {
+const isApprovedForSale = (approvalStatus?: string) => {
+  const normalized = (approvalStatus || 'APPROVED').toUpperCase();
+  return normalized === 'APPROVED';
+};
+
+const toVendorStatus = (
+  backendStatus: string | undefined,
+  stock: number,
+  approvalStatus?: string,
+): VendorProductStatus => {
+  const approval = (approvalStatus || 'APPROVED').toUpperCase();
+  if (approval === 'BANNED' || approval === 'REJECTED') {
+    return 'banned';
+  }
+  if (approval === 'PENDING' || approval === 'UNDER_REVIEW') {
+    return 'review';
+  }
+
   const normalized = (backendStatus || '').toUpperCase();
   if (normalized === 'DRAFT' || normalized === 'INACTIVE' || normalized === 'ARCHIVED') {
     return 'draft';
@@ -236,7 +260,9 @@ const toVendorStatus = (backendStatus: string | undefined, stock: number): Vendo
 
 const mapBackendProduct = (product: BackendVendorProduct): VendorProductRecord => {
   const stock = Math.max(0, Number(product.totalStock || 0));
-  const status = toVendorStatus(product.status, stock);
+  const approvalStatus = normalizeText(product.approvalStatus || 'APPROVED').toUpperCase();
+  const status = toVendorStatus(product.status, stock, approvalStatus);
+  const canToggleVisibility = isApprovedForSale(approvalStatus);
   const fallbackSku = normalizeText(product.slug) || product.id;
   const variants = (product.variants || [])
     .map((variant): VendorProductVariant | null => {
@@ -304,7 +330,10 @@ const mapBackendProduct = (product: BackendVendorProduct): VendorProductRecord =
     sold: Number(product.soldCount || 0),
     grossRevenue: Number(product.grossRevenue || 0),
     status,
-    visible: Boolean(product.visible),
+    approvalStatus,
+    moderationReason: normalizeText(product.moderationReason),
+    visible: canToggleVisibility && Boolean(product.visible),
+    canToggleVisibility,
     image: normalizedImages[0],
     images: normalizedImages,
     description: normalizeText(product.description),
@@ -380,7 +409,13 @@ const statusToBackend = (status?: VendorProductQuery['status']) => {
   if (!status || status === 'all') return undefined;
   if (status === 'active') return 'ACTIVE';
   if (status === 'draft') return 'DRAFT';
+  if (status === 'banned') return undefined;
   return 'ACTIVE';
+};
+
+const approvalStatusToBackend = (status?: VendorProductQuery['status']) => {
+  if (status === 'banned') return 'BANNED';
+  return undefined;
 };
 
 const inventoryToBackend = (status?: VendorProductQuery['status']) => {
@@ -409,6 +444,9 @@ export const vendorProductService = {
     const backendStatus = statusToBackend(params.status);
     if (backendStatus) searchParams.set('status', backendStatus);
 
+    const approvalStatus = approvalStatusToBackend(params.status);
+    if (approvalStatus) searchParams.set('approval_status', approvalStatus);
+
     const inventory = inventoryToBackend(params.status);
     if (inventory) searchParams.set('inventory', inventory);
 
@@ -435,6 +473,7 @@ export const vendorProductService = {
         draft: Number(statusCounts.draft || 0),
         outOfStock: Number(statusCounts.outOfStock || 0),
         lowStock: Number(statusCounts.lowStock || 0),
+        banned: Number(statusCounts.banned || 0),
       },
     };
   },

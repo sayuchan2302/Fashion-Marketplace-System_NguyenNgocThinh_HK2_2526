@@ -10,6 +10,7 @@ interface VendorProductVariantsSectionProps {
   productSalePrice: number;
   variantStockTotal: number;
   variantsError?: string;
+  readOnly?: boolean;
   onAddVariantRow: () => void;
   onUpdateVariantRow: (key: string, mutate: (current: VariantRowFormState) => VariantRowFormState) => void;
   onRemoveVariantRow: (key: string) => void;
@@ -21,6 +22,7 @@ const VendorProductVariantsSection = ({
   productSalePrice,
   variantStockTotal,
   variantsError,
+  readOnly = false,
   onAddVariantRow,
   onUpdateVariantRow,
   onRemoveVariantRow,
@@ -30,9 +32,11 @@ const VendorProductVariantsSection = ({
       <div>
         <h4>Danh sách biến thể</h4>
       </div>
-      <button type="button" className="admin-ghost-btn small" onClick={onAddVariantRow}>
-        Thêm biến thể
-      </button>
+      {!readOnly ? (
+        <button type="button" className="admin-ghost-btn small" onClick={onAddVariantRow}>
+          Thêm biến thể
+        </button>
+      ) : null}
     </div>
 
     {variantsError && <small className="form-field-error">{variantsError}</small>}
@@ -56,6 +60,7 @@ const VendorProductVariantsSection = ({
             <div className="vendor-variant-color-cell">
               <select
                 value={selectedColorPreset}
+                disabled={readOnly}
                 onChange={(event) => {
                   const selected = event.target.value;
                   if (selected === CUSTOM_COLOR_PRESET_VALUE) {
@@ -90,6 +95,7 @@ const VendorProductVariantsSection = ({
                     type="text"
                     placeholder="Tên màu (vd: New Classic Navy Blue)"
                     value={row.axis1}
+                    readOnly={readOnly}
                     onChange={(event) => onUpdateVariantRow(row.key, (current) => ({
                       ...current,
                       axis1: event.target.value,
@@ -99,6 +105,7 @@ const VendorProductVariantsSection = ({
                     <input
                       type="color"
                       value={normalizeHexColor(row.colorHex, resolveColorSwatch(row.axis1, '#111827'))}
+                      disabled={readOnly}
                       onChange={(event) => onUpdateVariantRow(row.key, (current) => ({
                         ...current,
                         colorHex: normalizeHexColor(event.target.value, '#111827'),
@@ -109,6 +116,7 @@ const VendorProductVariantsSection = ({
                       type="text"
                       placeholder="#000000"
                       value={normalizeHexColor(row.colorHex, resolveColorSwatch(row.axis1, '#111827'))}
+                      readOnly={readOnly}
                       onChange={(event) => onUpdateVariantRow(row.key, (current) => ({
                         ...current,
                         colorHex: normalizeHexColor(event.target.value, current.colorHex || '#111827'),
@@ -128,6 +136,7 @@ const VendorProductVariantsSection = ({
                 type="text"
                 placeholder="Ví dụ: M"
                 value={row.axis2}
+                readOnly={readOnly}
                 onChange={(event) => onUpdateVariantRow(row.key, (current) => ({
                   ...current,
                   axis2: event.target.value,
@@ -139,6 +148,7 @@ const VendorProductVariantsSection = ({
                 type="number"
                 min={0}
                 value={row.stockQuantity}
+                readOnly={readOnly}
                 onChange={(event) => onUpdateVariantRow(row.key, (current) => ({
                   ...current,
                   stockQuantity: Math.max(0, Number(event.target.value || 0)),
@@ -151,6 +161,7 @@ const VendorProductVariantsSection = ({
                 min={0}
                 step={1000}
                 value={Math.max(0, (productSalePrice || productBasePrice) + row.priceAdjustment)}
+                readOnly={readOnly}
                 onChange={(event) => onUpdateVariantRow(row.key, (current) => ({
                   ...current,
                   priceAdjustment: Math.max(0, Number(event.target.value || 0)) - (productSalePrice || productBasePrice),
@@ -161,6 +172,7 @@ const VendorProductVariantsSection = ({
               <input
                 type="checkbox"
                 checked={row.isActive}
+                disabled={readOnly}
                 onChange={(event) => onUpdateVariantRow(row.key, (current) => ({
                   ...current,
                   isActive: event.target.checked,
@@ -168,14 +180,16 @@ const VendorProductVariantsSection = ({
               />
             </div>
             <div className="vendor-variant-actions">
-              <button
-                type="button"
-                className="admin-icon-btn subtle danger-icon"
-                title="Xóa dòng biến thể"
-                onClick={() => onRemoveVariantRow(row.key)}
-              >
-                <Trash2 size={14} />
-              </button>
+              {!readOnly ? (
+                <button
+                  type="button"
+                  className="admin-icon-btn subtle danger-icon"
+                  title="Xóa dòng biến thể"
+                  onClick={() => onRemoveVariantRow(row.key)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              ) : null}
             </div>
           </div>
         );

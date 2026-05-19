@@ -27,6 +27,8 @@ interface UseVendorProductEditorOptions {
   loadProducts: () => Promise<void>;
 }
 
+type ProductDrawerMode = 'create' | 'edit' | 'view';
+
 export const useVendorProductEditor = ({
   products,
   showDrawer,
@@ -39,6 +41,7 @@ export const useVendorProductEditor = ({
   const [productForm, setProductForm] = useState<ProductFormState>(createEmptyProductForm());
   const [formErrors, setFormErrors] = useState<ProductFormErrors>({});
   const [variantRows, setVariantRows] = useState<VariantRowFormState[]>([]);
+  const [drawerMode, setDrawerMode] = useState<ProductDrawerMode>('create');
   const [saving, setSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const productImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -148,6 +151,7 @@ export const useVendorProductEditor = ({
 
   const openCreateDrawer = useCallback(() => {
     const nextParentId = parentCategories.length === 1 ? parentCategories[0].id : '';
+    setDrawerMode('create');
     setProductForm({
       ...createEmptyProductForm(),
       parentCategoryId: nextParentId,
@@ -157,12 +161,13 @@ export const useVendorProductEditor = ({
     setShowDrawer(true);
   }, [parentCategories, setShowDrawer]);
 
-  const openEditDrawer = useCallback((id: string) => {
+  const openProductDrawer = useCallback((id: string, mode: ProductDrawerMode) => {
     const current = products.find((product) => product.id === id);
     if (!current) {
       return;
     }
 
+    setDrawerMode(mode);
     setProductForm({
       id: current.id,
       slug: current.slug,
@@ -179,6 +184,9 @@ export const useVendorProductEditor = ({
       images: current.images && current.images.length > 0 ? [...current.images] : (current.image ? [current.image] : []),
       description: current.description,
       visible: current.visible,
+      status: current.status,
+      approvalStatus: current.approvalStatus,
+      moderationReason: current.moderationReason,
     });
 
     const usedKeys = new Set<string>();
@@ -206,6 +214,19 @@ export const useVendorProductEditor = ({
     setFormErrors({});
     setShowDrawer(true);
   }, [products, resolveRootCategoryId, setShowDrawer]);
+
+  const openEditDrawer = useCallback((id: string) => {
+    const current = products.find((product) => product.id === id);
+    if (current?.status === 'banned') {
+      openProductDrawer(id, 'view');
+      return;
+    }
+    openProductDrawer(id, 'edit');
+  }, [openProductDrawer, products]);
+
+  const openViewDrawer = useCallback((id: string) => {
+    openProductDrawer(id, 'view');
+  }, [openProductDrawer]);
 
   const closeDrawer = useCallback(() => {
     setShowDrawer(false);
@@ -310,6 +331,10 @@ export const useVendorProductEditor = ({
   }, []);
 
   const saveProduct = useCallback(async () => {
+    if (drawerMode === 'view') {
+      return;
+    }
+
     let normalizedVariants = normalizeVariantRowsForSave(variantRows).filter((variant) => (
       variant.color || variant.size || variant.stockQuantity > 0 || variant.priceAdjustment !== 0
     ));
@@ -401,7 +426,7 @@ export const useVendorProductEditor = ({
     } finally {
       setSaving(false);
     }
-  }, [addToast, loadProducts, productForm, pushToast, setShowDrawer, variantRows]);
+  }, [addToast, drawerMode, loadProducts, productForm, pushToast, setShowDrawer, variantRows]);
 
   return {
     categories,
@@ -414,11 +439,14 @@ export const useVendorProductEditor = ({
     variantStockTotal,
     saving,
     imageUploading,
+    drawerMode,
+    drawerReadOnly: drawerMode === 'view',
     productImageInputRef,
     updateProductForm,
     setFormErrors,
     openCreateDrawer,
     openEditDrawer,
+    openViewDrawer,
     closeDrawer,
     openProductImagePicker,
     removeProductImage,

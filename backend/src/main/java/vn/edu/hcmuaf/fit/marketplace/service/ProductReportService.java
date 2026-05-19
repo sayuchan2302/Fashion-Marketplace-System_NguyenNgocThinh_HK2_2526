@@ -105,7 +105,7 @@ public class ProductReportService {
         Product product = productRepository.findById(report.getProductId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
 
-        User admin = userRepository.findByEmail(adminEmail).orElse(null);
+        User admin = resolveAdmin(adminEmail);
         UUID adminId = admin != null ? admin.getId() : null;
 
         AdminProcessReportRequest.ProcessAction action = request.getAction();
@@ -114,6 +114,10 @@ public class ProductReportService {
                 ProductReport.ReportStatus.PENDING);
 
         if (action == AdminProcessReportRequest.ProcessAction.BAN) {
+            if (adminNote.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ban reason is required");
+            }
+
             product.setApprovalStatus(Product.ApprovalStatus.BANNED);
             productRepository.save(product);
 
@@ -180,6 +184,13 @@ public class ProductReportService {
 
     private String normalizeDisplayName(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private User resolveAdmin(String adminEmail) {
+        if (adminEmail == null || adminEmail.isBlank()) {
+            return null;
+        }
+        return userRepository.findByEmail(adminEmail.trim()).orElse(null);
     }
 
     private String enumName(Enum<?> value) {

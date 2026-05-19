@@ -27,6 +27,8 @@ public class VendorProductSummaryResponse {
     private String gender;
     private String careInstructions;
     private String status;
+    private String approvalStatus;
+    private String moderationReason;
     private Boolean visible;
     private UUID categoryId;
     private String categoryName;

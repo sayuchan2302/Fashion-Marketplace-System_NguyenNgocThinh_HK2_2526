@@ -26,6 +26,7 @@ interface VendorProductsTableProps {
   isSelected: (id: string) => boolean;
   onToggleOne: (id: string, checked: boolean) => void;
   onOpenEditDrawer: (id: string) => void;
+  onOpenViewDrawer: (id: string) => void;
   onToggleVisibility: (id: string, visible: boolean) => void;
   onRequestDelete: (ids: string[]) => void;
   onPageChange: (page: number) => void;
@@ -50,6 +51,7 @@ const VendorProductsTable = ({
   isSelected,
   onToggleOne,
   onOpenEditDrawer,
+  onOpenViewDrawer,
   onToggleVisibility,
   onRequestDelete,
   onPageChange,
@@ -109,6 +111,7 @@ const VendorProductsTable = ({
             working={working}
             onToggle={(checked) => onToggleOne(product.id, checked)}
             onOpenEdit={() => onOpenEditDrawer(product.id)}
+            onOpenView={() => onOpenViewDrawer(product.id)}
             onToggleVisibility={() => onToggleVisibility(product.id, !product.visible)}
             onDelete={() => onRequestDelete([product.id])}
           />
@@ -116,76 +119,96 @@ const VendorProductsTable = ({
       </div>
 
       <div className="vendor-mobile-cards vendor-product-card-list" aria-label="Danh sách sản phẩm dạng thẻ">
-        {products.map((product, index) => (
-          <motion.article
-            key={`product-card-${product.id}`}
-            className={`vendor-mobile-card vendor-product-card ${product.status === 'draft' ? 'row-muted' : ''}`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.16, delay: Math.min(index * 0.02, 0.1) }}
-            onClick={() => onOpenEditDrawer(product.id)}
-          >
-            <div className="vendor-card-head">
-              <label className="vendor-card-check" onClick={(event) => event.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  aria-label={`Chọn ${product.name}`}
-                  checked={isSelected(product.id)}
-                  onChange={(event) => onToggleOne(product.id, event.target.checked)}
-                />
-                <span>#{startIndex + index}</span>
-              </label>
-              <span className={`admin-pill ${getVendorProductStatusTone(product.status)}`}>
-                {getVendorProductStatusLabel(product.status)}
-              </span>
-            </div>
+        {products.map((product, index) => {
+          const isBanned = product.status === 'banned';
+          const blockReason = product.moderationReason || 'Chưa có lý do cụ thể từ quản trị viên.';
 
-            <div className="vendor-card-product">
-              <img src={product.image} alt={product.name} className="vendor-admin-thumb" loading="lazy" decoding="async" />
-              <div className="vendor-admin-product-copy">
-                <div className="admin-bold">{product.name}</div>
-                <div className="admin-muted small">SKU: {product.sku}</div>
+          return (
+            <motion.article
+              key={`product-card-${product.id}`}
+              className={`vendor-mobile-card vendor-product-card ${product.status === 'draft' || isBanned || product.status === 'review' ? 'row-muted' : ''}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.16, delay: Math.min(index * 0.02, 0.1) }}
+              onClick={isBanned ? undefined : () => onOpenEditDrawer(product.id)}
+            >
+              <div className="vendor-card-head">
+                <label className="vendor-card-check" onClick={(event) => event.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Chọn ${product.name}`}
+                    checked={isSelected(product.id)}
+                    onChange={(event) => onToggleOne(product.id, event.target.checked)}
+                    disabled={isBanned}
+                  />
+                  <span>#{startIndex + index}</span>
+                </label>
+                <span className={`admin-pill ${getVendorProductStatusTone(product.status)}`}>
+                  {getVendorProductStatusLabel(product.status)}
+                </span>
               </div>
-            </div>
 
-            <div className="vendor-card-meta-grid product">
-              <div>
-                <span>Danh mục</span>
-                <strong>{product.category}</strong>
+              <div className="vendor-card-product">
+                <img src={product.image} alt={product.name} className="vendor-admin-thumb" loading="lazy" decoding="async" />
+                <div className="vendor-admin-product-copy">
+                  <div className="admin-bold">{product.name}</div>
+                  <div className="admin-muted small">SKU: {product.sku}</div>
+                </div>
               </div>
-              <div>
-                <span>Giá bán</span>
-                <strong>{formatCurrency(product.price)}</strong>
-              </div>
-              <div>
-                <span>Tồn kho</span>
-                <strong>{product.stock} sản phẩm</strong>
-              </div>
-              <div>
-                <span>Đã bán</span>
-                <strong>{product.sold}</strong>
-              </div>
-            </div>
 
-            <div className="vendor-card-actions" onClick={(event) => event.stopPropagation()}>
-              <button className="admin-icon-btn subtle" title="Chỉnh sửa sản phẩm" aria-label={`Chỉnh sửa ${product.name}`} onClick={() => onOpenEditDrawer(product.id)}>
-                <Pencil size={16} />
-              </button>
-              <button
-                className="admin-icon-btn subtle"
-                title={product.visible ? 'Ẩn sản phẩm' : 'Hiển thị sản phẩm'}
-                aria-label={product.visible ? `Ẩn ${product.name}` : `Hiển thị ${product.name}`}
-                onClick={() => onToggleVisibility(product.id, !product.visible)}
-                disabled={working}
-              >
-                {product.visible ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-              <button className="admin-icon-btn subtle danger-icon" title="Xóa sản phẩm" aria-label={`Xóa ${product.name}`} onClick={() => onRequestDelete([product.id])} disabled={working}>
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </motion.article>
-        ))}
+              {isBanned ? (
+                <div className="vendor-product-ban-reason mobile" title={blockReason}>
+                  Lý do chặn: {blockReason}
+                </div>
+              ) : null}
+
+              <div className="vendor-card-meta-grid product">
+                <div>
+                  <span>Danh mục</span>
+                  <strong>{product.category}</strong>
+                </div>
+                <div>
+                  <span>Giá bán</span>
+                  <strong>{formatCurrency(product.price)}</strong>
+                </div>
+                <div>
+                  <span>Tồn kho</span>
+                  <strong>{product.stock} sản phẩm</strong>
+                </div>
+                <div>
+                  <span>Đã bán</span>
+                  <strong>{product.sold}</strong>
+                </div>
+              </div>
+
+              <div className="vendor-card-actions" onClick={(event) => event.stopPropagation()}>
+                {isBanned ? (
+                  <button className="admin-icon-btn subtle" title="Xem lý do bị chặn" aria-label={`Xem lý do chặn ${product.name}`} onClick={() => onOpenViewDrawer(product.id)}>
+                    <Eye size={16} />
+                  </button>
+                ) : (
+                  <>
+                    <button className="admin-icon-btn subtle" title="Chỉnh sửa sản phẩm" aria-label={`Chỉnh sửa ${product.name}`} onClick={() => onOpenEditDrawer(product.id)}>
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      className="admin-icon-btn subtle"
+                      title={product.canToggleVisibility ? (product.visible ? 'Ẩn sản phẩm' : 'Hiển thị sản phẩm') : 'Sản phẩm đang bị quản trị viên chặn'}
+                      aria-label={product.canToggleVisibility ? (product.visible ? `Ẩn ${product.name}` : `Hiển thị ${product.name}`) : `${product.name} đang bị quản trị viên chặn`}
+                      onClick={() => onToggleVisibility(product.id, !product.visible)}
+                      disabled={working || !product.canToggleVisibility}
+                    >
+                      {product.visible ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <button className="admin-icon-btn subtle danger-icon" title="Xóa sản phẩm" aria-label={`Xóa ${product.name}`} onClick={() => onRequestDelete([product.id])} disabled={working}>
+                      <Trash2 size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </motion.article>
+          );
+        })}
       </div>
 
       <PanelTableFooter

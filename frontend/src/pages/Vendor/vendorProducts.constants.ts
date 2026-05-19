@@ -11,6 +11,7 @@ export const DEFAULT_STATUS_COUNTS: VendorProductStatusCounts = {
   draft: 0,
   outOfStock: 0,
   lowStock: 0,
+  banned: 0,
 };
 
 export const PRODUCT_TABS: Array<{ key: ProductTab; label: string }> = [
@@ -18,10 +19,11 @@ export const PRODUCT_TABS: Array<{ key: ProductTab; label: string }> = [
   { key: 'active', label: 'Đang bán' },
   { key: 'outOfStock', label: 'Hết hàng' },
   { key: 'draft', label: 'Ẩn / nháp' },
+  { key: 'banned', label: 'Bị chặn' },
 ];
 
 export const normalizeProductTab = (value: string | null): ProductTab => {
-  if (value === 'active' || value === 'outOfStock' || value === 'draft') {
+  if (value === 'active' || value === 'outOfStock' || value === 'draft' || value === 'banned') {
     return value;
   }
   return 'all';

@@ -16,6 +16,7 @@ import vn.edu.hcmuaf.fit.marketplace.dto.response.VendorProductPageResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VendorProductSummaryResponse;
 import vn.edu.hcmuaf.fit.marketplace.entity.Category;
 import vn.edu.hcmuaf.fit.marketplace.entity.Product;
+import vn.edu.hcmuaf.fit.marketplace.entity.ProductAuditLog;
 import vn.edu.hcmuaf.fit.marketplace.entity.ProductImage;
 import vn.edu.hcmuaf.fit.marketplace.entity.ProductVariant;
 import vn.edu.hcmuaf.fit.marketplace.entity.Product.Gender;
@@ -25,12 +26,14 @@ import vn.edu.hcmuaf.fit.marketplace.exception.ForbiddenException;
 import vn.edu.hcmuaf.fit.marketplace.exception.ResourceNotFoundException;
 import vn.edu.hcmuaf.fit.marketplace.repository.CategoryRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.OrderRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.ProductAuditLogRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductVariantRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.math.BigDecimal;
@@ -48,9 +51,15 @@ public class ProductService {
     private final ProductVariantRepository productVariantRepository;
     private final StoreRepository storeRepository;
     private final OrderRepository orderRepository;
+    private final ProductAuditLogRepository productAuditLogRepository;
 
     private static final int LOW_STOCK_THRESHOLD = 10;
     private static final int MAX_PRODUCT_IMAGES = 4;
+    private static final List<ProductAuditLog.Action> VENDOR_BLOCK_REASON_ACTIONS = List.of(
+            ProductAuditLog.Action.BANNED,
+            ProductAuditLog.Action.REJECTED,
+            ProductAuditLog.Action.REPORT_CONFIRMED
+    );
 
     public enum InventoryState {
         LOW,
@@ -106,13 +115,15 @@ public class ProductService {
             CategoryRepository categoryRepository,
             ProductVariantRepository productVariantRepository,
             StoreRepository storeRepository,
-            OrderRepository orderRepository
+            OrderRepository orderRepository,
+            ProductAuditLogRepository productAuditLogRepository
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.productVariantRepository = productVariantRepository;
         this.storeRepository = storeRepository;
         this.orderRepository = orderRepository;
+        this.productAuditLogRepository = productAuditLogRepository;
     }
 
     // ─── Public Methods (No tenant filtering) ──────────────────────────────────
@@ -354,6 +365,7 @@ public class ProductService {
     public VendorProductPageResponse getVendorProductPage(
             UUID storeId,
             ProductStatus status,
+            Product.ApprovalStatus approvalStatus,
             String keyword,
             UUID categoryId,
             InventoryState inventoryState,
@@ -362,6 +374,7 @@ public class ProductService {
         Page<Product> page = productRepository.searchVendorProducts(
                 storeId,
                 status,
+                approvalStatus,
                 normalizeKeyword(keyword),
                 categoryId,
                 inventoryState == null ? null : inventoryState.name(),
@@ -369,10 +382,14 @@ public class ProductService {
                 pageable
         );
         Map<UUID, ProductSalesSnapshot> salesByProductId = loadDeliveredSalesByProduct(page.getContent(), storeId);
+        Map<UUID, String> blockReasonsByProductId = loadVendorBlockReasons(page.getContent());
 
         return VendorProductPageResponse.builder()
                 .content(page.getContent().stream()
-                        .map(product -> toVendorProductSummaryResponse(product, salesByProductId.get(product.getId())))
+                        .map(product -> toVendorProductSummaryResponse(
+                                product,
+                                salesByProductId.get(product.getId()),
+                                blockReasonsByProductId.get(product.getId())))
                         .toList())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
@@ -392,13 +409,14 @@ public class ProductService {
     private VendorProductPageResponse.StatusCounts buildVendorStatusCounts(UUID storeId) {
         return VendorProductPageResponse.StatusCounts.builder()
                 .all(productRepository.countByStoreIdExcludingArchived(storeId))
-                .active(productRepository.countByStoreIdAndStatus(storeId, ProductStatus.ACTIVE))
+                .active(productRepository.countVisibleByStoreId(storeId))
                 .draft(
                         productRepository.countByStoreIdAndStatus(storeId, ProductStatus.DRAFT)
                                 + productRepository.countByStoreIdAndStatus(storeId, ProductStatus.INACTIVE)
                 )
                 .outOfStock(productRepository.countOutOfStockByStoreId(storeId))
                 .lowStock(productRepository.countLowStockByStoreId(storeId, LOW_STOCK_THRESHOLD))
+                .banned(productRepository.countBannedByStoreId(storeId))
                 .build();
     }
 
@@ -499,6 +517,7 @@ public class ProductService {
     public Product updateForStore(UUID id, UUID storeId, ProductRequest request) {
         Product product = productRepository.findByIdAndStoreId(id, storeId)
                 .orElseThrow(() -> new ForbiddenException("Product not found or you don't have permission to edit it"));
+        ensureVendorCanMutate(product, "edited");
         
         return applyUpdates(product, request);
     }
@@ -778,16 +797,21 @@ public class ProductService {
     public void deleteForStore(UUID id, UUID storeId) {
         Product product = productRepository.findByIdAndStoreId(id, storeId)
                 .orElseThrow(() -> new ForbiddenException("Product not found or you don't have permission to delete it"));
+        ensureVendorCanMutate(product, "deleted");
         
         product.setStatus(ProductStatus.ARCHIVED);
         productRepository.save(product);
     }
 
     public VendorProductSummaryResponse toVendorProductSummaryResponse(Product product) {
-        return toVendorProductSummaryResponse(product, null);
+        return toVendorProductSummaryResponse(product, null, null);
     }
 
-    private VendorProductSummaryResponse toVendorProductSummaryResponse(Product product, ProductSalesSnapshot salesSnapshot) {
+    private VendorProductSummaryResponse toVendorProductSummaryResponse(
+            Product product,
+            ProductSalesSnapshot salesSnapshot,
+            String moderationReason
+    ) {
         List<ProductVariant> variants = ensureVariantList(product);
         List<ProductImage> images = ensureImageList(product);
 
@@ -842,7 +866,9 @@ public class ProductService {
                 .gender(product.getGender() == null ? null : product.getGender().name())
                 .careInstructions(firstNonBlank(product.getFabricAndCare(), product.getCareInstructions(), product.getMaterial()))
                 .status(product.getStatus() == null ? null : product.getStatus().name())
-                .visible(product.getStatus() == ProductStatus.ACTIVE)
+                .approvalStatus(product.getApprovalStatus() == null ? null : product.getApprovalStatus().name())
+                .moderationReason(visibleModerationReason(product, moderationReason))
+                .visible(isVendorProductVisible(product))
                 .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
                 .basePrice(product.getBasePrice())
@@ -858,6 +884,54 @@ public class ProductService {
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();
+    }
+
+    private Map<UUID, String> loadVendorBlockReasons(List<Product> products) {
+        List<UUID> blockedProductIds = products.stream()
+                .filter(product -> product != null && product.getId() != null)
+                .filter(this::isVendorBlockedProduct)
+                .map(Product::getId)
+                .toList();
+        if (blockedProductIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<UUID, String> reasonsByProductId = new LinkedHashMap<>();
+        productAuditLogRepository.findVendorBlockReasonCandidates(blockedProductIds, VENDOR_BLOCK_REASON_ACTIONS)
+                .forEach(log -> {
+                    String reason = normalizeOptionalText(log.getReason());
+                    if (reason != null) {
+                        reasonsByProductId.putIfAbsent(log.getProductId(), reason);
+                    }
+                });
+        return reasonsByProductId;
+    }
+
+    private String visibleModerationReason(Product product, String moderationReason) {
+        if (!isVendorBlockedProduct(product)) {
+            return null;
+        }
+        return moderationReason == null || moderationReason.isBlank()
+                ? "Sản phẩm bị quản trị viên chặn. Vui lòng liên hệ hỗ trợ để biết thêm chi tiết."
+                : moderationReason;
+    }
+
+    private boolean isVendorProductVisible(Product product) {
+        boolean active = product.getStatus() == ProductStatus.ACTIVE;
+        boolean approved = product.getApprovalStatus() == null
+                || product.getApprovalStatus() == Product.ApprovalStatus.APPROVED;
+        return active && approved;
+    }
+
+    private boolean isVendorBlockedProduct(Product product) {
+        return product.getApprovalStatus() == Product.ApprovalStatus.BANNED
+                || product.getApprovalStatus() == Product.ApprovalStatus.REJECTED;
+    }
+
+    private void ensureVendorCanMutate(Product product, String action) {
+        if (isVendorBlockedProduct(product)) {
+            throw new ForbiddenException("Product is blocked by admin and cannot be " + action + " by vendor");
+        }
     }
 
     private String resolveSizeAndFit(ProductRequest request) {
@@ -1088,6 +1162,15 @@ public class ProductService {
         }
 
         String normalized = keyword.trim().toLowerCase(Locale.ROOT);
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalized = value.trim();
         return normalized.isEmpty() ? null : normalized;
     }
 

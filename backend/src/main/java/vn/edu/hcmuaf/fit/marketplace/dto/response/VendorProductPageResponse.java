@@ -29,5 +29,6 @@ public class VendorProductPageResponse {
         private long draft;
         private long outOfStock;
         private long lowStock;
+        private long banned;
     }
 }

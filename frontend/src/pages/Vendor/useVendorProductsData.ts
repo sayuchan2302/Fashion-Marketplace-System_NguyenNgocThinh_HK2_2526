@@ -60,7 +60,9 @@ export const useVendorProductsData = ({
       setTotalElements(response.totalElements);
       setTotalPages(Math.max(response.totalPages, 1));
       setStatusCounts(response.statusCounts);
-      pruneToVisibleIds(response.items.map((item) => item.id));
+      pruneToVisibleIds(response.items
+        .filter((item) => item.status !== 'banned')
+        .map((item) => item.id));
 
       if (page > Math.max(response.totalPages, 1)) {
         updateQuery((next) => {
@@ -112,6 +114,9 @@ export const useVendorProductsData = ({
             break;
           case 'draft':
             next.draft = Math.max(0, next.draft - 1);
+            break;
+          case 'banned':
+            next.banned = Math.max(0, next.banned - 1);
             break;
           default:
             break;

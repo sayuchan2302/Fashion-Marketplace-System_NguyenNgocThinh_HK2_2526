@@ -5,7 +5,7 @@ import type {
   VendorProductVariant,
 } from '../../services/vendorProductService';
 
-export type ProductTab = 'all' | 'active' | 'outOfStock' | 'draft';
+export type ProductTab = 'all' | 'active' | 'outOfStock' | 'draft' | 'banned';
 
 export interface DeleteConfirmState {
   ids: string[];
@@ -31,6 +31,9 @@ export interface ProductFormState {
   gender: string;
   fit: string;
   visible: boolean;
+  status?: VendorProductStatus;
+  approvalStatus?: string;
+  moderationReason?: string;
 }
 
 export interface VariantRowFormState {
@@ -56,6 +59,7 @@ export interface VendorProductStatusCounts {
   draft: number;
   outOfStock: number;
   lowStock: number;
+  banned: number;
 }
 
 export interface VendorProductsDataState {

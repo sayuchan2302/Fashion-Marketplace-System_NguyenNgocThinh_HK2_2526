@@ -5,7 +5,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.StoreResponse;
-import vn.edu.hcmuaf.fit.marketplace.entity.Product;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.entity.User;
 import vn.edu.hcmuaf.fit.marketplace.repository.OrderRepository;
@@ -75,7 +74,7 @@ class StoreServiceAggregatesTest {
 
         when(storeRepository.findAll()).thenReturn(List.of(store));
         when(productRepository.countByStoreIdExcludingArchived(store.getId())).thenReturn(12L);
-        when(productRepository.countByStoreIdAndStatus(store.getId(), Product.ProductStatus.ACTIVE)).thenReturn(9L);
+        when(productRepository.countActiveByStoreId(store.getId())).thenReturn(9L);
         when(orderRepository.countByStoreId(store.getId())).thenReturn(5L);
         when(orderRepository.calculateRevenueByStoreId(store.getId())).thenReturn(new BigDecimal("250000"));
         when(reviewRepository.countByStoreId(store.getId())).thenReturn(10L);
