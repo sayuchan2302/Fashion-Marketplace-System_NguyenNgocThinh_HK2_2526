@@ -5,7 +5,7 @@ type ProductGovernanceTabKey = 'products' | 'reports';
 
 const productGovernanceTabs = [
   { key: 'products', label: 'Sản phẩm' },
-  { key: 'reports', label: 'Tố cáo sản phẩm' },
+  { key: 'reports', label: 'Sản phẩm bị tố cáo' },
 ];
 
 interface AdminProductGovernanceTabsProps {

@@ -1500,14 +1500,14 @@ body {
   grid-template-columns:
     40px
     minmax(320px, 2.2fr)
-    minmax(230px, 1.25fr)
-    minmax(220px, 1.2fr)
-    minmax(124px, 0.7fr)
-    minmax(124px, 0.7fr)
-    minmax(128px, 0.7fr);
-  min-width: 1160px;
-  gap: 16px;
-  padding: 14px 16px;
+    minmax(220px, 1.18fr)
+    minmax(200px, 1.05fr)
+    minmax(132px, 0.68fr)
+    minmax(132px, 0.68fr)
+    minmax(148px, 0.72fr);
+  min-width: 1220px;
+  column-gap: 20px;
+  padding: 14px 24px;
   font-size: 14px;
   line-height: 1.35;
 }
@@ -1536,6 +1536,7 @@ body {
 .admin-table-row.report-row > [role='columnheader']:last-child,
 .admin-table-row.report-row > [role='cell']:last-child {
   justify-content: flex-end;
+  padding-right: 4px;
   text-align: right;
 }
 
@@ -1670,6 +1671,8 @@ body {
   justify-content: flex-end;
   justify-self: stretch;
   gap: 8px;
+  min-width: 120px;
+  padding-right: 4px !important;
 }
 
 .report-actions .admin-icon-btn {

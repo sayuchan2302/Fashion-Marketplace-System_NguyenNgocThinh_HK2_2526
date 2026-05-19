@@ -52,6 +52,51 @@
   box-shadow: 0 0 0 3px rgba(47,90,207,0.14);
 }
 
+.auth-password-control {
+  position: relative;
+}
+
+.auth-password-input {
+  padding-right: 48px;
+}
+
+.auth-password-input::-ms-reveal,
+.auth-password-input::-ms-clear {
+  display: none;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.auth-password-toggle:hover {
+  background: #f3f4f6;
+  color: var(--text-primary);
+}
+
+.auth-password-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47,90,207,0.14);
+}
+
+.auth-password-toggle[aria-pressed="true"] {
+  color: var(--co-blue);
+}
+
 .auth-error {
   color: var(--co-error);
   font-size: 13px;

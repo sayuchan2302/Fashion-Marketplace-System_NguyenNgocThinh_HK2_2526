@@ -36,6 +36,7 @@ import { storeFollowService, type FollowedStoreItem } from '../../services/store
 import { calculateTier, TIER_CONFIG, getProgressToNextTier, getSpendRequiredForNextTier, getNextTier } from '../../utils/tierUtils';
 import { formatPrice } from '../../utils/formatters';
 import { resolveDetailRouteKey } from '../../utils/displayCode';
+import { resolveAvatarSrc } from '../../utils/avatar';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import type { Address } from '../../types';
 import type { Order } from '../../types';
@@ -444,7 +445,7 @@ const Profile = () => {
     const name = profile?.name || authUser?.name || 'Khách hàng';
     const email = profile?.email || authUser?.email || '';
     const phone = profile?.phone || authUser?.phone || '';
-    const avatar = profile?.avatar || authUser?.avatar || name.charAt(0).toUpperCase();
+    const avatar = profile?.avatar || authUser?.avatar || '';
     const dateOfBirthLabel = profile?.dateOfBirth
       ? new Date(`${profile.dateOfBirth}T00:00:00`).toLocaleDateString('vi-VN')
       : 'Chưa cập nhật';
@@ -470,6 +471,7 @@ const Profile = () => {
   const progress = getProgressToNextTier(user.totalSpent, currentTier);
   const requiredForNext = getSpendRequiredForNextTier(currentTier, user.totalSpent);
   const tierConfig = TIER_CONFIG[currentTier];
+  const avatarImageSrc = resolveAvatarSrc(user.avatar);
 
   const tabs = [
     { id: 'account', label: t.tabs.account, icon: User },
@@ -750,8 +752,8 @@ const Profile = () => {
                 aria-label="Thay đổi ảnh đại diện"
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') avatarInputRef.current?.click(); }}
               >
-                {user.avatar && /^https?:\/\//.test(user.avatar) ? (
-                  <img src={user.avatar} alt={user.name} />
+                {avatarImageSrc ? (
+                  <img src={avatarImageSrc} alt={user.name} />
                 ) : (
                   <span>{(user.name.charAt(0) || 'U').toUpperCase()}</span>
                 )}

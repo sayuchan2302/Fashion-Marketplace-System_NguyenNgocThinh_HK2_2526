@@ -12,7 +12,6 @@ import {
   Phone,
   Ruler,
   Scale,
-  Shield,
   ShieldCheck,
   Store,
   UserRound,
@@ -25,6 +24,7 @@ import { PanelFilterSelect, PanelSearchField, PanelStatsGrid, PanelTableFooter }
 import { useToast } from '../../contexts/ToastContext';
 import { adminUserService, type AdminUserRecord, type AdminUserRole, type AdminUserStatus } from '../../services/adminUserService';
 import { getUiErrorMessage } from '../../utils/errorMessage';
+import { resolveAvatarSrc } from '../../utils/avatar';
 import Drawer from '../../components/Drawer/Drawer';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
@@ -186,16 +186,11 @@ const buildUserNote = (user: AdminUserRecord): string => {
 
 const getUserInitial = (user: Pick<UserRecord, 'name' | 'email'>) => (user.name || user.email || 'U').trim().charAt(0).toUpperCase();
 
-const normalizeAvatar = (avatar?: string) => {
-  const next = avatar?.trim();
-  return next ? next : undefined;
-};
-
 const renderUserAvatar = (
   user: Pick<UserRecord, 'name' | 'email' | 'avatar'>,
   options?: { large?: boolean },
 ) => {
-  const avatar = normalizeAvatar(user.avatar);
+  const avatar = resolveAvatarSrc(user.avatar);
   const className = options?.large ? 'user-avatar large' : 'user-avatar';
 
   return (
@@ -839,7 +834,7 @@ const AdminUsers = () => {
                   </button>
                 ) : (
                   <button className="admin-ghost-btn danger" onClick={() => openConfirm('lock', [detailUser.id])}>
-                    <Shield size={14} />
+                    <Ban size={14} />
                     Khóa tài khoản
                   </button>
                 )
