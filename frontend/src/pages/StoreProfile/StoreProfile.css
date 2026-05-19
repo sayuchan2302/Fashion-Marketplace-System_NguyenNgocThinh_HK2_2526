@@ -368,13 +368,36 @@
 
 .storefront-category-item {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #f8fafc;
   padding: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.storefront-category-item:hover:not(:disabled),
+.storefront-category-item:focus-visible {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+  outline: none;
+}
+
+.storefront-category-item:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.storefront-category-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .storefront-category-name {

@@ -36,6 +36,7 @@ import './StoreProfile.css';
 type StoreTab = 'browse' | 'products' | 'categories' | 'reviews';
 type PanelHeightMap = Record<StoreTab, number>;
 type ProductCategoryFilter = { id: string; name: string; count: number };
+type ProductCategoryGroup = { id?: string; name: string; rows: StoreProduct[] };
 type IdleCapableWindow = Window & typeof globalThis & {
   requestIdleCallback?: (callback: IdleRequestCallback) => number;
   cancelIdleCallback?: (handle: number) => void;
@@ -62,6 +63,14 @@ const MAX_PRODUCT_SNAPSHOT_PAGES = 5;
 const CATEGORY_PREFETCH_DELAY_MS = 180;
 const PRODUCT_SEARCH_DEBOUNCE_MS = 300;
 const DEFAULT_PRODUCT_SORT: StoreProductSort = 'newest';
+
+const buildProductFiltersKey = (filters: StoreProductFilters) => [
+  filters.q || '',
+  filters.categoryId || '',
+  filters.minPrice ?? '',
+  filters.maxPrice ?? '',
+  filters.sort || DEFAULT_PRODUCT_SORT,
+].join('|');
 
 const parsePriceInput = (value: string) => {
   const trimmed = value.trim();
@@ -189,16 +198,7 @@ const StoreProfilePage = () => {
     maxPrice: productMaxPrice,
     sort: productSort,
   }), [debouncedProductSearch, productMaxPrice, productMinPrice, productSort, selectedCategoryId]);
-  const productFiltersKey = useMemo(
-    () => [
-      productFilters.q || '',
-      productFilters.categoryId || '',
-      productFilters.minPrice ?? '',
-      productFilters.maxPrice ?? '',
-      productFilters.sort || DEFAULT_PRODUCT_SORT,
-    ].join('|'),
-    [productFilters],
-  );
+  const productFiltersKey = useMemo(() => buildProductFiltersKey(productFilters), [productFilters]);
   const hasActiveProductFilters = Boolean(
     productSearch.trim()
       || selectedCategoryId
@@ -581,37 +581,11 @@ const StoreProfilePage = () => {
     scrollToProductsPanelTop();
   }, [activeTab, productPage, productPageItems, scrollToProductsPanelTop]);
 
-  const handleProductPageChange = useCallback(async (nextPage: number) => {
-    if (!store?.id || productPageLoading || nextPage === productPage) return;
-
-    const storeId = store.id;
-    const storeRequestId = storeRequestRef.current;
-    const requestId = paginationRequestRef.current + 1;
-    paginationRequestRef.current = requestId;
-
-    setProductPageLoading(true);
-    pendingProductPageScrollRef.current = true;
-    scrollToProductsPanelTop();
-    try {
-      const response = await storeService.getStoreProducts(storeId, nextPage, PRODUCTS_PAGE_SIZE, productFilters);
-      if (storeRequestRef.current !== storeRequestId || paginationRequestRef.current !== requestId) return;
-      setProductPageItems(response.products || []);
-      setProductPage(Math.max(Number(response.page || nextPage), 1));
-      setProductTotal(Math.max(Number(response.total || 0), 0));
-      setProductTotalPages(Math.max(Number(response.totalPages || 1), 1));
-    } catch {
-      if (storeRequestRef.current === storeRequestId && paginationRequestRef.current === requestId) {
-        pendingProductPageScrollRef.current = false;
-      }
-      // keep current page data if pagination request fails
-    } finally {
-      if (storeRequestRef.current === storeRequestId && paginationRequestRef.current === requestId) {
-        setProductPageLoading(false);
-      }
-    }
-  }, [productFilters, productPage, productPageLoading, scrollToProductsPanelTop, store?.id]);
-
-  const handleProductFiltersChange = useCallback(async () => {
+  const fetchProductPage = useCallback(async (
+    nextPage: number,
+    filters: StoreProductFilters,
+    options: { scrollBeforeFetch?: boolean } = {},
+  ) => {
     if (!store?.id) return;
 
     const storeId = store.id;
@@ -621,24 +595,37 @@ const StoreProfilePage = () => {
 
     setProductPageLoading(true);
     pendingProductPageScrollRef.current = true;
-    scrollToProductsPanelTop();
+    if (options.scrollBeforeFetch !== false) {
+      scrollToProductsPanelTop();
+    }
+
     try {
-      const response = await storeService.getStoreProducts(storeId, 1, PRODUCTS_PAGE_SIZE, productFilters);
+      const response = await storeService.getStoreProducts(storeId, nextPage, PRODUCTS_PAGE_SIZE, filters);
       if (storeRequestRef.current !== storeRequestId || paginationRequestRef.current !== requestId) return;
       setProductPageItems(response.products || []);
-      setProductPage(Math.max(Number(response.page || 1), 1));
+      setProductPage(Math.max(Number(response.page || nextPage), 1));
       setProductTotal(Math.max(Number(response.total || 0), 0));
       setProductTotalPages(Math.max(Number(response.totalPages || 1), 1));
     } catch {
       if (storeRequestRef.current === storeRequestId && paginationRequestRef.current === requestId) {
         pendingProductPageScrollRef.current = false;
       }
+      // keep current page data if the request fails
     } finally {
       if (storeRequestRef.current === storeRequestId && paginationRequestRef.current === requestId) {
         setProductPageLoading(false);
       }
     }
-  }, [productFilters, scrollToProductsPanelTop, store?.id]);
+  }, [scrollToProductsPanelTop, store?.id]);
+
+  const handleProductPageChange = useCallback(async (nextPage: number) => {
+    if (productPageLoading || nextPage === productPage) return;
+    await fetchProductPage(nextPage, productFilters);
+  }, [fetchProductPage, productFilters, productPage, productPageLoading]);
+
+  const handleProductFiltersChange = useCallback(async () => {
+    await fetchProductPage(1, productFilters);
+  }, [fetchProductPage, productFilters]);
 
   useEffect(() => {
     if (!store?.id || loading) return;
@@ -661,6 +648,28 @@ const StoreProfilePage = () => {
     setProductSort(DEFAULT_PRODUCT_SORT);
   }, []);
 
+  const handleCategorySelect = useCallback((categoryId: string) => {
+    if (!categoryId) return;
+
+    const nextFilters: StoreProductFilters = {
+      categoryId,
+      sort: DEFAULT_PRODUCT_SORT,
+    };
+
+    previousProductFiltersKeyRef.current = buildProductFiltersKey(nextFilters);
+    setProductSearch('');
+    setDebouncedProductSearch('');
+    setSelectedCategoryId(categoryId);
+    setMinPrice('');
+    setMaxPrice('');
+    setProductSort(DEFAULT_PRODUCT_SORT);
+    startTabTransition(() => {
+      setActiveTab('products');
+    });
+
+    void fetchProductPage(1, nextFilters, { scrollBeforeFetch: false });
+  }, [fetchProductPage, startTabTransition]);
+
   const onlineLabel = store?.status === 'ACTIVE' ? '\u0110ang online' : 'T\u1EA1m offline';
 
   const topSellingProducts = useMemo(
@@ -668,15 +677,16 @@ const StoreProfilePage = () => {
     [featuredProducts],
   );
 
-  const groupedByCategory = useMemo(() => {
-    const groups = new Map<string, StoreProduct[]>();
+  const groupedByCategory = useMemo<ProductCategoryGroup[]>(() => {
+    const groups = new Map<string, ProductCategoryGroup>();
     for (const product of categoryProducts || []) {
-      const key = product.categoryName || 'Danh m\u1EE5c kh\u00E1c';
-      const bucket = groups.get(key) || [];
-      bucket.push(product);
-      groups.set(key, bucket);
+      const name = product.categoryName || 'Danh m\u1EE5c kh\u00E1c';
+      const key = product.categoryId || `name:${name}`;
+      const group = groups.get(key) || { id: product.categoryId, name, rows: [] };
+      group.rows.push(product);
+      groups.set(key, group);
     }
-    return Array.from(groups.entries()).map(([name, rows]) => ({ name, rows }));
+    return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
   }, [categoryProducts]);
 
   const productCategoryOptions = useMemo<ProductCategoryFilter[]>(() => {
@@ -902,6 +912,7 @@ const StoreProfilePage = () => {
               <CategoriesTabContent
                 categoryLoading={categoryLoading}
                 groupedByCategory={groupedByCategory}
+                onCategorySelect={handleCategorySelect}
               />
             </StorefrontTabPanel>
 

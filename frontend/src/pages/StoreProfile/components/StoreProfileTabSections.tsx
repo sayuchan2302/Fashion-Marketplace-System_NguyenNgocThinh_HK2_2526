@@ -57,7 +57,8 @@ export interface ProductsTabContentProps {
 
 export interface CategoriesTabContentProps {
   categoryLoading: boolean;
-  groupedByCategory: Array<{ name: string; rows: StoreProduct[] }>;
+  groupedByCategory: Array<{ id?: string; name: string; rows: StoreProduct[] }>;
+  onCategorySelect: (categoryId: string) => void;
 }
 
 export interface ReviewsTabContentProps {
@@ -369,6 +370,7 @@ ProductsTabContent.displayName = 'ProductsTabContent';
 export const CategoriesTabContent = memo(({
   categoryLoading,
   groupedByCategory,
+  onCategorySelect,
 }: CategoriesTabContentProps) => (
   <div className="storefront-panel">
     <div className="storefront-panel-head">
@@ -382,10 +384,19 @@ export const CategoriesTabContent = memo(({
     ) : (
       <div className="storefront-category-list">
         {groupedByCategory.map((group) => (
-          <div key={group.name} className="storefront-category-item">
+          <button
+            key={group.id || group.name}
+            type="button"
+            className="storefront-category-item"
+            disabled={!group.id}
+            aria-label={group.id ? `Xem sản phẩm trong danh mục ${group.name}` : undefined}
+            onClick={() => {
+              if (group.id) onCategorySelect(group.id);
+            }}
+          >
             <p className="storefront-category-name">{group.name}</p>
             <span className="storefront-category-count">{group.rows.length} sản phẩm</span>
-          </div>
+          </button>
         ))}
       </div>
     )}
