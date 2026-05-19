@@ -145,7 +145,7 @@ class CatalogSyncServiceTests(unittest.TestCase):
         page = VisionCatalogPage(items=[item], totalProducts=1, page=0, size=100, totalPages=1, generatedAt=None)
         existing_rows = {
             service._image_reuse_key(item.image_url): {
-                "source_updated_at": datetime(2026, 5, 1, tzinfo=UTC),
+                "source_updated_at": datetime(2026, 5, 8, tzinfo=UTC),
                 "model_name": settings.openclip_model_name,
                 "model_pretrained": settings.openclip_pretrained,
                 "embedding": [0.1, 0.2],
@@ -167,6 +167,26 @@ class CatalogSyncServiceTests(unittest.TestCase):
         self.assertEqual(response.skipped_unchanged, 1)
         self.assertEqual(response.embeddings_inserted, 0)
         self.assertEqual(response.embeddings_updated, 0)
+
+    def test_can_reuse_embedding_rejects_changed_source_timestamp(self) -> None:
+        service = CatalogSyncService(clip_service=Mock())
+        item = VisionCatalogItem(
+            backend_product_id=uuid4(),
+            product_slug="changed-product",
+            store_id=uuid4(),
+            store_slug="store",
+            category_slug="men-ao",
+            image_url="https://example.com/product.jpg",
+            source_updated_at=datetime(2026, 5, 8, tzinfo=UTC),
+        )
+        existing = {
+            "source_updated_at": datetime(2026, 5, 1, tzinfo=UTC),
+            "model_name": settings.openclip_model_name,
+            "model_pretrained": settings.openclip_pretrained,
+            "embedding": [0.1, 0.2],
+        }
+
+        self.assertFalse(service._can_reuse_embedding(item, existing))
 
     def test_upsert_reusable_rows_writes_new_product_id_with_existing_embedding(self) -> None:
         service = CatalogSyncService(clip_service=Mock())

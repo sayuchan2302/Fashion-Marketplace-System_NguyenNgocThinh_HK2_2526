@@ -86,6 +86,30 @@ CREATE INDEX IF NOT EXISTS product_image_embeddings_active_embedding_hnsw_idx
     ON vision.product_image_embeddings
     USING hnsw (embedding vector_cosine_ops)
     WHERE is_active = true;
+
+CREATE TABLE IF NOT EXISTS vision.search_metric_events (
+    id uuid PRIMARY KEY,
+    status text NOT NULL,
+    empty_reason text,
+    grouped_candidates integer NOT NULL DEFAULT 0,
+    returned_candidates integer NOT NULL DEFAULT 0,
+    threshold_filtered_count integer NOT NULL DEFAULT 0,
+    top_score double precision,
+    score_floor double precision,
+    search_latency_ms double precision,
+    encode_latency_ms double precision,
+    db_query_latency_ms double precision,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS search_metric_events_created_at_idx
+    ON vision.search_metric_events (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS search_metric_events_status_idx
+    ON vision.search_metric_events (status);
+
+CREATE INDEX IF NOT EXISTS search_metric_events_empty_reason_idx
+    ON vision.search_metric_events (empty_reason);
 """
 
 

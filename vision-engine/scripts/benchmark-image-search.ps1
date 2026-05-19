@@ -474,7 +474,7 @@ try {
   }
 
   $metricsAfter = Invoke-JsonGet -Url "$VisionBaseUrl/v1/metrics" -Headers $headers
-  $indexInfo = Invoke-JsonGet -Url "$VisionBaseUrl/v1/index/info"
+  $indexInfo = Invoke-JsonGet -Url "$VisionBaseUrl/v1/index/info" -Headers $headers
 
   $deltaAccepted = [Math]::Max(0, [int]$metricsAfter.accepted_requests - [int]$metricsBefore.accepted_requests)
   $deltaLowConfidence = [Math]::Max(0, [int]$metricsAfter.low_confidence_requests - [int]$metricsBefore.low_confidence_requests)

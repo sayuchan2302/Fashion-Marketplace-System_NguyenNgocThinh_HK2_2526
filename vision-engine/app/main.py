@@ -74,7 +74,8 @@ def ready() -> dict[str, bool]:
 
 
 @app.get("/v1/index/info", response_model=IndexInfoResponse)
-def index_info() -> IndexInfoResponse:
+def index_info(x_vision_internal_secret: str | None = Header(default=None)) -> IndexInfoResponse:
+    _ensure_internal_secret(x_vision_internal_secret)
     if image_search_service is None:
         info = {"active_image_count": 0, "active_product_count": 0, "index_version": "empty"}
     else:
@@ -173,7 +174,7 @@ def metrics(x_vision_internal_secret: str | None = Header(default=None)) -> Sear
 
 
 @app.post("/v1/search/image", response_model=SearchResponse)
-async def search_image(
+def search_image(
     file: UploadFile = File(...),
     limit: int = Query(default=120, ge=1, le=120),
     category_slug: str | None = Query(default=None),
@@ -185,7 +186,7 @@ async def search_image(
     if image_search_service is None:
         raise HTTPException(status_code=503, detail="OpenCLIP model is not ready")
 
-    payload = await file.read()
+    payload = file.file.read()
     try:
         result = image_search_service.search_bytes(
             content_type=file.content_type,

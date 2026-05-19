@@ -453,7 +453,19 @@ class CatalogSyncService:
             return False
         if existing.get("model_pretrained") != settings.openclip_pretrained:
             return False
-        return existing.get("embedding") is not None
+        if existing.get("embedding") is None:
+            return False
+        return self._timestamps_match(item.source_updated_at, existing.get("source_updated_at"))
+
+    def _timestamps_match(self, expected: datetime | None, actual: object) -> bool:
+        return self._normalize_timestamp(expected) == self._normalize_timestamp(actual)
+
+    def _normalize_timestamp(self, value: object) -> datetime | None:
+        if not isinstance(value, datetime):
+            return None
+        if value.tzinfo is not None:
+            return value.astimezone(UTC).replace(tzinfo=None)
+        return value
 
     def _upsert_reusable_rows(
         self,

@@ -37,7 +37,7 @@ public class VisionAdminClient {
     }
 
     public IndexInfoPayload getIndexInfo() {
-        return exchange("/v1/index/info", "GET", false,
+        return exchange("/v1/index/info", "GET", true,
                 IndexInfoPayload.class);
     }
 

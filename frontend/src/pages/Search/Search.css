@@ -499,6 +499,10 @@
   background: #fafcff;
 }
 
+.store-empty-state__action {
+  margin-top: 12px;
+}
+
 .store-results-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

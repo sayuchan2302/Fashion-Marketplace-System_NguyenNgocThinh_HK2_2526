@@ -57,6 +57,12 @@ class DatabaseBootstrapTests(unittest.TestCase):
         )
         self.assertEqual(events[-1], "commit")
 
+    def test_bootstrap_schema_defines_search_metric_events(self) -> None:
+        self.assertIn("CREATE TABLE IF NOT EXISTS vision.search_metric_events", db.BOOTSTRAP_SQL)
+        self.assertIn("search_metric_events_created_at_idx", db.BOOTSTRAP_SQL)
+        self.assertIn("search_metric_events_status_idx", db.BOOTSTRAP_SQL)
+        self.assertIn("search_metric_events_empty_reason_idx", db.BOOTSTRAP_SQL)
+
 
 if __name__ == "__main__":
     unittest.main()

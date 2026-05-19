@@ -28,6 +28,8 @@ export interface SearchImageSession {
 
 type SearchImageStatus = 'idle' | 'loading' | 'success';
 
+const MISSING_IMAGE_SEARCH_FILE_MESSAGE = 'Ảnh tìm kiếm không còn sau khi tải lại. Vui lòng chọn ảnh lại.';
+
 interface UseSearchImageFlowOptions {
   imageSearchToken: string;
   imageCategory: string;
@@ -59,6 +61,7 @@ export const useSearchImageFlow = ({
   const [imageSearchSession, setImageSearchSession] = useState<SearchImageSession | null>(null);
   const [imageSearchError, setImageSearchError] = useState<string | null>(null);
   const [imageSearchStatus, setImageSearchStatus] = useState<SearchImageStatus>('idle');
+  const [hasMissingImageSearchFile, setHasMissingImageSearchFile] = useState(false);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const consumedImageTokenRef = useRef<string | null>(null);
   const pasteTargetRef = useRef<HTMLDivElement | null>(null);
@@ -66,10 +69,12 @@ export const useSearchImageFlow = ({
   const isImageSearchMode = imageSearchStatus !== 'idle' && Boolean(imageSearchSession);
   const isImageSearchLoading = imageSearchStatus === 'loading';
   const isAwaitingImageSearch = Boolean(imageSearchToken)
+    && !hasMissingImageSearchFile
     && !isImageSearchMode
     && pendingImageSearchSession.hasPendingFile();
 
   const clearImageSearchState = useCallback((clearResults = false) => {
+    setHasMissingImageSearchFile(false);
     setImageSearchError(null);
     setImageSearchStatus('idle');
     setImageSearchSession((current) => {
@@ -90,12 +95,14 @@ export const useSearchImageFlow = ({
 
     const validation = validateImageSearchFile(file);
     if (!validation.ok) {
+      setHasMissingImageSearchFile(false);
       setImageSearchError(validation.message);
       return false;
     }
 
     isImageSearchSubmittingRef.current = true;
     setIsSearching(true);
+    setHasMissingImageSearchFile(false);
     setImageSearchError(null);
     const previewUrl = URL.createObjectURL(file);
     setImageSearchStatus('loading');
@@ -194,18 +201,37 @@ export const useSearchImageFlow = ({
   }, []);
 
   useEffect(() => {
-    if (!imageSearchToken || consumedImageTokenRef.current === imageSearchToken) {
+    if (!imageSearchToken) {
+      consumedImageTokenRef.current = null;
+      setHasMissingImageSearchFile(false);
+      return;
+    }
+
+    if (consumedImageTokenRef.current === imageSearchToken) {
       return;
     }
 
     const pendingFile = pendingImageSearchSession.consumePendingFile();
+    consumedImageTokenRef.current = imageSearchToken;
+
     if (!pendingFile) {
+      clearSearchResults();
+      setIsSearching(false);
+      setImageSearchSession((current) => {
+        if (current?.previewUrl) {
+          URL.revokeObjectURL(current.previewUrl);
+        }
+        return null;
+      });
+      setImageSearchStatus('idle');
+      setHasMissingImageSearchFile(true);
+      setImageSearchError(MISSING_IMAGE_SEARCH_FILE_MESSAGE);
       return;
     }
 
-    consumedImageTokenRef.current = imageSearchToken;
+    setHasMissingImageSearchFile(false);
     void handleImageSearch(pendingFile);
-  }, [handleImageSearch, imageSearchToken]);
+  }, [clearSearchResults, handleImageSearch, imageSearchToken, setIsSearching]);
 
   useEffect(() => {
     const handleWindowPaste = (event: ClipboardEvent) => {
@@ -247,6 +273,7 @@ export const useSearchImageFlow = ({
     isImageSearchMode,
     isImageSearchLoading,
     isAwaitingImageSearch,
+    hasMissingImageSearchFile,
     clearImageSearchState,
     triggerImagePicker,
     focusPasteTarget,

@@ -118,6 +118,7 @@ const Search = () => {
     isImageSearchMode,
     isImageSearchLoading,
     isAwaitingImageSearch,
+    hasMissingImageSearchFile,
     clearImageSearchState,
     triggerImagePicker,
     focusPasteTarget,
@@ -152,7 +153,7 @@ const Search = () => {
     let cancelled = false;
 
     const fetchResults = async () => {
-      if (isImageSearchMode) {
+      if (isImageSearchMode || hasMissingImageSearchFile) {
         return;
       }
 
@@ -211,7 +212,7 @@ const Search = () => {
     return () => {
       cancelled = true;
     };
-  }, [clearSearchResults, isFlashSaleMode, isImageSearchMode, query, scope]);
+  }, [clearSearchResults, hasMissingImageSearchFile, isFlashSaleMode, isImageSearchMode, query, scope]);
 
   const filteredResults = useMemo(() => {
     const source = (isFlashSaleMode || isImageSearchMode || (query && scope === 'products'))
@@ -278,10 +279,12 @@ const Search = () => {
     updateSearchParams(query, nextScope);
   };
 
-  const isImageSearchPage = isImageSearchMode || isAwaitingImageSearch;
+  const isImageSearchPage = isImageSearchMode || isAwaitingImageSearch || hasMissingImageSearchFile;
   const effectiveSortKey = isImageSearchPage && !searchParams.get('sort') ? 'relevance' : view.sortKey;
   const showLanding = !query && !isFlashSaleMode && !isImageSearchPage;
-  const hasNoResults = isAwaitingImageSearch
+  const hasNoResults = hasMissingImageSearchFile
+    ? true
+    : isAwaitingImageSearch
     ? false
     : isImageSearchMode
     ? !isImageSearchLoading && filteredResults.length === 0
@@ -332,7 +335,7 @@ const Search = () => {
       </div>
 
       <div className="search-page-container container">
-        {imageSearchError && (
+        {imageSearchError && !hasMissingImageSearchFile && (
           <div className="search-image-error" role="alert">
             {imageSearchError}
           </div>
@@ -476,7 +479,24 @@ const Search = () => {
                   ? (isFlashSaleMode
                       ? <div className="store-empty-state"><p>Hiện chưa có sản phẩm Flash Sale đang hoạt động.</p></div>
                       : isImageSearchPage
-                        ? <div className="store-empty-state"><p>Không tìm thấy sản phẩm phù hợp với ảnh bạn đã tải lên.</p></div>
+                        ? (
+                            <div className="store-empty-state">
+                              <p>
+                                {hasMissingImageSearchFile
+                                  ? imageSearchError || 'Ảnh tìm kiếm không còn sau khi tải lại. Vui lòng chọn ảnh lại.'
+                                  : 'Không tìm thấy sản phẩm phù hợp với ảnh bạn đã tải lên.'}
+                              </p>
+                              {hasMissingImageSearchFile && (
+                                <button
+                                  type="button"
+                                  className="search-visual-query__button store-empty-state__action"
+                                  onClick={triggerImagePicker}
+                                >
+                                  Chọn ảnh lại
+                                </button>
+                              )}
+                            </div>
+                          )
                         : <EmptySearchState query={query} />)
                   : <div className="store-empty-state"><p>Không tìm thấy cửa hàng phù hợp cho "{query}".</p></div>
               ) : scope === 'stores' ? (
