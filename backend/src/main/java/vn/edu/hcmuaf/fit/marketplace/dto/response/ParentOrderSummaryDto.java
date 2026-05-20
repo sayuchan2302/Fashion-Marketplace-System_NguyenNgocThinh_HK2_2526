@@ -29,6 +29,7 @@ public class ParentOrderSummaryDto {
     private Integer itemCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime vendorConfirmationDeadlineAt;
     private Customer customer;
     private Address shippingAddress;
     private List<SubOrderSummaryDto> subOrders;

@@ -219,8 +219,8 @@ const ReviewModal = ({ isOpen, onClose, product, existingReview }: ReviewModalPr
                   </div>
                 ))}
                 {images.length < 5 && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="review-image-add"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingImages}

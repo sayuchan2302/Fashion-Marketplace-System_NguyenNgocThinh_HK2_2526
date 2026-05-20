@@ -148,7 +148,7 @@ const Header = () => {
   const { addToast } = useToast();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const { unreadCount } = useNotifications();
+  const { unreadCount, markAllAsRead } = useNotifications();
   const [searchScope, setSearchScope] = useState<SearchScope>('products');
   const [categoryTree, setCategoryTree] = useState<MarketplaceHeaderCategoryRoot[]>(FALLBACK_HEADER_CATEGORY_TREE);
 
@@ -233,6 +233,13 @@ const Header = () => {
       return;
     }
     navigate('/cart');
+  };
+
+  const handleOpenNotifications = () => {
+    if (unreadCount > 0) {
+      markAllAsRead();
+    }
+    setIsNotificationOpen(true);
   };
 
   return (
@@ -432,7 +439,7 @@ const Header = () => {
               <button
                 className="icon-btn notification-btn"
                 aria-label="Thông báo"
-                onClick={() => setIsNotificationOpen(true)}
+                onClick={handleOpenNotifications}
               >
                 <Bell size={22} />
                 {unreadCount > 0 && <span className="icon-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}

@@ -28,6 +28,7 @@ import java.util.UUID;
         @Index(name = "idx_orders_created_at", columnList = "created_at"),
         @Index(name = "idx_orders_store_created", columnList = "store_id, created_at"),
         @Index(name = "idx_orders_status_store", columnList = "status, store_id, created_at"),
+        @Index(name = "idx_orders_vendor_deadline", columnList = "status, vendor_confirmation_deadline_at"),
 })
 public class Order extends BaseEntity {
 
@@ -84,6 +85,9 @@ public class Order extends BaseEntity {
 
     @Column(name = "warehouse_note", columnDefinition = "text")
     private String warehouseNote;
+
+    @Column(name = "vendor_confirmation_deadline_at")
+    private LocalDateTime vendorConfirmationDeadlineAt;
 
     @Column(name = "store_id")
     private UUID storeId;

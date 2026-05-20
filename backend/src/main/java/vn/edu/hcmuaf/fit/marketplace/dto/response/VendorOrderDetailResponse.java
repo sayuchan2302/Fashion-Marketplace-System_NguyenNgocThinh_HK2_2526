@@ -20,6 +20,7 @@ public class VendorOrderDetailResponse {
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime vendorConfirmationDeadlineAt;
     private BigDecimal subtotal;
     private BigDecimal shippingFee;
     private BigDecimal discount;

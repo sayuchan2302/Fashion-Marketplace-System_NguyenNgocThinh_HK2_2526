@@ -33,6 +33,7 @@ public class SubOrderSummaryDto {
     private String productImage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime vendorConfirmationDeadlineAt;
     private Customer customer;
 
     @Data

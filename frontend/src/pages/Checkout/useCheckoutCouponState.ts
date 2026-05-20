@@ -92,7 +92,7 @@ export const useCheckoutCouponState = ({
     }
 
     setAppliedCoupon(coupon);
-    setCouponInput('');
+    setCouponInput(coupon.code);
     setCouponError('');
     addToast(`Áp dụng mã ${coupon.code} thành công!`, 'success');
     return true;
@@ -124,7 +124,7 @@ export const useCheckoutCouponState = ({
 
       if (result.valid && result.coupon) {
         setAppliedCoupon({ ...result.coupon, customerVoucherId: undefined });
-        setCouponInput('');
+        setCouponInput(result.coupon.code);
         addToast(`Áp dụng mã ${result.coupon.code} thành công!`, 'success');
         return;
       }
@@ -148,6 +148,7 @@ export const useCheckoutCouponState = ({
 
   const handleRemoveCoupon = useCallback(() => {
     setAppliedCoupon(null);
+    setCouponInput('');
     setCouponError('');
     addToast('Đã xóa mã giảm giá', 'info');
   }, [addToast]);
@@ -155,6 +156,7 @@ export const useCheckoutCouponState = ({
   const handleSelectCoupon = useCallback((coupon: CustomerWalletVoucher) => {
     if (appliedCoupon?.customerVoucherId === coupon.customerVoucherId) {
       setAppliedCoupon(null);
+      setCouponInput('');
       addToast('Đã bỏ chọn mã giảm giá', 'info');
       return;
     }

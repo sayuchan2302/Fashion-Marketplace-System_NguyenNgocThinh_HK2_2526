@@ -15,6 +15,38 @@ const statusMap: Record<string, string> = {
   'Đã hủy': 'cancelled',
 };
 
+const formatVendorDeadlineNotice = (deadline?: string): string | null => {
+  if (!deadline) return null;
+
+  const date = new Date(deadline);
+  if (Number.isNaN(date.getTime())) return null;
+
+  if (date.getTime() <= Date.now()) {
+    return 'Shop đã quá hạn xác nhận. Hệ thống sẽ tự xử lý nếu shop vẫn không phản hồi.';
+  }
+
+  return `Shop cần xác nhận trước ${date.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })}.`;
+};
+
+const getOrderSlaNotice = (order: ProfileTabContentProps['orders'][number]): { text: string; tone: 'pending' | 'cancelled' } | null => {
+  if (order.status === 'pending') {
+    const notice = formatVendorDeadlineNotice(order.vendorConfirmationDeadlineAt);
+    return notice ? { text: notice, tone: 'pending' } : null;
+  }
+
+  if (order.status === 'cancelled' && order.cancelReason?.includes('shop không xử lý quá 3 ngày')) {
+    return { text: 'Đơn tự hủy do shop không xử lý quá 3 ngày.', tone: 'cancelled' };
+  }
+
+  return null;
+};
+
 const OrdersTab = ({
   orderFilter,
   onOrderFilterChange,
@@ -27,6 +59,8 @@ const OrdersTab = ({
   orderStatusLabelMap,
   onOpenOrderDetail,
   onRequestCancelOrder,
+  onOpenReturnDrawer,
+  onOpenReviewForOrder,
 }: Pick<ProfileTabContentProps,
   | 'orderFilter'
   | 'onOrderFilterChange'
@@ -39,6 +73,8 @@ const OrdersTab = ({
   | 'orderStatusLabelMap'
   | 'onOpenOrderDetail'
   | 'onRequestCancelOrder'
+  | 'onOpenReturnDrawer'
+  | 'onOpenReviewForOrder'
 >) => {
   const filteredOrders = useMemo(
     () => orderFilter === 'Tất cả'
@@ -95,8 +131,11 @@ const OrdersTab = ({
             actionLink="/"
           />
         ) : (
-          pagedOrders.map((order) => (
-            <div key={order.id} className="order-card">
+          pagedOrders.map((order) => {
+            const slaNotice = getOrderSlaNotice(order);
+
+            return (
+              <div key={order.id} className="order-card">
               <div className="order-card-header">
                 <div className="order-card-meta">
                   <button className="order-id-link" onClick={() => onOpenOrderDetail(order)}>
@@ -108,6 +147,11 @@ const OrdersTab = ({
                   {orderStatusLabelMap[order.status] ?? order.status}
                 </span>
               </div>
+              {slaNotice ? (
+                <div className={`order-sla-note ${slaNotice.tone}`}>
+                  {slaNotice.text}
+                </div>
+              ) : null}
               <div className="order-card-items">
                 {order.items.slice(0, 2).map((item, idx) => (
                   <div key={idx} className="order-item">
@@ -139,13 +183,23 @@ const OrdersTab = ({
                   <button className="order-action-btn order-btn-outline" onClick={() => onOpenOrderDetail(order)}>
                     Xem chi tiết
                   </button>
-                  {order.status === 'delivered' && <button className="order-action-btn order-btn-primary">Đánh giá</button>}
+                  {order.status === 'delivered' && (
+                    <>
+                      <button className="order-action-btn order-btn-outline" onClick={() => onOpenReturnDrawer(order)}>
+                        Đổi / trả hàng
+                      </button>
+                      <button className="order-action-btn order-btn-primary" onClick={() => onOpenReviewForOrder(order)}>
+                        Đánh giá
+                      </button>
+                    </>
+                  )}
                   {order.status === 'shipping' && <button className="order-action-btn order-btn-primary">Theo dõi đơn</button>}
                   {order.status === 'cancelled' && <button className="order-action-btn order-btn-outline">Mua lại</button>}
                 </div>
               </div>
-            </div>
-          ))
+              </div>
+            );
+          })
         )}
       </div>
 

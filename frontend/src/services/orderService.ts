@@ -50,6 +50,7 @@ interface BackendOrderResponse {
   code?: string;
   createdAt?: string;
   status?: string;
+  vendorConfirmationDeadlineAt?: string;
   paymentMethod?: string;
   paymentStatus?: string;
   subtotal?: number;
@@ -96,6 +97,7 @@ interface BackendOrderTreeSubOrder {
   warehouseNote?: string;
   createdAt?: string;
   updatedAt?: string;
+  vendorConfirmationDeadlineAt?: string;
   items?: BackendOrderTreeItem[];
 }
 
@@ -110,6 +112,7 @@ interface BackendOrderTreeResponse {
   code?: string;
   createdAt?: string;
   status?: string;
+  vendorConfirmationDeadlineAt?: string;
   paymentMethod?: string;
   paymentStatus?: string;
   subtotal?: number;
@@ -250,12 +253,34 @@ const mapBackendTimelineEntries = (timeline?: BackendOrderTimelineEntry[]) =>
     })
     .filter((entry): entry is { time: string; text: string; tone: 'success' | 'pending' | 'error' | 'neutral' | 'info' } => Boolean(entry));
 
+const isVendorSlaAutoCancelText = (value?: string): boolean => {
+  const normalized = String(value || '').toLowerCase();
+  return normalized.includes('sla_auto_cancelled')
+    || normalized.includes('không xác nhận trong')
+    || normalized.includes('không xử lý quá')
+    || normalized.includes('tự hủy do shop');
+};
+
+const resolveOrderTreeVendorDeadline = (order: BackendOrderTreeResponse): string | undefined => {
+  const pendingDeadlines = (order.subOrders || [])
+    .filter((subOrder) => backendStatusToClientStatus(subOrder.status) === 'pending')
+    .map((subOrder) => subOrder.vendorConfirmationDeadlineAt)
+    .filter((value): value is string => Boolean(value));
+
+  if (pendingDeadlines.length > 0) {
+    return pendingDeadlines.sort((left, right) => new Date(left).getTime() - new Date(right).getTime())[0];
+  }
+
+  return order.vendorConfirmationDeadlineAt;
+};
+
 const mapBackendOrderToShared = (order: BackendOrderResponse): SharedOrder => {
   const clientStatus = backendStatusToClientStatus(order.status);
   return {
     id: order.id,
     code: order.code || order.id,
     createdAt: order.createdAt || new Date().toISOString(),
+    vendorConfirmationDeadlineAt: order.vendorConfirmationDeadlineAt,
     parentOrderId: order.subOrderId || undefined,
     storeId: order.storeId || undefined,
     storeName: order.storeName || undefined,
@@ -285,6 +310,9 @@ const mapBackendOrderToShared = (order: BackendOrderResponse): SharedOrder => {
     shippingFee: Number(order.shippingFee || 0),
     discount: Number(order.discount || 0),
     total: Number(order.total || 0),
+    cancelReason: clientStatus === 'cancelled' && isVendorSlaAutoCancelText(order.note)
+      ? 'Đơn tự hủy do shop không xử lý quá 3 ngày.'
+      : undefined,
     timeline: [
       {
         time: new Date(order.createdAt || Date.now()).toLocaleString('vi-VN'),
@@ -300,6 +328,9 @@ const mapBackendOrderTreeToShared = (order: BackendOrderTreeResponse): SharedOrd
   const subOrders = order.subOrders || [];
   const rootItems = order.items || [];
   const backendTimeline = mapBackendTimelineEntries(order.timeline);
+  const vendorConfirmationDeadlineAt = resolveOrderTreeVendorDeadline(order);
+  const hasSlaAutoCancel = backendTimeline.some((entry) => isVendorSlaAutoCancelText(entry.text))
+    || (order.timeline || []).some((entry) => isVendorSlaAutoCancelText(entry.text));
 
   const normalizedItems = subOrders.length > 0
     ? subOrders.flatMap((subOrder) =>
@@ -338,6 +369,7 @@ const mapBackendOrderTreeToShared = (order: BackendOrderTreeResponse): SharedOrd
     id: order.id,
     code: order.code || order.id,
     createdAt: order.createdAt || new Date().toISOString(),
+    vendorConfirmationDeadlineAt,
     customerName,
     customerEmail: order.customer?.email || '',
     customerPhone: order.shippingAddress?.phone || order.customer?.phone || '',
@@ -368,6 +400,9 @@ const mapBackendOrderTreeToShared = (order: BackendOrderTreeResponse): SharedOrd
           tone: 'neutral' as const,
         })),
       ],
+    cancelReason: backendStatusToClientStatus(order.status) === 'cancelled' && hasSlaAutoCancel
+      ? 'Đơn tự hủy do shop không xử lý quá 3 ngày.'
+      : undefined,
   };
 };
 
@@ -380,6 +415,7 @@ const toClientOrder = (o: SharedOrder): Order => ({
   id: o.id,
   code: o.code || o.id,
   createdAt: o.createdAt,
+  vendorConfirmationDeadlineAt: o.vendorConfirmationDeadlineAt,
   status: fulfillmentToClientStatus(o.fulfillment, o.paymentStatus) as OrderStatus,
   total: o.total,
   items: o.items.map((item): OrderItem => ({

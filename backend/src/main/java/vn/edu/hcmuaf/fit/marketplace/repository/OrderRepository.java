@@ -238,6 +238,22 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("""
             SELECT o FROM Order o
+            WHERE (o.storeId IS NOT NULL OR (o.parentOrder IS NULL AND o.subOrders IS EMPTY))
+              AND o.status = 'WAITING_FOR_VENDOR'
+              AND (
+                    (o.vendorConfirmationDeadlineAt IS NOT NULL AND o.vendorConfirmationDeadlineAt <= :now)
+                    OR (o.vendorConfirmationDeadlineAt IS NULL AND o.createdAt <= :legacyCutoff)
+                  )
+            ORDER BY COALESCE(o.vendorConfirmationDeadlineAt, o.createdAt) ASC
+            """)
+    List<Order> findVendorConfirmationDeadlineBreaches(
+            @Param("now") LocalDateTime now,
+            @Param("legacyCutoff") LocalDateTime legacyCutoff,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT o FROM Order o
             WHERE o.parentOrder IS NULL
               AND o.status = 'DELIVERED'
               AND COALESCE(o.deliveredAt, o.createdAt) >= :fromDate

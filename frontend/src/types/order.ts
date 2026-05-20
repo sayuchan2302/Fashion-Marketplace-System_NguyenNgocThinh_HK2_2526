@@ -26,6 +26,7 @@ export interface Order {
   id: string;
   code?: string;
   createdAt: string;
+  vendorConfirmationDeadlineAt?: string;
   status: OrderStatus;
   total: number;
   items: OrderItem[];

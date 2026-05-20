@@ -1,7 +1,7 @@
 import './Vendor.css';
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Check, Eye, Truck, XCircle, PackageCheck } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Eye, Truck, XCircle, PackageCheck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import {
@@ -54,6 +54,8 @@ type DelayAction = {
 };
 
 const PAGE_SIZE = 8;
+const VENDOR_CONFIRMATION_SLA_DAYS = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const TABS: Array<{ key: VendorOrderTab; label: string }> = [
   { key: 'all', label: 'Tất cả' },
   { key: 'confirmed', label: 'Đã xác nhận' },
@@ -94,6 +96,41 @@ const normalizeTab = (value: string | null): VendorOrderTab => {
   }
 
   return 'all';
+};
+
+const resolveVendorDeadline = (order: VendorOrderSummary): Date | null => {
+  const explicit = order.vendorConfirmationDeadlineAt ? new Date(order.vendorConfirmationDeadlineAt) : null;
+  if (explicit && !Number.isNaN(explicit.getTime())) {
+    return explicit;
+  }
+
+  const createdAt = new Date(order.date);
+  if (Number.isNaN(createdAt.getTime())) {
+    return null;
+  }
+  return new Date(createdAt.getTime() + VENDOR_CONFIRMATION_SLA_DAYS * DAY_MS);
+};
+
+const getVendorSlaMeta = (order: VendorOrderSummary): { label: string; tone: 'ok' | 'urgent' | 'overdue' } | null => {
+  if (order.status !== 'pending') {
+    return null;
+  }
+
+  const deadline = resolveVendorDeadline(order);
+  if (!deadline) {
+    return null;
+  }
+
+  const diff = deadline.getTime() - Date.now();
+  if (diff <= 0) {
+    return { label: 'Quá hạn xác nhận', tone: 'overdue' };
+  }
+
+  if (diff < DAY_MS) {
+    return { label: `Còn ${Math.max(1, Math.ceil(diff / (60 * 60 * 1000)))} giờ`, tone: 'urgent' };
+  }
+
+  return { label: `Còn ${Math.ceil(diff / DAY_MS)} ngày`, tone: 'ok' };
 };
 
 const buildActionMeta = (status: OrderUpdateStatus): {
@@ -470,12 +507,12 @@ const VendorOrders = () => {
 
   const renderOrderActions = (order: VendorOrderSummary) => (
     <div className="admin-actions vendor-order-actions">
-      <Link to={`/vendor/orders/${resolveDetailRouteKey(order.code, order.id)}`} className="admin-icon-btn subtle" title="Chi tiết đơn hàng" aria-label={`Chi tiết đơn ${toDisplayOrderCode(order.code)}`}>
+      <Link to={`/vendor/orders/${resolveDetailRouteKey(order.code, order.id)}`} className="admin-icon-btn subtle vendor-action-view" title="Chi tiết đơn hàng" aria-label={`Chi tiết đơn ${toDisplayOrderCode(order.code)}`}>
         <Eye size={16} />
       </Link>
       {order.status === 'pending' && (
         <button
-          className="admin-icon-btn subtle"
+          className="admin-icon-btn subtle vendor-action-confirm"
           title="Xác nhận đơn"
           aria-label={`Xác nhận đơn ${toDisplayOrderCode(order.code)}`}
           onClick={() => askStatusUpdate([order.id], 'CONFIRMED')}
@@ -486,7 +523,7 @@ const VendorOrders = () => {
       )}
       {order.status === 'confirmed' && (
         <button
-          className="admin-icon-btn subtle"
+          className="admin-icon-btn subtle vendor-action-confirm"
           title="Bắt đầu xử lý"
           aria-label={`Bắt đầu xử lý đơn ${toDisplayOrderCode(order.code)}`}
           onClick={() => askStatusUpdate([order.id], 'PROCESSING')}
@@ -497,7 +534,7 @@ const VendorOrders = () => {
       )}
       {order.status === 'processing' && (
         <button
-          className="admin-icon-btn subtle"
+          className="admin-icon-btn subtle vendor-action-confirm"
           title="Bàn giao vận chuyển"
           aria-label={`Bàn giao vận chuyển đơn ${toDisplayOrderCode(order.code)}`}
           onClick={() => askStatusUpdate([order.id], 'SHIPPED')}
@@ -508,7 +545,7 @@ const VendorOrders = () => {
       )}
       {order.status === 'shipped' && (
         <button
-          className="admin-icon-btn subtle"
+          className="admin-icon-btn subtle vendor-action-confirm"
           title="Xác nhận đã giao"
           aria-label={`Xác nhận đã giao đơn ${toDisplayOrderCode(order.code)}`}
           onClick={() => askStatusUpdate([order.id], 'DELIVERED')}
@@ -538,7 +575,7 @@ const VendorOrders = () => {
       )}
       {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped') ? (
         <button
-          className="admin-icon-btn subtle"
+          className="admin-icon-btn subtle vendor-action-delay"
           title="Báo đơn trễ"
           aria-label={`Báo đơn trễ ${toDisplayOrderCode(order.code)}`}
           onClick={() => requestDelayNotice([order.id])}
@@ -651,6 +688,7 @@ const VendorOrders = () => {
                 {paginatedOrders.map((order, index) => {
                   const statusTone = getVendorOrderStatusTone(order.status);
                   const statusLabel = getVendorOrderStatusLabel(order.status);
+                  const slaMeta = getVendorSlaMeta(order);
                   const isSelected = selected.has(order.id);
                   const productVariantLine = [order.productMeta, order.productExtra]
                     .map((value) => value?.trim())
@@ -699,7 +737,15 @@ const VendorOrders = () => {
                       </div>
                       <div className="admin-bold">{formatCurrency(order.total)}</div>
                       <div>
-                        <span className={`admin-pill ${statusTone}`}>{statusLabel}</span>
+                        <div className="vendor-status-stack">
+                          <span className={`admin-pill ${statusTone}`}>{statusLabel}</span>
+                          {slaMeta ? (
+                            <span className={`vendor-sla-chip ${slaMeta.tone}`}>
+                              <Clock size={12} />
+                              {slaMeta.label}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="order-date-cell">
                         <span className="order-date-time">{new Date(order.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -715,6 +761,7 @@ const VendorOrders = () => {
                 {paginatedOrders.map((order, index) => {
                   const statusTone = getVendorOrderStatusTone(order.status);
                   const statusLabel = getVendorOrderStatusLabel(order.status);
+                  const slaMeta = getVendorSlaMeta(order);
                   const isSelected = selected.has(order.id);
                   const productVariantLine = [order.productMeta, order.productExtra]
                     .map((value) => value?.trim())
@@ -739,7 +786,15 @@ const VendorOrders = () => {
                           />
                           <span>#{toDisplayOrderCode(order.code)}</span>
                         </label>
-                        <span className={`admin-pill ${statusTone}`}>{statusLabel}</span>
+                        <div className="vendor-status-stack compact">
+                          <span className={`admin-pill ${statusTone}`}>{statusLabel}</span>
+                          {slaMeta ? (
+                            <span className={`vendor-sla-chip ${slaMeta.tone}`}>
+                              <Clock size={12} />
+                              {slaMeta.label}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="vendor-card-product">

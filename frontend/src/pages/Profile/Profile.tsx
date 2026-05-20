@@ -15,6 +15,7 @@ import AddressModal from './AddressModal';
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import ReviewModal from '../../components/ReviewModal/ReviewModal';
 import ProfileTabContent from './components/ProfileTabContent';
+import ReturnRequestDrawer from '../OrderDetail/ReturnRequestDrawer';
 import type { PendingProduct } from './components/ProfileTabContent.types';
 import ProfileAccountModal from './components/ProfileAccountModal';
 import ProfilePasswordModal from './components/ProfilePasswordModal';
@@ -41,6 +42,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import type { Address } from '../../types';
 import type { Order } from '../../types';
 import './Profile.css';
+import '../OrderDetail/OrderDetail.css';
 
 const t = CLIENT_TEXT.profile;
 const tCommon = CLIENT_TEXT.common;
@@ -212,7 +214,7 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  
+
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -286,6 +288,8 @@ const Profile = () => {
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewProduct, setReviewProduct] = useState<PendingProduct | null>(null);
+  const [isReturnDrawerOpen, setIsReturnDrawerOpen] = useState(false);
+  const [returnOrder, setReturnOrder] = useState<Order | null>(null);
   const [reviewFilter, setReviewFilter] = useState<'pending' | 'completed'>('pending');
   const [pendingReviewPage, setPendingReviewPage] = useState(1);
   const [completedReviewPage, setCompletedReviewPage] = useState(1);
@@ -298,6 +302,30 @@ const Profile = () => {
   const [followingStoresLoading, setFollowingStoresLoading] = useState(false);
   const [followingStoresError, setFollowingStoresError] = useState<string | null>(null);
   const [notificationPage, setNotificationPage] = useState(1);
+
+  const handleOpenReturnDrawer = (order: Order) => {
+    setReturnOrder(order);
+    setIsReturnDrawerOpen(true);
+  };
+
+  const handleOpenReviewForOrder = (order: Order) => {
+    const firstItem = order.items[0];
+    if (firstItem) {
+      const details = [
+        firstItem.color?.trim() || null,
+        firstItem.size?.trim() || null,
+      ].filter(Boolean).join(' / ');
+
+      handleOpenReviewModal({
+        productId: firstItem.productId || firstItem.id,
+        productName: firstItem.name,
+        productImage: firstItem.image,
+        orderId: order.id,
+        orderCode: order.code,
+        variant: details || 'Đơn hàng đã giao',
+      });
+    }
+  };
 
   const handleOpenReviewModal = (product: PendingProduct) => {
     setReviewProduct(product);
@@ -565,6 +593,7 @@ const Profile = () => {
       isPasswordModalOpen ||
       isAddressModalOpen ||
       isReviewModalOpen ||
+      isReturnDrawerOpen ||
       isFollowingModalOpen;
     if (anyModalOpen) {
       document.body.classList.add('modal-open');
@@ -572,7 +601,7 @@ const Profile = () => {
       document.body.classList.remove('modal-open');
     }
     return () => document.body.classList.remove('modal-open');
-  }, [isAccountModalOpen, isPasswordModalOpen, isAddressModalOpen, isReviewModalOpen, isFollowingModalOpen]);
+  }, [isAccountModalOpen, isPasswordModalOpen, isAddressModalOpen, isReviewModalOpen, isFollowingModalOpen, isReturnDrawerOpen]);
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -782,8 +811,8 @@ const Profile = () => {
             <div className="loyalty-stats">
               <div className="loyalty-stat">
                 <span className="stat-label">Hạng thành viên</span>
-                <span 
-                  className="stat-value tier-badge" 
+                <span
+                  className="stat-value tier-badge"
                   style={{ backgroundColor: tierConfig.bg, color: tierConfig.color, borderColor: tierConfig.color }}
                 >
                   {tierConfig.label}
@@ -907,6 +936,8 @@ const Profile = () => {
                 onCompletedReviewPageChange={setCompletedReviewPage}
                 getOrderDisplayCode={getOrderDisplayCode}
                 onOpenReviewModal={handleOpenReviewModal}
+                onOpenReturnDrawer={handleOpenReturnDrawer}
+                onOpenReviewForOrder={handleOpenReviewForOrder}
                 notifications={notifications}
                 unreadCount={unreadCount}
                 notificationPage={notificationPage}
@@ -977,6 +1008,11 @@ const Profile = () => {
         editingAddress={editingAddress}
         existingAddressCount={savedAddresses.length}
         addressesLoading={addressesLoading}
+      />
+      <ReturnRequestDrawer
+        isOpen={isReturnDrawerOpen}
+        order={returnOrder}
+        onClose={() => setIsReturnDrawerOpen(false)}
       />
       {/* Review Modal */}
       {reviewProduct && (

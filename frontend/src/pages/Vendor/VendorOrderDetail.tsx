@@ -4,6 +4,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, Check, Copy, MapPin, Package, Percent, Printer, Store, Truck, User, XCircle } from 'lucide-react';
 import { startTransition, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { VendorOrderPrintTemplate } from './components/orders/VendorOrderPrintTemplate';
+import './components/orders/VendorPrintStyle.css';
 import VendorLayout from './VendorLayout';
 import { formatVendorOrderDate, getVendorOrderStatusLabel, getVendorOrderStatusTone } from './vendorOrderPresentation';
 import { formatCurrency } from '../../services/commissionService';
@@ -168,6 +171,30 @@ const VendorOrderDetail = () => {
     }
   };
 
+  const handlePrintDeliveryNote = () => {
+    // 1. Kích hoạt in trên trình duyệt
+    window.print();
+
+    // 2. Ghi nhận nhật ký sự kiện vào mảng timeline của đơn hàng hiện tại
+    setOrder((current) => {
+      const alreadyPrinted = current.timeline.some(
+        (log) => log.status === 'printed' || (log.note && log.note.includes('in phiếu giao'))
+      );
+      if (alreadyPrinted) return current;
+
+      const newTimelineItem = {
+        status: 'printed',
+        date: new Date().toISOString(),
+        note: 'Đối tác đã in phiếu giao hàng thành công.'
+      };
+
+      return {
+        ...current,
+        timeline: [newTimelineItem, ...current.timeline]
+      };
+    });
+  };
+
   const shippingAddress = [order.shippingAddress.address, order.shippingAddress.ward, order.shippingAddress.district, order.shippingAddress.city].filter(Boolean).join(', ');
   const statusLabel = getVendorOrderStatusLabel(order.status);
   const statusTone = getVendorOrderStatusTone(order.status);
@@ -195,7 +222,7 @@ const VendorOrderDetail = () => {
       breadcrumbs={['Kênh Người Bán', 'Đơn hàng', 'Chi tiết']}
       actions={(
         <div className="admin-actions">
-          <button className="admin-ghost-btn">
+          <button className="admin-ghost-btn" onClick={handlePrintDeliveryNote}>
             <Printer size={16} />
             In phiếu giao
           </button>
@@ -453,6 +480,7 @@ const VendorOrderDetail = () => {
           />
         </label>
       </AdminConfirmDialog>
+      {createPortal(<VendorOrderPrintTemplate order={order} />, document.body)}
     </VendorLayout>
   );
 };

@@ -44,6 +44,7 @@ interface BackendVendorOrderSummary {
   status?: string;
   createdAt?: string;
   updatedAt?: string;
+  vendorConfirmationDeadlineAt?: string;
   total?: number;
   commissionFee?: number;
   vendorPayout?: number;
@@ -201,6 +202,7 @@ export interface VendorOrderSummary {
   total: number;
   status: VendorOrderLifecycleStatus;
   date: string;
+  vendorConfirmationDeadlineAt?: string;
   items: number;
   commissionFee: number;
   vendorPayout: number;
@@ -234,6 +236,7 @@ export interface VendorOrderDetailData {
   status: VendorOrderLifecycleStatus;
   createdAt: string;
   updatedAt?: string;
+  vendorConfirmationDeadlineAt?: string;
   customer: {
     name: string;
     email: string;
@@ -436,6 +439,7 @@ const mapOrderSummary = (order: BackendVendorOrderSummary): VendorOrderSummary =
     total,
     status: mapBackendStatus(order.status),
     date: order.createdAt || new Date().toISOString(),
+    vendorConfirmationDeadlineAt: order.vendorConfirmationDeadlineAt || undefined,
     items: Number(order.itemCount || 0),
     commissionFee: Number(order.commissionFee ?? 0),
     vendorPayout: Number(order.vendorPayout ?? 0),
@@ -453,6 +457,7 @@ const mapOrderDetail = (order: BackendVendorOrderDetail): VendorOrderDetailData 
   status: mapBackendStatus(order.status),
   createdAt: order.createdAt || new Date().toISOString(),
   updatedAt: order.updatedAt || order.createdAt || new Date().toISOString(),
+  vendorConfirmationDeadlineAt: order.vendorConfirmationDeadlineAt || undefined,
   customer: {
     name: order.customer?.name || order.shippingAddress?.fullName || 'Khách hàng',
     email: order.customer?.email || '',

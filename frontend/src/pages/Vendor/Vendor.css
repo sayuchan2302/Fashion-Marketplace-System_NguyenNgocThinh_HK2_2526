@@ -1544,6 +1544,87 @@
   visibility: hidden;
 }
 
+.vendor-order-actions .admin-icon-btn.vendor-action-view {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.vendor-order-actions .admin-icon-btn.vendor-action-view:hover {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.vendor-order-actions .admin-icon-btn.vendor-action-confirm {
+  color: #15803d;
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.vendor-order-actions .admin-icon-btn.vendor-action-confirm:hover {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+
+.vendor-order-actions .admin-icon-btn.vendor-action-delay {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fbbf24;
+}
+
+.vendor-order-actions .admin-icon-btn.vendor-action-delay:hover {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.vendor-status-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vendor-status-stack.compact {
+  align-items: flex-end;
+}
+
+.vendor-sla-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.vendor-sla-chip.urgent {
+  border-color: #fbbf24;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.vendor-sla-chip.overdue {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.vendor-sla-chip svg {
+  flex: 0 0 auto;
+}
+
 .vendor-filter-toolbar,
 .vendor-tabs-toolbar {
   display: flex;

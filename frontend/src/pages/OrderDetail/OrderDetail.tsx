@@ -25,6 +25,7 @@ import { toDisplayOrderCode } from '../../utils/displayCode';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { CLIENT_TEXT } from '../../utils/texts';
 import type { Order } from '../../types';
+import ReturnRequestDrawer from './ReturnRequestDrawer';
 import './OrderDetail.css';
 import '../../styles/orderDetailTheme.css';
 import { getOptimizedImageUrl } from '../../utils/getOptimizedImageUrl';
@@ -41,6 +42,7 @@ const CANCEL_REASONS = [
 ];
 
 const statusColorMap: Record<string, string> = {
+  pending: 'status-pending',
   delivered: 'status-delivered',
   shipping: 'status-shipping',
   processing: 'status-processing',
@@ -78,6 +80,40 @@ const clampReviewRating = (value: number): number => {
   return Math.max(0, Math.min(5, Math.round(value)));
 };
 
+const getOrderSlaNotice = (order: Order): { text: string; tone: 'pending' | 'cancelled' } | null => {
+  if (order.status === 'pending' && order.vendorConfirmationDeadlineAt) {
+    const deadline = new Date(order.vendorConfirmationDeadlineAt);
+    if (Number.isNaN(deadline.getTime())) return null;
+
+    if (deadline.getTime() <= Date.now()) {
+      return {
+        tone: 'pending',
+        text: 'Shop đã quá hạn xác nhận. Hệ thống sẽ tự hủy nếu shop vẫn không xử lý.',
+      };
+    }
+
+    return {
+      tone: 'pending',
+      text: `Shop cần xác nhận trước ${deadline.toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })}.`,
+    };
+  }
+
+  if (order.status === 'cancelled' && order.cancelReason?.includes('shop không xử lý quá 3 ngày')) {
+    return {
+      tone: 'cancelled',
+      text: 'Đơn tự hủy do shop không xử lý quá 3 ngày.',
+    };
+  }
+
+  return null;
+};
+
 const OrderDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -89,6 +125,7 @@ const OrderDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isResolvingReview, setIsResolvingReview] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isReturnDrawerOpen, setIsReturnDrawerOpen] = useState(false);
   const [reviewProduct, setReviewProduct] = useState<ReviewProduct | null>(null);
   const [orderReviews, setOrderReviews] = useState<Review[]>([]);
   const [isLoadingOrderReviews, setIsLoadingOrderReviews] = useState(false);
@@ -270,6 +307,8 @@ const OrderDetail = () => {
   const shippingPhone = addressParts[1]?.trim() || '';
   const shippingAddress = addressParts.slice(2).join(',').trim() || '';
   const totalProductQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const slaNotice = getOrderSlaNotice(order);
   return (
     <div className="od-page od-theme od-theme-client">
       <div className="od-container">
@@ -287,10 +326,16 @@ const OrderDetail = () => {
           </Link>
           <div className="od-header-info">
             <h1>Đơn hàng <span className="od-order-id">#{order.code || order.id}</span></h1>
-            <span className="od-date">Ngày đặt: {new Date(order.createdAt).toLocaleString('vi-VN')}</span>
           </div>
           <span className={`od-status-badge ${statusColorMap[order.status]}`}>{t.status[order.status]}</span>
         </div>
+
+        {slaNotice ? (
+          <div className={`od-sla-notice ${slaNotice.tone}`}>
+            <Clock size={16} />
+            <span>{slaNotice.text}</span>
+          </div>
+        ) : null}
 
         <div className="od-grid">
           <div className="od-left">
@@ -362,11 +407,6 @@ const OrderDetail = () => {
                         <span className="od-item-price-label">Đơn giá</span>
                         <span className="od-item-price">{formatPrice(item.price)}</span>
                         <span className="od-item-line-total">Thành tiền: {formatPrice(lineTotal)}</span>
-                        {productHref && (
-                          <Link to={productHref} className="od-item-detail-link">
-                            Xem sản phẩm
-                          </Link>
-                        )}
                       </div>
                     </div>
                   );
@@ -462,12 +502,18 @@ const OrderDetail = () => {
               <div className="od-summary">
                 <div className="od-sum-row">
                   <span>Tạm tính</span>
-                  <span>{formatPrice(order.total)}</span>
+                  <span>{formatPrice(subtotal)}</span>
                 </div>
                 <div className="od-sum-row">
                   <span>Phí vận chuyển</span>
-                  <span>Miễn phí</span>
+                  <span>{order.shippingFee && order.shippingFee > 0 ? formatPrice(order.shippingFee) : 'Miễn phí'}</span>
                 </div>
+                {order.discount && order.discount > 0 ? (
+                  <div className="od-sum-row od-discount">
+                    <span>Voucher giảm giá</span>
+                    <span>-{formatPrice(order.discount)}</span>
+                  </div>
+                ) : null}
                 {order.cancelReason && (
                   <div className="od-sum-row">
                     <span>Trạng thái</span>
@@ -493,7 +539,9 @@ const OrderDetail = () => {
                       {isResolvingReview ? 'Đang tải...' : 'Đánh giá sản phẩm'}
                     </button>
                   ) : null}
-                  <button className="od-action-btn od-btn-outline"><RotateCcw size={16} /> Đổi / trả hàng</button>
+                  <button className="od-action-btn od-btn-outline" onClick={() => setIsReturnDrawerOpen(true)}>
+                    <RotateCcw size={16} /> Đổi / trả hàng
+                  </button>
                 </>
               )}
               {order.status === 'shipping' && (
@@ -583,6 +631,12 @@ const OrderDetail = () => {
           product={reviewProduct}
         />
       ) : null}
+
+      <ReturnRequestDrawer
+        isOpen={isReturnDrawerOpen}
+        order={order}
+        onClose={() => setIsReturnDrawerOpen(false)}
+      />
     </div>
   );
 };

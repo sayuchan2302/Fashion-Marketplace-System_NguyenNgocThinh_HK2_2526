@@ -92,7 +92,6 @@ const OrderDetailPage = () => {
         <div className="account-header">
           <div>
             <h1 className="account-title">Đơn hàng {toDisplayOrderCode(order.code || order.id)}</h1>
-            <p className="account-subtitle">Ngày đặt: {new Date(order.createdAt).toLocaleString('vi-VN')}</p>
           </div>
           <div className="account-actions">
             <button className="btn-secondary" onClick={() => navigate('/account/orders')}>Quay lại</button>

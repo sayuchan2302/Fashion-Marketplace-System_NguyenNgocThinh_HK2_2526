@@ -1,0 +1,345 @@
+/* Giao diện hiển thị trên màn hình: Mặc định ẩn hoàn toàn phôi in */
+@media screen {
+  .vendor-print-page-wrapper {
+    display: none !important;
+  }
+}
+
+/* Định cấu hình khi thiết bị thực hiện in */
+@media print {
+
+  /* Khôi phục và đảm bảo kích thước chiều cao html/body vừa khít */
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  /* Ẩn hoàn toàn gốc ứng dụng chính để tránh chiếm dụng không gian và phân trang dư thừa */
+  #root {
+    display: none !important;
+  }
+
+  /* Đảm bảo phôi in được hiển thị tĩnh, tương quan tương đối thay vì tuyệt đối để tránh phân trang rỗng */
+  .vendor-print-page-wrapper {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height: 1.35;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box;
+  }
+
+  @page {
+    size: 100mm 150mm;
+    /* Khổ giấy A6 in nhiệt */
+    margin: 3mm 3mm 3mm 3mm !important;
+  }
+}
+
+/* Phong cách hiển thị chi tiết của phiếu in giao hàng */
+.vendor-print-page-wrapper {
+  color: #000;
+  background: #fff;
+  padding: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+  box-sizing: border-box;
+}
+
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.print-shop-info {
+  text-align: left;
+}
+
+.print-shop-name {
+  font-size: 14px;
+  font-weight: 800;
+  margin: 0 0 2px 0;
+  letter-spacing: 0.5px;
+  color: #000;
+}
+
+.print-shop-sub {
+  font-size: 9px;
+  color: #333;
+  margin: 0;
+}
+
+.print-order-label {
+  text-align: right;
+  max-width: 180px;
+}
+
+.print-divider {
+  border-top: 1.5px dashed #000;
+  margin: 6px 0;
+}
+
+.print-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0;
+}
+
+.print-info-table td {
+  vertical-align: top;
+  padding: 2px 4px;
+}
+
+.w-50 {
+  width: 50%;
+}
+
+.separator-left {
+  border-left: 1.5px dashed #000;
+  padding-left: 8px !important;
+}
+
+.print-label {
+  display: block;
+  font-size: 9px;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 2px;
+}
+
+.print-value {
+  display: block;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 1px;
+}
+
+.print-value-phone {
+  display: block;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 1px;
+}
+
+.print-sub-value {
+  display: block;
+  font-size: 10px;
+  color: #000;
+  word-break: break-word;
+}
+
+.print-section-title {
+  font-size: 10px;
+  font-weight: bold;
+  margin: 6px 0 4px 0;
+  letter-spacing: 0.5px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.print-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.print-items-table th,
+.print-items-table td {
+  border: 1px solid #000;
+  padding: 4px;
+  color: #000;
+}
+
+.print-items-table th {
+  background: #f0f0f0;
+  font-weight: bold;
+}
+
+.print-item-name {
+  font-weight: bold;
+}
+
+.print-item-sku {
+  font-size: 9px;
+  margin-top: 1px;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.w-12 {
+  width: 12%;
+}
+
+.w-25 {
+  width: 25%;
+}
+
+.print-summary-section {
+  display: flex;
+  margin-top: 6px;
+}
+
+.print-summary-left {
+  width: 45%;
+  padding-right: 8px;
+}
+
+.print-summary-right {
+  width: 55%;
+  border-left: 1.5px dashed #000;
+  padding-left: 8px;
+}
+
+.print-note-box {
+  background: #fafafa;
+  border: 1px solid #000;
+  padding: 3px 5px;
+  margin-bottom: 4px;
+  border-radius: 2px;
+}
+
+.print-note-box span {
+  font-size: 8px;
+  font-weight: bold;
+  display: block;
+}
+
+.print-note-text {
+  margin: 1px 0 0 0;
+  font-size: 9px;
+  font-style: italic;
+  color: #000;
+}
+
+.print-carrier-info {
+  font-size: 9px;
+}
+
+.print-carrier-info span {
+  display: block;
+  font-size: 8px;
+  color: #000;
+}
+
+.print-tracking-wrap {
+  margin-top: 2px;
+}
+
+.print-monospace-bold {
+  font-family: monospace;
+  font-weight: bold;
+  font-size: 10px;
+}
+
+.print-payment-summary {
+  font-size: 9px;
+}
+
+.print-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.print-receipt-divider {
+  border-top: 1px solid #000;
+  margin: 3px 0;
+}
+
+.is-cod-row {
+  font-weight: bold;
+}
+
+.print-color-badge {
+  background: #000;
+  color: #fff;
+  padding: 1px 3px;
+  font-size: 8px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+.print-money-due {
+  margin-top: 4px;
+  padding: 4px;
+  border-radius: 2px;
+  text-align: center;
+}
+
+.theme-cod-alert {
+  border: 1.5px solid #000;
+  background: #fff;
+}
+
+.theme-paid-alert {
+  border: 1px solid #000;
+  background: #fafafa;
+}
+
+.print-money-due span {
+  font-size: 8px;
+  font-weight: bold;
+  display: block;
+}
+
+.print-due-amount {
+  margin: 1px 0 0 0;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.print-footer-signatures {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.print-sig-col {
+  width: 45%;
+}
+
+.sig-title {
+  display: block;
+  font-weight: bold;
+  font-size: 9px;
+}
+
+.sig-desc {
+  display: block;
+  font-size: 8px;
+  color: #000;
+  margin-top: 1px;
+}
+
+.sig-place-holder {
+  height: 25px;
+}
+
+.text-upper {
+  text-transform: uppercase;
+}

@@ -39,6 +39,7 @@ export interface SharedOrder {
   id: string;            // backend UUID
   code?: string;         // public code for display
   createdAt: string;     // ISO string
+  vendorConfirmationDeadlineAt?: string;
   
   // Multi-vendor: parent order ID for sub-orders
   parentOrderId?: string;  // If set, this is a sub-order belonging to a parent

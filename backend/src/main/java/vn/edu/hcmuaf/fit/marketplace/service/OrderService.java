@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -62,6 +63,9 @@ public class OrderService {
     private final AdminAuditLogService adminAuditLogService;
     private final NotificationDomainService notificationDomainService;
     private final OrderStatusLogRepository orderStatusLogRepository;
+
+    @Value("${app.orders.sla.vendor-confirmation.days:3}")
+    private long vendorConfirmationSlaDays = VENDOR_CONFIRMATION_SLA_DAYS;
 
     @Autowired
     public OrderService(OrderRepository orderRepository, UserRepository userRepository,
@@ -203,6 +207,10 @@ public class OrderService {
     private static final String ORDER_LOG_EVENT_CREATED = "ORDER_CREATED";
     private static final String ORDER_LOG_EVENT_STATUS_CHANGED = "STATUS_CHANGED";
     private static final String ORDER_LOG_EVENT_TRACKING_UPDATED = "TRACKING_UPDATED";
+    private static final String ORDER_LOG_EVENT_SLA_AUTO_CANCELLED = "SLA_AUTO_CANCELLED";
+    private static final long VENDOR_CONFIRMATION_SLA_DAYS = 3L;
+    private static final int MAX_VENDOR_CONFIRMATION_AUTO_CANCEL_BATCH_SIZE = 500;
+    private static final int VENDOR_CONFIRMATION_READ_RECONCILE_BATCH_SIZE = 100;
     private static final String OWN_STORE_PURCHASE_MESSAGE = "Khong the mua san pham tu gian hang cua chinh ban.";
 
     private record PreparedOrderItem(
@@ -271,8 +279,9 @@ public class OrderService {
 
     // ─── Customer Methods ──────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AdminOrderResponse> findByUserId(UUID userId) {
+        reconcileVendorConfirmationSlaForRead();
         return orderRepository.findByUserIdAndParentOrderIsNullOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(this::toAdminOrderResponse)
@@ -318,13 +327,15 @@ public class OrderService {
         return toAdminOrderResponse(findByCode(code));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AdminOrderResponse getCustomerOrderById(UUID orderId, UUID userId) {
+        reconcileVendorConfirmationSlaForRead();
         return toAdminOrderResponse(findByIdForUser(orderId, userId));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AdminOrderResponse getCustomerOrderByCode(String orderCode, UUID userId) {
+        reconcileVendorConfirmationSlaForRead();
         return toAdminOrderResponse(findByCodeForUser(orderCode, userId));
     }
 
@@ -404,7 +415,7 @@ public class OrderService {
                 .orElseThrow(() -> new ForbiddenException("Order not found or you don't have access to it"));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public VendorOrderPageResponse getVendorOrderPage(
             UUID storeId,
             Order.OrderStatus status,
@@ -413,6 +424,7 @@ public class OrderService {
             LocalDateTime toDate,
             Pageable pageable
     ) {
+        reconcileVendorConfirmationSlaForRead();
         Page<Order> page = findByStoreIdFiltered(storeId, status, keyword, fromDate, toDate, pageable);
         return VendorOrderPageResponse.builder()
                 .content(page.getContent().stream().map(this::toVendorOrderSummaryResponse).toList())
@@ -424,17 +436,19 @@ public class OrderService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public VendorOrderDetailResponse getVendorOrderDetail(UUID orderId, UUID storeId) {
+        reconcileVendorConfirmationSlaForRead();
         return toVendorOrderDetailResponse(findByIdForStore(orderId, storeId));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public VendorOrderDetailResponse getVendorOrderDetailByCode(String orderCode, UUID storeId) {
+        reconcileVendorConfirmationSlaForRead();
         return toVendorOrderDetailResponse(findByCodeForStore(orderCode, storeId));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public VendorSubOrderPageResponse getVendorSubOrderPage(
             UUID storeId,
             Order.OrderStatus status,
@@ -443,6 +457,7 @@ public class OrderService {
             LocalDateTime toDate,
             Pageable pageable
     ) {
+        reconcileVendorConfirmationSlaForRead();
         Page<Order> page = findByStoreIdFiltered(storeId, status, keyword, fromDate, toDate, pageable);
         Map<UUID, String> storeNames = buildStoreNameMap(page.getContent());
 
@@ -502,6 +517,50 @@ public class OrderService {
         consumeDiscountUsageIfEligible(savedOrder);
         notifyCustomerPaymentSuccess(savedOrder);
         return toAdminOrderResponse(savedOrder);
+    }
+
+    @Transactional
+    public int autoCancelExpiredVendorConfirmations(LocalDateTime now, int batchSize) {
+        LocalDateTime effectiveNow = now == null ? LocalDateTime.now() : now;
+        LocalDateTime legacyCutoff = effectiveNow.minusDays(vendorConfirmationSlaDays());
+        int limit = Math.max(1, Math.min(batchSize, MAX_VENDOR_CONFIRMATION_AUTO_CANCEL_BATCH_SIZE));
+
+        List<Order> candidates = orderRepository.findVendorConfirmationDeadlineBreaches(
+                effectiveNow,
+                legacyCutoff,
+                PageRequest.of(0, limit)
+        );
+
+        int cancelled = 0;
+        for (Order candidate : candidates) {
+            if (candidate == null || candidate.getId() == null) {
+                continue;
+            }
+            Order order = orderRepository.findByIdForUpdate(candidate.getId()).orElse(null);
+            if (!isVendorConfirmationExpired(order, effectiveNow)) {
+                continue;
+            }
+
+            LocalDateTime missedDeadline = resolveVendorConfirmationDeadline(order);
+            Order.OrderStatus parentStatusBefore = resolveParentStatus(order);
+            Order saved = applyStatusUpdate(
+                    order,
+                    Order.OrderStatus.CANCELLED,
+                    null,
+                    null,
+                    vendorConfirmationSlaCancelReason(),
+                    false
+            );
+            recordSlaAutoCancelled(saved, missedDeadline);
+            notifyCustomerVendorSlaAutoCancelled(saved, parentStatusBefore);
+            cancelled++;
+        }
+
+        return cancelled;
+    }
+
+    private void reconcileVendorConfirmationSlaForRead() {
+        autoCancelExpiredVendorConfirmations(LocalDateTime.now(), VENDOR_CONFIRMATION_READ_RECONCILE_BATCH_SIZE);
     }
 
     /**
@@ -616,13 +675,15 @@ public class OrderService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public OrderTreeResponseDto getCustomerOrderTree(UUID orderId, UUID userId) {
+        reconcileVendorConfirmationSlaForRead();
         return buildCustomerOrderTree(findByIdForUser(orderId, userId), userId);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public OrderTreeResponseDto getCustomerOrderTreeByCode(String orderCode, UUID userId) {
+        reconcileVendorConfirmationSlaForRead();
         return buildCustomerOrderTree(findByCodeForUser(orderCode, userId), userId);
     }
 
@@ -658,6 +719,7 @@ public class OrderService {
                 .splitOrder(!syntheticSingleSubOrder && !normalizedSubOrders.isEmpty())
                 .createdAt(rootOrder.getCreatedAt())
                 .updatedAt(rootOrder.getUpdatedAt())
+                .vendorConfirmationDeadlineAt(resolveEarliestVendorConfirmationDeadline(rootOrder, normalizedSubOrders))
                 .customer(toOrderTreeCustomer(rootOrder))
                 .shippingAddress(toOrderTreeAddress(rootOrder))
                 .subOrders(subOrderNodes)
@@ -692,6 +754,7 @@ public class OrderService {
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .deliveredAt(order.getDeliveredAt())
+                .vendorConfirmationDeadlineAt(order.getVendorConfirmationDeadlineAt())
                 .customer(order.getUser() != null ? AdminOrderResponse.CustomerInfo.builder()
                         .name(order.getUser().getName())
                         .email(order.getUser().getEmail())
@@ -748,6 +811,7 @@ public class OrderService {
                 .itemCount(itemCount)
                 .createdAt(rootOrder.getCreatedAt())
                 .updatedAt(rootOrder.getUpdatedAt())
+                .vendorConfirmationDeadlineAt(resolveEarliestVendorConfirmationDeadline(rootOrder, normalizedSubOrders))
                 .customer(ParentOrderSummaryDto.Customer.builder()
                         .name(rootOrder.getUser() != null ? rootOrder.getUser().getName() : null)
                         .email(rootOrder.getUser() != null ? rootOrder.getUser().getEmail() : null)
@@ -774,6 +838,20 @@ public class OrderService {
             return List.of(rootOrder);
         }
         return List.of();
+    }
+
+    private LocalDateTime resolveEarliestVendorConfirmationDeadline(Order rootOrder, List<Order> subOrders) {
+        Stream<Order> candidates = subOrders == null || subOrders.isEmpty()
+                ? Stream.of(rootOrder)
+                : subOrders.stream();
+        return candidates
+                .filter(order -> order != null && order.getStatus() == Order.OrderStatus.WAITING_FOR_VENDOR)
+                .map(Order::getVendorConfirmationDeadlineAt)
+                .filter(deadline -> deadline != null)
+                .min(LocalDateTime::compareTo)
+                .orElse(rootOrder != null && rootOrder.getStatus() == Order.OrderStatus.WAITING_FOR_VENDOR
+                        ? rootOrder.getVendorConfirmationDeadlineAt()
+                        : null);
     }
 
     private Map<UUID, List<Order>> groupSubOrdersByParent(List<Order> subOrders) {
@@ -836,6 +914,7 @@ public class OrderService {
                 .productImage(firstItem != null ? firstItem.getProductImage() : null)
                 .createdAt(subOrder.getCreatedAt())
                 .updatedAt(subOrder.getUpdatedAt())
+                .vendorConfirmationDeadlineAt(subOrder.getVendorConfirmationDeadlineAt())
                 .customer(SubOrderSummaryDto.Customer.builder()
                         .name(subOrder.getUser() != null ? subOrder.getUser().getName() : null)
                         .email(subOrder.getUser() != null ? subOrder.getUser().getEmail() : null)
@@ -879,6 +958,7 @@ public class OrderService {
                 .warehouseNote(subOrder.getWarehouseNote())
                 .createdAt(subOrder.getCreatedAt())
                 .updatedAt(subOrder.getUpdatedAt())
+                .vendorConfirmationDeadlineAt(subOrder.getVendorConfirmationDeadlineAt())
                 .items(toOrderTreeItemNodes(subOrder.getItems()))
                 .build();
     }
@@ -1156,6 +1236,114 @@ public class OrderService {
                 .build());
     }
 
+    private void assignVendorConfirmationDeadline(Order order, LocalDateTime baseTime) {
+        if (order == null) {
+            return;
+        }
+        LocalDateTime start = baseTime == null ? LocalDateTime.now() : baseTime;
+        order.setVendorConfirmationDeadlineAt(start.plusDays(vendorConfirmationSlaDays()));
+    }
+
+    private long vendorConfirmationSlaDays() {
+        return Math.max(1L, vendorConfirmationSlaDays);
+    }
+
+    private String vendorConfirmationSlaCancelReason() {
+        return "Shop không xác nhận trong " + vendorConfirmationSlaDays() + " ngày";
+    }
+
+    private void refreshVendorConfirmationDeadline(Order order, Order.OrderStatus status) {
+        if (order == null) {
+            return;
+        }
+        if (status == Order.OrderStatus.WAITING_FOR_VENDOR) {
+            if (order.getVendorConfirmationDeadlineAt() == null) {
+                assignVendorConfirmationDeadline(order, LocalDateTime.now());
+            }
+            return;
+        }
+        order.setVendorConfirmationDeadlineAt(null);
+    }
+
+    private LocalDateTime resolveVendorConfirmationDeadline(Order order) {
+        if (order == null) {
+            return null;
+        }
+        if (order.getVendorConfirmationDeadlineAt() != null) {
+            return order.getVendorConfirmationDeadlineAt();
+        }
+        return order.getCreatedAt() == null
+                ? null
+                : order.getCreatedAt().plusDays(vendorConfirmationSlaDays());
+    }
+
+    private boolean isVendorConfirmationExpired(Order order, LocalDateTime now) {
+        if (!isVendorConfirmationSlaManagedOrder(order) || order.getStatus() != Order.OrderStatus.WAITING_FOR_VENDOR) {
+            return false;
+        }
+        LocalDateTime deadline = resolveVendorConfirmationDeadline(order);
+        return deadline != null && !deadline.isAfter(now);
+    }
+
+    private boolean isVendorConfirmationSlaManagedOrder(Order order) {
+        if (order == null) {
+            return false;
+        }
+        if (order.getStoreId() != null) {
+            return true;
+        }
+        if (order.getParentOrder() != null) {
+            return false;
+        }
+        List<Order> subOrders = order.getSubOrders();
+        return subOrders == null || subOrders.isEmpty();
+    }
+
+    private void recordSlaAutoCancelled(Order order, LocalDateTime missedDeadline) {
+        String message = "Đơn tự hủy do shop không xác nhận trong " + vendorConfirmationSlaDays() + " ngày.";
+        if (missedDeadline != null) {
+            message += " Hạn xác nhận: " + missedDeadline + ".";
+        }
+        recordOrderStatusLog(
+                order,
+                ORDER_LOG_EVENT_SLA_AUTO_CANCELLED,
+                "error",
+                Order.OrderStatus.WAITING_FOR_VENDOR,
+                Order.OrderStatus.CANCELLED,
+                message
+        );
+    }
+
+    private Order.OrderStatus resolveParentStatus(Order order) {
+        if (order == null || order.getParentOrder() == null) {
+            return null;
+        }
+        return order.getParentOrder().getStatus();
+    }
+
+    private void notifyCustomerVendorSlaAutoCancelled(Order order, Order.OrderStatus parentStatusBefore) {
+        if (notificationDomainService == null || order == null || !order.isSubOrder()) {
+            return;
+        }
+        Order parent = order.getParentOrder();
+        if (parent == null || parent.getUser() == null) {
+            return;
+        }
+        Order.OrderStatus parentStatusAfter = parent.getStatus();
+        String code = resolveOrderDisplayCode(parent);
+        String title = "Đơn #" + code + " có kiện hàng tự hủy";
+        String message = parentStatusBefore != null && parentStatusBefore != parentStatusAfter
+                ? "Đơn tự hủy do shop không xử lý quá " + vendorConfirmationSlaDays() + " ngày."
+                : "Một kiện hàng trong đơn tự hủy do shop không xử lý quá " + vendorConfirmationSlaDays() + " ngày.";
+        notificationDomainService.createAndPush(
+                parent.getUser().getId(),
+                Notification.NotificationType.ORDER,
+                title,
+                message,
+                buildOrderDetailLink(parent)
+        );
+    }
+
     private String localizeTimelineMessage(String message) {
         String localized = normalizeOptionalText(message);
         if (localized.isEmpty()) {
@@ -1411,8 +1599,12 @@ public class OrderService {
         }
 
         order.setStatus(status);
+        refreshVendorConfirmationDeadline(order, status);
         if (status == Order.OrderStatus.CANCELLED) {
             restoreReservedStockOnCancellation(order, previousStatus);
+            if (shouldMarkRefundPendingOnCancellation(order)) {
+                order.setPaymentStatus(Order.PaymentStatus.REFUND_PENDING);
+            }
         }
 
         if (status == Order.OrderStatus.DELIVERED) {
@@ -1436,8 +1628,9 @@ public class OrderService {
             recordTrackingUpdated(savedOrder);
         }
 
+        boolean hasSubOrders = false;
         if (savedOrder.isParentOrder()) {
-            cascadeStatusToSubOrders(savedOrder, status, trackingNumber, carrier, reason);
+            hasSubOrders = cascadeStatusToSubOrders(savedOrder, status, trackingNumber, carrier, reason);
         }
 
         if (savedOrder.getPaymentStatus() == Order.PaymentStatus.PAID) {
@@ -1458,7 +1651,7 @@ public class OrderService {
             syncParentOrderStatus(savedOrder.getParentOrder().getId());
         }
 
-        if (savedOrder.isParentOrder()) {
+        if (savedOrder.isParentOrder() && hasSubOrders) {
             Order syncedParent = syncParentOrderStatus(savedOrder.getId());
             notifyCustomerOrderStatusChanged(syncedParent, previousStatus, syncedParent.getStatus());
             return syncedParent;
@@ -1471,8 +1664,11 @@ public class OrderService {
         return savedOrder;
     }
 
-    private void cascadeStatusToSubOrders(Order parentOrder, Order.OrderStatus status, String trackingNumber, String carrier, String reason) {
+    private boolean cascadeStatusToSubOrders(Order parentOrder, Order.OrderStatus status, String trackingNumber, String carrier, String reason) {
         List<Order> subOrders = orderRepository.findByParentOrderOrderByCreatedAtDesc(parentOrder);
+        if (subOrders == null || subOrders.isEmpty()) {
+            return false;
+        }
         for (Order subOrder : subOrders) {
             if (subOrder.getStatus() == status) continue;
 
@@ -1482,10 +1678,11 @@ public class OrderService {
             // Recurse without enforcing vendor rules (since Admin forced it)
             applyStatusUpdate(subOrder, status, subTracking, subCarrier, reason, false);
         }
+        return true;
     }
 
     private void restoreReservedStockOnCancellation(Order order, Order.OrderStatus previousStatus) {
-        if (order == null || order.getStoreId() == null) {
+        if (order == null || (order.getStoreId() == null && !isVendorConfirmationSlaManagedOrder(order))) {
             return;
         }
         if (!RESTOCKABLE_CANCEL_SOURCE_STATUSES.contains(previousStatus)) {
@@ -1684,6 +1881,7 @@ public class OrderService {
                 .status(safeEnumName(order.getStatus()))
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
+                .vendorConfirmationDeadlineAt(order.getVendorConfirmationDeadlineAt())
                 .total(order.getTotal())
                 .commissionFee(order.getCommissionFee())
                 .vendorPayout(order.getVendorPayout())
@@ -1710,6 +1908,7 @@ public class OrderService {
                 .status(safeEnumName(order.getStatus()))
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
+                .vendorConfirmationDeadlineAt(order.getVendorConfirmationDeadlineAt())
                 .subtotal(order.getSubtotal())
                 .shippingFee(order.getShippingFee())
                 .discount(order.getDiscount())
@@ -2512,13 +2711,33 @@ public class OrderService {
         return paymentMethod != null && paymentMethod != Order.PaymentMethod.COD;
     }
 
+    private boolean shouldMarkRefundPendingOnCancellation(Order order) {
+        if (order == null) {
+            return false;
+        }
+        Order.PaymentMethod paymentMethod = order.getPaymentMethod();
+        Order.PaymentStatus paymentStatus = order.getPaymentStatus();
+        if (order.getParentOrder() != null) {
+            if (paymentMethod == null) {
+                paymentMethod = order.getParentOrder().getPaymentMethod();
+            }
+            if (paymentStatus != Order.PaymentStatus.PAID && paymentStatus != Order.PaymentStatus.REFUND_PENDING) {
+                paymentStatus = order.getParentOrder().getPaymentStatus();
+            }
+        }
+        return isOnlinePaymentMethod(paymentMethod)
+                && (paymentStatus == Order.PaymentStatus.PAID || paymentStatus == Order.PaymentStatus.REFUND_PENDING);
+    }
+
     private Order moveOrderToWaitingForVendor(Order order) {
         if (order.isParentOrder()) {
             List<Order> subOrders = orderRepository.findByParentOrderOrderByCreatedAtDesc(order);
+            LocalDateTime deadlineStart = LocalDateTime.now();
             for (Order subOrder : subOrders) {
                 if (subOrder.getStatus() == Order.OrderStatus.PENDING) {
                     Order.OrderStatus previousStatus = subOrder.getStatus();
                     subOrder.setStatus(Order.OrderStatus.WAITING_FOR_VENDOR);
+                    assignVendorConfirmationDeadline(subOrder, deadlineStart);
                     Order savedSubOrder = orderRepository.save(subOrder);
                     recordStatusTransition(savedSubOrder, previousStatus, savedSubOrder.getStatus(), null);
                     publishVendorReadyNotification(savedSubOrder);
@@ -2530,6 +2749,7 @@ public class OrderService {
         if (order.getStatus() == Order.OrderStatus.PENDING) {
             Order.OrderStatus previousStatus = order.getStatus();
             order.setStatus(Order.OrderStatus.WAITING_FOR_VENDOR);
+            assignVendorConfirmationDeadline(order, LocalDateTime.now());
             Order saved = orderRepository.save(order);
             recordStatusTransition(saved, previousStatus, saved.getStatus(), null);
             publishVendorReadyNotification(saved);
@@ -2613,6 +2833,7 @@ public class OrderService {
 
         boolean allDelivered = subOrders.stream().allMatch(subOrder -> subOrder.getStatus() == Order.OrderStatus.DELIVERED);
         boolean allCancelled = subOrders.stream().allMatch(subOrder -> subOrder.getStatus() == Order.OrderStatus.CANCELLED);
+        boolean anyCancelled = subOrders.stream().anyMatch(subOrder -> subOrder.getStatus() == Order.OrderStatus.CANCELLED);
 
         if (allDelivered) {
             parentOrder.setPaymentStatus(Order.PaymentStatus.PAID);
@@ -2623,9 +2844,14 @@ public class OrderService {
                 parentOrder.setDeliveredAt(LocalDateTime.now());
             }
         } else if (allCancelled) {
-            parentOrder.setPaymentStatus(Order.PaymentStatus.FAILED);
+            parentOrder.setPaymentStatus(shouldMarkRefundPendingOnCancellation(parentOrder)
+                    ? Order.PaymentStatus.REFUND_PENDING
+                    : Order.PaymentStatus.FAILED);
             parentOrder.setDeliveredAt(null);
         } else {
+            if (anyCancelled && shouldMarkRefundPendingOnCancellation(parentOrder)) {
+                parentOrder.setPaymentStatus(Order.PaymentStatus.REFUND_PENDING);
+            }
             parentOrder.setDeliveredAt(null);
         }
 
@@ -2724,8 +2950,8 @@ public class OrderService {
         }
 
         String code = resolveOrderDisplayCode(order);
-        String title = "Đơn #" + code + " " + customerStatusTitle(currentStatus);
-        String message = customerStatusMessage(currentStatus);
+        String title = "Đơn #" + code + " " + customerStatusTitle(order, currentStatus);
+        String message = customerStatusMessage(order, currentStatus);
         notificationDomainService.createAndPush(
                 order.getUser().getId(),
                 Notification.NotificationType.ORDER,
@@ -2735,7 +2961,10 @@ public class OrderService {
         );
     }
 
-    private String customerStatusTitle(Order.OrderStatus status) {
+    private String customerStatusTitle(Order order, Order.OrderStatus status) {
+        if (status == Order.OrderStatus.CANCELLED && hasVendorSlaCancelReason(order)) {
+            return "tự hủy do shop quá hạn xác nhận";
+        }
         return switch (status) {
             case WAITING_FOR_VENDOR -> "đã được tiếp nhận";
             case CONFIRMED -> "đã được xác nhận";
@@ -2747,7 +2976,10 @@ public class OrderService {
         };
     }
 
-    private String customerStatusMessage(Order.OrderStatus status) {
+    private String customerStatusMessage(Order order, Order.OrderStatus status) {
+        if (status == Order.OrderStatus.CANCELLED && hasVendorSlaCancelReason(order)) {
+            return "Đơn tự hủy do shop không xử lý quá " + vendorConfirmationSlaDays() + " ngày. Nếu đã thanh toán, hệ thống sẽ chuyển sang trạng thái chờ hoàn tiền.";
+        }
         return switch (status) {
             case WAITING_FOR_VENDOR -> "Người bán sẽ xác nhận đơn của bạn trong thời gian sớm nhất.";
             case CONFIRMED -> "Người bán đã xác nhận đơn hàng của bạn.";
@@ -2757,6 +2989,13 @@ public class OrderService {
             case CANCELLED -> "Đơn hàng đã bị hủy. Nếu đã thanh toán, hệ thống sẽ xử lý hoàn tiền theo chính sách.";
             default -> "Trạng thái đơn hàng của bạn đã được cập nhật.";
         };
+    }
+
+    private boolean hasVendorSlaCancelReason(Order order) {
+        if (order == null) {
+            return false;
+        }
+        return normalizeOptionalText(order.getNote()).contains(vendorConfirmationSlaCancelReason());
     }
 
     private String buildOrderDetailLink(Order order) {

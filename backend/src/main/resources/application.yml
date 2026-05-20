@@ -118,6 +118,12 @@ app:
         backoff-minutes: "${APP_PROMOTION_DISPATCHER_BACKOFF_MINUTES:1,5,15,60}"
       reminder:
         cron: ${APP_PROMOTION_REMINDER_CRON:0 */10 * * * *}
+  orders:
+    sla:
+      vendor-confirmation:
+        days: ${APP_ORDER_VENDOR_CONFIRMATION_SLA_DAYS:3}
+        batch-size: ${APP_ORDER_VENDOR_CONFIRMATION_BATCH_SIZE:100}
+        cron: ${APP_ORDER_VENDOR_CONFIRMATION_CRON:0 */15 * * * *}
 
 springdoc:
   api-docs:

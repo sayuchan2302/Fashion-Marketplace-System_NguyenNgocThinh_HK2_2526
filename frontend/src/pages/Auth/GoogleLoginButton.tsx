@@ -5,6 +5,8 @@ const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
 
 let scriptPromise: Promise<void> | null = null;
+let initializedClientId: string | null = null;
+let activeCredentialHandler: ((idToken: string) => void) | null = null;
 let warnedMissingClientId = false;
 
 interface GoogleCredentialResponse {
@@ -114,6 +116,23 @@ const loadGoogleScript = (): Promise<void> => {
   return scriptPromise;
 };
 
+const initializeGoogleIdentity = (api: GoogleAccountsId) => {
+  if (initializedClientId === GOOGLE_CLIENT_ID) {
+    return;
+  }
+
+  api.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    ux_mode: 'popup',
+    callback: (response) => {
+      if (response.credential) {
+        activeCredentialHandler?.(response.credential);
+      }
+    },
+  });
+  initializedClientId = GOOGLE_CLIENT_ID;
+};
+
 const GoogleLoginButton = ({
   disabled = false,
   onIdToken,
@@ -138,6 +157,11 @@ const GoogleLoginButton = ({
 
     let cancelled = false;
     let renderedContainer: HTMLDivElement | null = null;
+    const handleCredential = (idToken: string) => {
+      void onIdTokenRef.current(idToken);
+    };
+
+    activeCredentialHandler = handleCredential;
 
     loadGoogleScript()
       .then(() => {
@@ -152,15 +176,7 @@ const GoogleLoginButton = ({
 
         renderedContainer = container;
         container.innerHTML = '';
-        api.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          ux_mode: 'popup',
-          callback: (response) => {
-            if (response.credential) {
-              void onIdTokenRef.current(response.credential);
-            }
-          },
-        });
+        initializeGoogleIdentity(api);
 
         if (cancelled) return;
 
@@ -183,6 +199,9 @@ const GoogleLoginButton = ({
 
     return () => {
       cancelled = true;
+      if (activeCredentialHandler === handleCredential) {
+        activeCredentialHandler = null;
+      }
       if (renderedContainer) {
         renderedContainer.innerHTML = '';
       }

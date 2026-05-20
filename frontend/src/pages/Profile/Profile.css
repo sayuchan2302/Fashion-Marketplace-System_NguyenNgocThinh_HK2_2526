@@ -694,6 +694,7 @@ body.modal-open {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -850,7 +851,7 @@ body.modal-open {
 .profile-modal-form {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
   flex: 1;
 }
 
@@ -976,16 +977,16 @@ body.modal-open {
   border-radius: 50%;
 }
 
-.modal-radio-label:hover input ~ .radio-custom {
+.modal-radio-label:hover input~.radio-custom {
   border-color: var(--co-blue);
 }
 
-.modal-radio-label input:checked ~ .radio-custom {
+.modal-radio-label input:checked~.radio-custom {
   background-color: white;
   border-color: var(--co-blue);
 }
 
-.modal-radio-label input:checked ~ .radio-custom:after {
+.modal-radio-label input:checked~.radio-custom:after {
   content: "";
   position: absolute;
   display: block;
@@ -1058,7 +1059,7 @@ body.modal-open {
   justify-content: center;
   align-items: center;
   transition: all 0.2s;
-  margin-top: 12px;
+  margin-top: auto;
   letter-spacing: 0.5px;
 }
 
@@ -1151,6 +1152,24 @@ body.modal-open {
   border-radius: 999px;
 }
 
+.order-sla-note {
+  margin: 12px 20px 0;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.order-sla-note.cancelled {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 .status-delivered {
   background-color: #dcfce7;
   color: #16a34a;
@@ -1185,7 +1204,7 @@ body.modal-open {
   padding: 8px 0;
 }
 
-.order-item + .order-item {
+.order-item+.order-item {
   border-top: 1px solid var(--co-gray-100);
 }
 
@@ -1324,7 +1343,7 @@ body.modal-open {
   color: var(--co-gray-400);
 }
 
-.review-empty-state > p {
+.review-empty-state>p {
   margin: 0;
   font-size: 14px;
   color: var(--co-gray-500);
@@ -1932,12 +1951,12 @@ body.modal-open {
   transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-.address-default-check input:checked ~ .address-check-custom {
+.address-default-check input:checked~.address-check-custom {
   background: var(--co-blue);
   border-color: var(--co-blue);
 }
 
-.address-default-check input:checked ~ .address-check-custom::after {
+.address-default-check input:checked~.address-check-custom::after {
   content: '';
   position: absolute;
   left: 5px;
@@ -1948,15 +1967,39 @@ body.modal-open {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
+
 /* --- Explicit Modal Spacing Helpers (Tailwind Fallbacks) --- */
-.mt-6 { margin-top: 24px !important; }
-.mt-8 { margin-top: 32px !important; }
-.mt-10 { margin-top: 40px !important; }
-.mb-2 { margin-bottom: 8px !important; }
-.mb-8 { margin-bottom: 32px !important; }
-.mb-10 { margin-bottom: 40px !important; }
-.gap-4 { gap: 16px !important; }
-.gap-6 { gap: 24px !important; }
+.mt-6 {
+  margin-top: 24px !important;
+}
+
+.mt-8 {
+  margin-top: 32px !important;
+}
+
+.mt-10 {
+  margin-top: 40px !important;
+}
+
+.mb-2 {
+  margin-bottom: 8px !important;
+}
+
+.mb-8 {
+  margin-bottom: 32px !important;
+}
+
+.mb-10 {
+  margin-bottom: 40px !important;
+}
+
+.gap-4 {
+  gap: 16px !important;
+}
+
+.gap-6 {
+  gap: 24px !important;
+}
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {

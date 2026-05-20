@@ -19,6 +19,7 @@ public class VendorOrderSummaryResponse {
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime vendorConfirmationDeadlineAt;
     private BigDecimal total;
     private BigDecimal commissionFee;
     private BigDecimal vendorPayout;

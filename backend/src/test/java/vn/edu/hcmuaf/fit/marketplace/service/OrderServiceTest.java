@@ -3,18 +3,23 @@ package vn.edu.hcmuaf.fit.marketplace.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.OrderRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.AdminOrderResponse;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.NotificationResponse;
 import vn.edu.hcmuaf.fit.marketplace.entity.Address;
 import vn.edu.hcmuaf.fit.marketplace.entity.Coupon;
 import vn.edu.hcmuaf.fit.marketplace.entity.CustomerVoucher;
+import vn.edu.hcmuaf.fit.marketplace.entity.Notification;
 import vn.edu.hcmuaf.fit.marketplace.entity.Order;
 import vn.edu.hcmuaf.fit.marketplace.entity.OrderItem;
+import vn.edu.hcmuaf.fit.marketplace.entity.OrderStatusLog;
 import vn.edu.hcmuaf.fit.marketplace.entity.Product;
 import vn.edu.hcmuaf.fit.marketplace.entity.ProductImage;
 import vn.edu.hcmuaf.fit.marketplace.entity.ProductVariant;
@@ -25,7 +30,9 @@ import vn.edu.hcmuaf.fit.marketplace.exception.ForbiddenException;
 import vn.edu.hcmuaf.fit.marketplace.repository.AddressRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.CouponRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.CustomerVoucherRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleItemRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.OrderRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.OrderStatusLogRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductVariantRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
@@ -40,13 +47,17 @@ import java.util.Queue;
 import java.util.UUID;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -69,6 +80,9 @@ class OrderServiceTest {
     private ProductVariantRepository productVariantRepository;
 
     @Mock
+    private FlashSaleItemRepository flashSaleItemRepository;
+
+    @Mock
     private StoreRepository storeRepository;
 
     @Mock
@@ -83,6 +97,11 @@ class OrderServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    private NotificationDomainService notificationDomainService;
+
+    @Mock
+    private OrderStatusLogRepository orderStatusLogRepository;
+
     private OrderService orderService;
     private RecordingWalletService walletService;
     private FixedPublicCodeService publicCodeService;
@@ -96,19 +115,24 @@ class OrderServiceTest {
         storeId = UUID.randomUUID();
         walletService = new RecordingWalletService();
         publicCodeService = new FixedPublicCodeService();
+        notificationDomainService = new NoopNotificationDomainService();
         orderService = new OrderService(
                 orderRepository,
                 userRepository,
                 addressRepository,
                 productRepository,
                 productVariantRepository,
+                flashSaleItemRepository,
                 walletService,
                 storeRepository,
                 couponRepository,
                 voucherRepository,
                 customerVoucherRepository,
                 publicCodeService,
-                eventPublisher
+                eventPublisher,
+                null,
+                notificationDomainService,
+                orderStatusLogRepository
         );
     }
 
@@ -584,6 +608,272 @@ class OrderServiceTest {
         assertEquals(Order.OrderStatus.CANCELLED, updated.getStatus());
         assertEquals(5, variant.getStockQuantity());
         assertEquals(5, product.getStockQuantity());
+    }
+
+    @Test
+    void autoCancelExpiredVendorConfirmationsSkipsOrdersBeforeDeadline() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 20, 10, 0);
+
+        when(orderRepository.findVendorConfirmationDeadlineBreaches(
+                eq(now),
+                eq(now.minusDays(3)),
+                any(Pageable.class)
+        )).thenReturn(List.of());
+
+        int cancelled = orderService.autoCancelExpiredVendorConfirmations(now, 50);
+
+        assertEquals(0, cancelled);
+        verify(orderRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void autoCancelExpiredVendorConfirmationsCancelsAndRestoresStock() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 20, 10, 0);
+        UUID productId = UUID.randomUUID();
+        UUID variantId = UUID.randomUUID();
+
+        Product product = Product.builder()
+                .id(productId)
+                .storeId(storeId)
+                .stockQuantity(3)
+                .build();
+        ProductVariant variant = ProductVariant.builder()
+                .id(variantId)
+                .product(product)
+                .isActive(true)
+                .stockQuantity(3)
+                .build();
+        Order order = buildStoreOrder(Order.OrderStatus.WAITING_FOR_VENDOR);
+        order.setCreatedAt(now.minusDays(4));
+        order.setVendorConfirmationDeadlineAt(now.minusMinutes(1));
+        OrderItem item = OrderItem.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .product(product)
+                .variant(variant)
+                .quantity(2)
+                .unitPrice(new BigDecimal("50000"))
+                .totalPrice(new BigDecimal("100000"))
+                .storeId(storeId)
+                .build();
+        order.setItems(new ArrayList<>(List.of(item)));
+
+        when(orderRepository.findVendorConfirmationDeadlineBreaches(eq(now), eq(now.minusDays(3)), any(Pageable.class)))
+                .thenReturn(List.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productVariantRepository.findByIdForUpdate(variantId)).thenReturn(Optional.of(variant));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(productVariantRepository.sumActiveStockByProductId(productId)).thenReturn(5L);
+
+        int cancelled = orderService.autoCancelExpiredVendorConfirmations(now, 50);
+
+        assertEquals(1, cancelled);
+        assertEquals(Order.OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(5, variant.getStockQuantity());
+        assertEquals(5, product.getStockQuantity());
+        assertNull(order.getVendorConfirmationDeadlineAt());
+
+        ArgumentCaptor<OrderStatusLog> logCaptor = forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository, times(2)).save(logCaptor.capture());
+        assertTrue(logCaptor.getAllValues().stream()
+                .anyMatch(log -> "SLA_AUTO_CANCELLED".equals(log.getEventType())));
+    }
+
+    @Test
+    void autoCancelExpiredVendorConfirmationsIgnoresConfirmedOrders() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 20, 10, 0);
+        Order order = buildStoreOrder(Order.OrderStatus.CONFIRMED);
+        order.setCreatedAt(now.minusDays(5));
+        order.setVendorConfirmationDeadlineAt(now.minusDays(2));
+
+        when(orderRepository.findVendorConfirmationDeadlineBreaches(eq(now), eq(now.minusDays(3)), any(Pageable.class)))
+                .thenReturn(List.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+
+        int cancelled = orderService.autoCancelExpiredVendorConfirmations(now, 50);
+
+        assertEquals(0, cancelled);
+        assertEquals(Order.OrderStatus.CONFIRMED, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void autoCancelExpiredVendorConfirmationsMarksPaidOnlineOrderRefundPending() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 20, 10, 0);
+        Order order = buildStoreOrder(Order.OrderStatus.WAITING_FOR_VENDOR);
+        order.setCreatedAt(now.minusDays(4));
+        order.setVendorConfirmationDeadlineAt(now.minusMinutes(1));
+        order.setPaymentMethod(Order.PaymentMethod.MOMO);
+        order.setPaymentStatus(Order.PaymentStatus.PAID);
+
+        when(orderRepository.findVendorConfirmationDeadlineBreaches(eq(now), eq(now.minusDays(3)), any(Pageable.class)))
+                .thenReturn(List.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int cancelled = orderService.autoCancelExpiredVendorConfirmations(now, 50);
+
+        assertEquals(1, cancelled);
+        assertEquals(Order.OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(Order.PaymentStatus.REFUND_PENDING, order.getPaymentStatus());
+    }
+
+    @Test
+    void autoCancelExpiredVendorConfirmationsCancelsLegacySingleOrderWithoutStoreId() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 20, 10, 0);
+        UUID productId = UUID.randomUUID();
+        UUID variantId = UUID.randomUUID();
+
+        Product product = Product.builder()
+                .id(productId)
+                .storeId(storeId)
+                .stockQuantity(1)
+                .build();
+        ProductVariant variant = ProductVariant.builder()
+                .id(variantId)
+                .product(product)
+                .isActive(true)
+                .stockQuantity(1)
+                .build();
+        Order order = buildStoreOrder(Order.OrderStatus.WAITING_FOR_VENDOR);
+        order.setStoreId(null);
+        order.setCreatedAt(now.minusDays(4));
+        order.setVendorConfirmationDeadlineAt(now.minusMinutes(1));
+        order.setSubOrders(new ArrayList<>());
+        OrderItem item = OrderItem.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .product(product)
+                .variant(variant)
+                .quantity(1)
+                .unitPrice(new BigDecimal("50000"))
+                .totalPrice(new BigDecimal("50000"))
+                .storeId(storeId)
+                .build();
+        order.setItems(new ArrayList<>(List.of(item)));
+
+        when(orderRepository.findVendorConfirmationDeadlineBreaches(eq(now), eq(now.minusDays(3)), any(Pageable.class)))
+                .thenReturn(List.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.findByParentOrderOrderByCreatedAtDesc(order)).thenReturn(List.of());
+        when(productVariantRepository.findByIdForUpdate(variantId)).thenReturn(Optional.of(variant));
+        when(productRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(product));
+        when(productVariantRepository.sumActiveStockByProductId(productId)).thenReturn(2L);
+
+        int cancelled = orderService.autoCancelExpiredVendorConfirmations(now, 50);
+
+        assertEquals(1, cancelled);
+        assertEquals(Order.OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(2, variant.getStockQuantity());
+        assertEquals(2, product.getStockQuantity());
+    }
+
+    @Test
+    void findByUserIdReconcilesExpiredVendorConfirmationsBeforeReturningOrders() {
+        UUID userId = UUID.randomUUID();
+        Order order = buildStoreOrder(Order.OrderStatus.WAITING_FOR_VENDOR);
+        order.setCreatedAt(LocalDateTime.now().minusDays(4));
+        order.setVendorConfirmationDeadlineAt(LocalDateTime.now().minusDays(1));
+
+        when(orderRepository.findVendorConfirmationDeadlineBreaches(
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
+                any(Pageable.class)
+        )).thenReturn(List.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.findByUserIdAndParentOrderIsNullOrderByCreatedAtDesc(userId)).thenReturn(List.of(order));
+        when(storeRepository.findById(storeId)).thenReturn(Optional.empty());
+
+        List<AdminOrderResponse> orders = orderService.findByUserId(userId);
+
+        assertEquals(1, orders.size());
+        assertEquals(Order.OrderStatus.CANCELLED, orders.get(0).getStatus());
+        assertEquals(Order.OrderStatus.CANCELLED, order.getStatus());
+    }
+
+    @Test
+    void autoCancelExpiredVendorConfirmationsSyncsParentWhenOneSubOrderCancelled() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 20, 10, 0);
+        UUID parentId = UUID.randomUUID();
+        UUID subOrderId = UUID.randomUUID();
+
+        Order parent = Order.builder()
+                .id(parentId)
+                .status(Order.OrderStatus.WAITING_FOR_VENDOR)
+                .paymentMethod(Order.PaymentMethod.COD)
+                .paymentStatus(Order.PaymentStatus.UNPAID)
+                .build();
+        Order expiredSubOrder = buildStoreOrder(Order.OrderStatus.WAITING_FOR_VENDOR);
+        expiredSubOrder.setId(subOrderId);
+        expiredSubOrder.setParentOrder(parent);
+        expiredSubOrder.setCreatedAt(now.minusDays(4));
+        expiredSubOrder.setVendorConfirmationDeadlineAt(now.minusMinutes(1));
+
+        Order waitingSubOrder = buildStoreOrder(Order.OrderStatus.WAITING_FOR_VENDOR);
+        waitingSubOrder.setId(UUID.randomUUID());
+        waitingSubOrder.setParentOrder(parent);
+        waitingSubOrder.setVendorConfirmationDeadlineAt(now.plusDays(1));
+
+        when(orderRepository.findVendorConfirmationDeadlineBreaches(eq(now), eq(now.minusDays(3)), any(Pageable.class)))
+                .thenReturn(List.of(expiredSubOrder));
+        when(orderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(expiredSubOrder));
+        when(orderRepository.findById(parentId)).thenReturn(Optional.of(parent));
+        when(orderRepository.findByParentOrderIdOrderByCreatedAtDesc(parentId))
+                .thenReturn(List.of(expiredSubOrder, waitingSubOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int cancelled = orderService.autoCancelExpiredVendorConfirmations(now, 50);
+
+        assertEquals(1, cancelled);
+        assertEquals(Order.OrderStatus.CANCELLED, expiredSubOrder.getStatus());
+        assertEquals(Order.OrderStatus.WAITING_FOR_VENDOR, waitingSubOrder.getStatus());
+        assertEquals(Order.OrderStatus.WAITING_FOR_VENDOR, parent.getStatus());
+    }
+
+    @Test
+    void autoCancelExpiredVendorConfirmationsCancelsParentWhenAllSubOrdersExpired() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 20, 10, 0);
+        UUID parentId = UUID.randomUUID();
+        UUID firstSubOrderId = UUID.randomUUID();
+        UUID secondSubOrderId = UUID.randomUUID();
+
+        Order parent = Order.builder()
+                .id(parentId)
+                .status(Order.OrderStatus.WAITING_FOR_VENDOR)
+                .paymentMethod(Order.PaymentMethod.COD)
+                .paymentStatus(Order.PaymentStatus.UNPAID)
+                .build();
+        Order firstSubOrder = buildStoreOrder(Order.OrderStatus.WAITING_FOR_VENDOR);
+        firstSubOrder.setId(firstSubOrderId);
+        firstSubOrder.setParentOrder(parent);
+        firstSubOrder.setCreatedAt(now.minusDays(4));
+        firstSubOrder.setVendorConfirmationDeadlineAt(now.minusMinutes(2));
+
+        Order secondSubOrder = buildStoreOrder(Order.OrderStatus.WAITING_FOR_VENDOR);
+        secondSubOrder.setId(secondSubOrderId);
+        secondSubOrder.setParentOrder(parent);
+        secondSubOrder.setCreatedAt(now.minusDays(4));
+        secondSubOrder.setVendorConfirmationDeadlineAt(now.minusMinutes(1));
+
+        when(orderRepository.findVendorConfirmationDeadlineBreaches(eq(now), eq(now.minusDays(3)), any(Pageable.class)))
+                .thenReturn(List.of(firstSubOrder, secondSubOrder));
+        when(orderRepository.findByIdForUpdate(firstSubOrderId)).thenReturn(Optional.of(firstSubOrder));
+        when(orderRepository.findByIdForUpdate(secondSubOrderId)).thenReturn(Optional.of(secondSubOrder));
+        when(orderRepository.findById(parentId)).thenReturn(Optional.of(parent));
+        when(orderRepository.findByParentOrderIdOrderByCreatedAtDesc(parentId))
+                .thenReturn(List.of(firstSubOrder, secondSubOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int cancelled = orderService.autoCancelExpiredVendorConfirmations(now, 50);
+
+        assertEquals(2, cancelled);
+        assertEquals(Order.OrderStatus.CANCELLED, firstSubOrder.getStatus());
+        assertEquals(Order.OrderStatus.CANCELLED, secondSubOrder.getStatus());
+        assertEquals(Order.OrderStatus.CANCELLED, parent.getStatus());
+        assertEquals(Order.PaymentStatus.FAILED, parent.getPaymentStatus());
     }
 
     @Test
@@ -1068,6 +1358,23 @@ class OrderServiceTest {
         public String nextOrderCode() {
             String code = orderCodes.poll();
             return code != null ? code : "DH-TEST-000001";
+        }
+    }
+
+    private static final class NoopNotificationDomainService extends NotificationDomainService {
+        private NoopNotificationDomainService() {
+            super(null, null, null);
+        }
+
+        @Override
+        public NotificationResponse createAndPush(
+                UUID userId,
+                Notification.NotificationType type,
+                String title,
+                String message,
+                String link
+        ) {
+            return null;
         }
     }
 }

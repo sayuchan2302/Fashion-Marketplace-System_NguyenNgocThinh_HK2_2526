@@ -46,6 +46,8 @@ export interface ProfileTabContentProps {
   orderStatusLabelMap: Record<string, string>;
   onOpenOrderDetail: (order: Order) => void;
   onRequestCancelOrder: (orderId: string) => void;
+  onOpenReturnDrawer: (order: Order) => void;
+  onOpenReviewForOrder: (order: Order) => void;
   vouchers: CustomerWalletVoucher[];
   pagedVouchers: CustomerWalletVoucher[];
   voucherPage: number;
